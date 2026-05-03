@@ -493,6 +493,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 
 <header>
   <div class="logo">⚡ אקדמיית הכוכבים</div>
+  <div id="modeBadge" style="padding:6px 14px;border-radius:10px;font-weight:900;font-size:0.9em"></div>
   <div class="tabs" id="tabs"></div>
   <button class="btn btn-primary" onclick="addClass()">➕ כיתה</button>
 </header>
@@ -615,7 +616,8 @@ const URL_PARAMS = new URLSearchParams(window.location.search);
 const APP_MODE = URL_PARAMS.get('home') === '1' ? 'student' : 'teacher';
 if (URL_PARAMS.get('reset') === '1') {
   localStorage.removeItem('cps_state_v2');
-  window.location.replace(window.location.pathname);
+  const keep = APP_MODE === 'student' ? '?home=1' : '';
+  window.location.replace(window.location.pathname + keep);
 }
 
 let cloudPushTimer = null;
@@ -2321,7 +2323,21 @@ function importData() {
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function renderModeBadge() {
+  const b = document.getElementById('modeBadge');
+  if (!b) return;
+  if (APP_MODE === 'student') {
+    b.style.background = 'linear-gradient(135deg,#00ff88,#00f5ff)';
+    b.style.color = '#001020';
+    b.textContent = '🏠 מצב בית';
+  } else {
+    b.style.background = 'linear-gradient(135deg,#ff2e93,#b829ff)';
+    b.style.color = '#fff';
+    b.textContent = '🧑‍🏫 מצב מורה';
+  }
+}
 function renderAll() {
+  renderModeBadge();
   if (APP_MODE === 'student') { renderStudentApp(); return; }
   renderTabs();
   renderClassroom();
