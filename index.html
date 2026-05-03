@@ -608,12 +608,57 @@ const SHOP = {
 
 const MYSTERY_BOX_PRICE = 75;
 
+// ==================== CLOUD SYNC (Firebase RTDB via REST) ====================
+const FIREBASE_DB = 'https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatabase.app';
+const FIREBASE_PATH = 'cps_v1';
+const URL_PARAMS = new URLSearchParams(window.location.search);
+const APP_MODE = URL_PARAMS.get('home') === '1' ? 'student' : 'teacher';
+
+let cloudPushTimer = null;
+let lastCloudHash = '';
+async function cloudLoad() {
+  try {
+    const res = await fetch(`${FIREBASE_DB}/${FIREBASE_PATH}.json?_=${Date.now()}`);
+    return await res.json();
+  } catch(e) { console.warn('cloud load failed', e); return null; }
+}
+async function cloudSave(data) {
+  try {
+    await fetch(`${FIREBASE_DB}/${FIREBASE_PATH}.json`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    lastCloudHash = JSON.stringify(data);
+  } catch(e) { console.warn('cloud save failed', e); }
+}
+function queueCloudSave() {
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(() => cloudSave(state), 600);
+}
+function startCloudPoll() {
+  setInterval(async () => {
+    const remote = await cloudLoad();
+    if (!remote) return;
+    const hash = JSON.stringify(remote);
+    if (hash === lastCloudHash) return;
+    if (hash === JSON.stringify(state)) { lastCloudHash = hash; return; }
+    state = remote;
+    lastCloudHash = hash;
+    localStorage.setItem('cps_state_v2', hash);
+    if (APP_MODE === 'student') renderStudentApp();
+    else renderAll();
+  }, 3000);
+}
+
 // ==================== STATE ====================
 let state = JSON.parse(localStorage.getItem('cps_state_v2') || 'null') || {
   classes: [createClass('כיתה א׳')],
   activeClassId: null,
+  pending: [],
 };
 if (!state.activeClassId) state.activeClassId = state.classes[0].id;
+if (!state.pending) state.pending = [];
 // migrate old states without aura
 state.classes.forEach(c => c.students.forEach(s => {
   if (!s.equipped.aura) s.equipped.aura = 'aura-none';
@@ -640,7 +685,10 @@ function createStudent(name, column) {
   };
 }
 
-function save() { localStorage.setItem('cps_state_v2', JSON.stringify(state)); }
+function save() {
+  localStorage.setItem('cps_state_v2', JSON.stringify(state));
+  queueCloudSave();
+}
 function getActiveClass() { return state.classes.find(c => c.id === state.activeClassId); }
 function getRank(p) {
   let r = RANKS[0], next = RANKS[1];
@@ -2235,7 +2283,343 @@ function importData() {
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
-function renderAll() { renderTabs(); renderClassroom(); }
+function renderAll() {
+  if (APP_MODE === 'student') { renderStudentApp(); return; }
+  renderTabs();
+  renderClassroom();
+  renderApprovalBanner();
+}
+
+// ==================== PENDING / APPROVAL ====================
+function pendingForStudent(sid) {
+  return (state.pending || []).filter(p => p.studentId === sid);
+}
+function previewEquipped(student) {
+  const eq = { ...student.equipped };
+  for (const p of pendingForStudent(student.id)) {
+    if (p.slot) eq[p.slot] = p.itemId;
+  }
+  return eq;
+}
+function previewOwned(student) {
+  const owned = [...student.owned];
+  for (const p of pendingForStudent(student.id)) {
+    if (p.type === 'buy' && !owned.includes(p.itemId)) owned.push(p.itemId);
+  }
+  return owned;
+}
+function previewPoints(student) {
+  let pts = student.points;
+  for (const p of pendingForStudent(student.id)) if (p.type === 'buy') pts -= (p.price || 0);
+  return Math.max(0, pts);
+}
+
+function renderApprovalBanner() {
+  let banner = document.getElementById('approvalBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'approvalBanner';
+    banner.style.cssText = 'background:linear-gradient(90deg,#ff8c00,#ff2e93);color:#fff;padding:12px 24px;display:none;cursor:pointer;font-weight:900;text-align:center;box-shadow:0 4px 20px rgba(255,46,147,0.4);position:sticky;top:64px;z-index:50';
+    banner.onclick = openApprovalModal;
+    document.querySelector('header').after(banner);
+  }
+  const count = (state.pending || []).length;
+  if (count > 0) {
+    banner.style.display = 'block';
+    banner.innerHTML = `🔔 ${count} קניות ממתינות לאישור — לחץ לאישור`;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function openApprovalModal() {
+  const m = document.getElementById('modalContent');
+  const list = state.pending || [];
+  m.innerHTML = `
+    <div class="modal-hero" style="padding-bottom:10px">
+      <div style="font-size:60px">🔔</div>
+      <div style="flex:1">
+        <div class="modal-title">תור אישורים (${list.length})</div>
+        <div class="modal-sub">קניות שתלמידים ביצעו מהבית</div>
+      </div>
+      <button class="btn" onclick="closeModal()">✕</button>
+    </div>
+    ${list.length === 0 ? '<div style="text-align:center;padding:40px;color:var(--text-dim)">אין קניות ממתינות 🎉</div>' : ''}
+    <div>
+      ${list.map(p => {
+        const cls = state.classes.find(c => c.id === p.classId);
+        const stu = cls?.students.find(s => s.id === p.studentId);
+        if (!stu) return '';
+        const item = findItem(p.itemId);
+        const slotIcon = ({body:'🎨',hat:'🎩',glasses:'👓',pet:'🐾',aura:'✨'})[p.slot] || '';
+        return `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:12px;margin-bottom:8px">
+            <canvas data-pendapprove="${p.id}" data-stu="${stu.id}" width="120" height="120" style="width:60px;height:60px"></canvas>
+            <div style="flex:1">
+              <div style="font-weight:900">${escapeHtml(stu.name)}</div>
+              <div style="font-size:0.9em;color:var(--text-dim)">
+                ${slotIcon} ${escapeHtml(item?.name || p.itemId)} ${p.type === 'buy' ? `<span style="color:var(--neon-yellow)">· ${p.price} נק׳</span>` : '<span style="color:var(--neon-green)">· הלבשה</span>'}
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="approvePending('${p.id}')" style="font-size:1.2em">✓</button>
+            <button class="btn btn-danger" onclick="rejectPending('${p.id}')" style="font-size:1.2em">✗</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  document.getElementById('studentModal').classList.add('show');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('canvas[data-pendapprove]').forEach(c => {
+      const stu = state.classes.flatMap(cl => cl.students).find(s => s.id === c.dataset.stu);
+      if (stu) renderToCanvas(c, previewEquipped(stu));
+    });
+  });
+}
+
+function approvePending(pid) {
+  const p = state.pending.find(p => p.id === pid);
+  if (!p) return;
+  const cls = state.classes.find(c => c.id === p.classId);
+  const stu = cls?.students.find(s => s.id === p.studentId);
+  if (stu) {
+    if (p.type === 'buy') {
+      stu.points = Math.max(0, stu.points - p.price);
+      if (!stu.owned.includes(p.itemId)) stu.owned.push(p.itemId);
+    }
+    if (p.slot) stu.equipped[p.slot] = p.itemId;
+  }
+  state.pending = state.pending.filter(x => x.id !== pid);
+  playSound('buy');
+  save(); renderAll(); openApprovalModal();
+}
+function rejectPending(pid) {
+  state.pending = state.pending.filter(x => x.id !== pid);
+  playSound('minus');
+  save(); renderAll(); openApprovalModal();
+}
+
+// ==================== STUDENT APP (?home=1) ====================
+let studentSelectedId = null;
+
+function renderStudentApp() {
+  const el = document.getElementById('classroom');
+  const tabs = document.getElementById('tabs');
+  const footer = document.querySelector('.footer-actions');
+  if (tabs) tabs.style.display = 'none';
+  if (footer) footer.style.display = 'none';
+  document.querySelector('header > .btn').style.display = 'none';
+
+  if (!studentSelectedId) renderStudentPicker();
+  else renderStudentProfile();
+}
+
+function renderStudentPicker() {
+  const el = document.getElementById('classroom');
+  const allStudents = state.classes.flatMap(c => c.students.map(s => ({...s, _classId: c.id, _className: c.name})));
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="text-align:center;padding:20px;font-size:1.4em;font-weight:900;background:linear-gradient(90deg,#00f5ff,#ff2e93);-webkit-background-clip:text;background-clip:text;color:transparent">
+      👋 שלום! מי אתה?
+    </div>
+    <div style="text-align:center;color:var(--text-dim);margin-bottom:20px">לחץ על השם שלך</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;max-width:1000px;margin:0 auto">
+      ${allStudents.map(s => `
+        <div class="student" style="flex-direction:column;text-align:center;padding:14px;cursor:pointer" onclick="enterStudentMode('${s.id}')">
+          <canvas data-picker="${s.id}" width="180" height="180" style="width:120px;height:120px"></canvas>
+          <div style="font-weight:900;font-size:1em;margin-top:6px">${escapeHtml(s.name)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  requestAnimationFrame(() => {
+    allStudents.forEach(s => {
+      const c = document.querySelector(`canvas[data-picker="${s.id}"]`);
+      if (c) renderToCanvas(c, previewEquipped(s));
+    });
+  });
+}
+
+function enterStudentMode(sid) {
+  studentSelectedId = sid;
+  renderStudentProfile();
+}
+
+function exitStudentMode() {
+  studentSelectedId = null;
+  renderStudentPicker();
+}
+
+function findStudent(sid) {
+  for (const c of state.classes) {
+    const s = c.students.find(x => x.id === sid);
+    if (s) return { student: s, cls: c };
+  }
+  return null;
+}
+
+let studentAnimId = null;
+function renderStudentProfile() {
+  const found = findStudent(studentSelectedId);
+  if (!found) { studentSelectedId = null; renderStudentPicker(); return; }
+  const { student: s, cls } = found;
+  const previewEq = previewEquipped(s);
+  const previewPts = previewPoints(s);
+  const realRank = getRank(s.points);
+  const previewRank = getRank(previewPts);
+  const pending = pendingForStudent(s.id);
+
+  const el = document.getElementById('classroom');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="max-width:800px;margin:0 auto;padding:10px">
+      <button class="btn" onclick="exitStudentMode()" style="margin-bottom:14px">← חזרה</button>
+
+      <div style="display:flex;gap:18px;align-items:center;background:var(--card);padding:20px;border-radius:18px;margin-bottom:16px">
+        <canvas id="studentBigAvatar" width="320" height="320" style="width:180px;height:180px;border-radius:14px;background:radial-gradient(circle at 50% 30%, rgba(0,245,255,0.2), transparent 70%)"></canvas>
+        <div style="flex:1">
+          <div style="font-size:1.7em;font-weight:900">${escapeHtml(s.name)}</div>
+          <div style="font-size:1em;color:${realRank.current.color};margin-top:4px">${realRank.current.icon} ${realRank.current.name}</div>
+          <div style="font-size:1.1em;margin-top:8px">
+            <span style="color:var(--neon-yellow);font-weight:900">${s.points}</span> נקודות
+            ${pending.length > 0 ? `<br><span style="color:var(--neon-cyan);font-size:0.85em">תצוגה מקדימה: ${previewPts} נק׳</span>` : ''}
+          </div>
+          ${pending.length > 0 ? `<div style="margin-top:10px;padding:10px;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.4);border-radius:10px;font-size:0.9em">
+            ⏳ <b>${pending.length}</b> פריטים ממתינים לאישור המורה
+          </div>` : ''}
+        </div>
+      </div>
+
+      <div class="modal-tabs" style="border:none;padding:0">
+        <button class="modal-tab active" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
+        <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
+      </div>
+      <div id="studentBody"></div>
+    </div>
+  `;
+
+  // animate avatar
+  if (studentAnimId) cancelAnimationFrame(studentAnimId);
+  let rotation = 0;
+  const canvas = document.getElementById('studentBigAvatar');
+  function animate() {
+    rotation += 0.012;
+    renderToCanvas(canvas, previewEq, rotation);
+    studentAnimId = requestAnimationFrame(animate);
+  }
+  animate();
+
+  setStudentTab('shop');
+}
+
+let studentTab = 'shop';
+function setStudentTab(t) {
+  studentTab = t;
+  const found = findStudent(studentSelectedId);
+  if (!found) return;
+  const { student: s } = found;
+  const body = document.getElementById('studentBody');
+  ['stTabShop','stTabBox'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  document.getElementById(t === 'shop' ? 'stTabShop' : 'stTabBox')?.classList.add('active');
+
+  if (t === 'shop') {
+    const previewOw = previewOwned(s);
+    const previewEq = previewEquipped(s);
+    const previewPts = previewPoints(s);
+    body.innerHTML = ['bodies','hats','glasses','pets','auras'].map(cat => {
+      const slot = ({bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
+      return `
+        <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({bodies:'🎨 דמות',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
+        <div class="shop-grid">
+          ${SHOP[cat].map(item => renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts)).join('')}
+        </div>
+      `;
+    }).join('');
+    requestAnimationFrame(() => {
+      document.querySelectorAll('canvas[data-stshop]').forEach(c => {
+        const slot = c.dataset.slot;
+        const itemId = c.dataset.item;
+        const eq = { ...previewEquipped(s), [slot]: itemId };
+        renderToCanvas(c, eq);
+      });
+    });
+  } else if (t === 'box') {
+    const previewPts = previewPoints(s);
+    body.innerHTML = `
+      <div class="box-section">
+        <div class="box-emoji">🎁</div>
+        <h2 style="margin:12px 0">תיבת הפתעה!</h2>
+        <p style="color:var(--text-dim);margin-bottom:14px">פותח? תקבל פריט אקראי שצריך אישור המורה</p>
+        <button class="btn btn-warning" style="font-size:1.1em;padding:14px 32px" onclick="studentOpenBox()" ${previewPts < MYSTERY_BOX_PRICE ? 'disabled style="opacity:0.5"' : ''}>
+          🎲 פתח · ${MYSTERY_BOX_PRICE} נקודות
+        </button>
+      </div>
+    `;
+  }
+}
+
+function renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts) {
+  const owned = previewOw.includes(item.id);
+  const equipped = previewEq[slot] === item.id;
+  const canAfford = previewPts >= item.price;
+  const pendingThis = pendingForStudent(s.id).some(p => p.itemId === item.id);
+  let cls = '';
+  if (equipped) cls = 'equipped';
+  else if (owned) cls = 'owned';
+  else if (!canAfford) cls = 'locked';
+  const action = equipped ? ''
+    : owned ? `onclick="studentEquip('${slot}','${item.id}')"`
+    : (canAfford ? `onclick="studentBuy('${slot}','${item.id}', ${item.price})"` : '');
+  const isNone = item.id.endsWith('-none');
+  return `
+    <div class="shop-item ${cls}" ${action} style="position:relative">
+      ${pendingThis ? '<div style="position:absolute;top:4px;left:4px;font-size:0.7em;background:#ff8c00;color:#000;padding:2px 6px;border-radius:6px;font-weight:900">⏳</div>' : ''}
+      ${isNone
+        ? '<div class="shop-preview" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#666">🚫</div>'
+        : `<canvas class="shop-preview" data-stshop="1" data-slot="${slot}" data-item="${item.id}" width="160" height="160"></canvas>`}
+      <div class="shop-name">${escapeHtml(item.name)}</div>
+      ${equipped ? '<div class="shop-status">✓ לבוש</div>'
+        : owned ? '<div class="shop-status">קליק להלביש</div>'
+        : `<div class="shop-price">⭐ ${item.price}</div>`}
+    </div>
+  `;
+}
+
+function addPending(pending) {
+  pending.id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
+  pending.ts = Date.now();
+  state.pending = state.pending || [];
+  state.pending.push(pending);
+  save();
+  renderStudentProfile();
+  burstConfetti(window.innerWidth/2, window.innerHeight/2, 20);
+  playSound('buy');
+}
+function studentBuy(slot, itemId, price) {
+  const found = findStudent(studentSelectedId);
+  if (!found) return;
+  if (previewPoints(found.student) < price) return;
+  addPending({ type: 'buy', studentId: found.student.id, classId: found.cls.id, slot, itemId, price });
+}
+function studentEquip(slot, itemId) {
+  const found = findStudent(studentSelectedId);
+  if (!found) return;
+  addPending({ type: 'equip', studentId: found.student.id, classId: found.cls.id, slot, itemId, price: 0 });
+}
+function studentOpenBox() {
+  const found = findStudent(studentSelectedId);
+  if (!found) return;
+  if (previewPoints(found.student) < MYSTERY_BOX_PRICE) return;
+  const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)];
+  const item = allItems[Math.floor(Math.random() * allItems.length)];
+  let slot = 'hat';
+  if (SHOP.bodies.find(i => i.id === item.id)) slot = 'body';
+  else if (SHOP.glasses.find(i => i.id === item.id)) slot = 'glasses';
+  else if (SHOP.pets.find(i => i.id === item.id)) slot = 'pet';
+  else if (SHOP.auras.find(i => i.id === item.id)) slot = 'aura';
+  addPending({ type: 'buy', studentId: found.student.id, classId: found.cls.id, slot, itemId: item.id, price: MYSTERY_BOX_PRICE });
+  alert(`🎉 קיבלת: ${item.name}! ממתין לאישור המורה.`);
+}
 
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
@@ -2258,11 +2642,30 @@ async function init() {
     const key = Object.keys(labels).find(k => url.includes(k));
     detail.textContent = `${labels[key] || url} · ${done}/${total}`;
   });
+
+  // load latest from cloud (overrides local if exists)
+  text.textContent = '☁️ מסנכרן עם הענן...';
+  const cloud = await cloudLoad();
+  if (cloud && cloud.classes) {
+    state = cloud;
+    if (!state.pending) state.pending = [];
+    state.classes.forEach(c => c.students.forEach(s => {
+      if (!s.equipped.aura) s.equipped.aura = 'aura-none';
+      if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
+    }));
+    lastCloudHash = JSON.stringify(state);
+    localStorage.setItem('cps_state_v2', lastCloudHash);
+  } else {
+    // first run — push local to cloud
+    cloudSave(state);
+  }
+
   text.textContent = '✓ הכל מוכן!';
-  detail.textContent = '';
+  detail.textContent = APP_MODE === 'student' ? '🏠 מצב בית' : '🧑‍🏫 מצב כיתה';
   setTimeout(() => {
     document.getElementById('loadingScreen').style.display = 'none';
     renderAll();
+    startCloudPoll();
   }, 400);
 }
 

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>3 צעדים אחרונים</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Heebo', sans-serif; background: linear-gradient(135deg, #1a1d3a, #0a0e27); color: #e8e8f0; padding: 36px; max-width: 950px; margin: 0 auto; line-height: 1.75; }
+h1 { color: #ffe600; border-bottom: 3px solid #ff2e93; padding-bottom: 10px; }
+.step { background: rgba(255,255,255,0.07); border-right: 5px solid #00ff88; padding: 22px 26px; border-radius: 14px; margin: 20px 0; }
+.num { background: linear-gradient(135deg, #00ff88, #00f5ff); color: #001020; padding: 6px 16px; border-radius: 10px; font-weight: 900; margin-left: 12px; font-size: 1.1em; }
+.step h3 { display: inline; }
+.click { background: rgba(255,46,147,0.2); border-radius: 6px; padding: 2px 10px; color: #ff2e93; font-weight: 900; }
+code { background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; color: #00f5ff; font-family: monospace; }
+.copy-area { background: #0a0e27; border: 2px dashed #00f5ff; padding: 16px; border-radius: 10px; margin: 14px 0; font-family: monospace; font-size: 0.9em; color: #ffe600; }
+.note { background: rgba(0,245,255,0.1); border-right: 4px solid #00f5ff; padding: 14px 20px; border-radius: 10px; }
+b { color: #ffe600; }
+ul { padding-right: 24px; } li { margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>🎯 3 צעדים אחרונים — אתה כמעט שם!</h1>
+
+<div class="note">
+ראיתי במסך — יש לך פרויקט <b>nikud</b> פתוח ב-Firebase. עכשיו צריך:<br>
+1. להפעיל Realtime Database (אם עוד לא) → 2. ליצור Web App → 3. להעתיק config ולשלוח לי.
+</div>
+
+<div class="step">
+<span class="num">1</span><h3>הפעל Realtime Database</h3>
+<ul>
+<li>היכנס לטאב <b>nikud - Firebase</b></li>
+<li>בתפריט השמאלי: לחץ <span class="click">Build</span></li>
+<li>תחת זה: לחץ <span class="click">Realtime Database</span></li>
+<li>לחץ <span class="click">Create Database</span></li>
+<li>מיקום: בחר <code>europe-west1</code> → <span class="click">Next</span></li>
+<li>בחר <span class="click">Start in test mode</span> → <span class="click">Enable</span></li>
+</ul>
+</div>
+
+<div class="step">
+<span class="num">2</span><h3>צור אפליקציית Web</h3>
+<ul>
+<li>בעמוד הראשי של הפרויקט (סמל הבית 🏠 בצד שמאל למעלה)</li>
+<li>תחת "Get started by adding Firebase to your app" — לחץ על סמל <code>&lt;/&gt;</code> (Web)</li>
+<li>בכינוי תכתוב: <code>kohavim-web</code> → <span class="click">Register app</span></li>
+<li>תקבל מסך שכתוב בו <b>"Add Firebase SDK"</b>. גלול למטה.</li>
+<li>תראה בלוק קוד שמתחיל ב-<code>const firebaseConfig = {</code></li>
+</ul>
+</div>
+
+<div class="step">
+<span class="num">3</span><h3>העתק את ה-config ושלח לי</h3>
+<p>הבלוק נראה ככה (הערכים שלך יהיו אחרים):</p>
+<div class="copy-area">
+const firebaseConfig = {<br>
+&nbsp;&nbsp;apiKey: "AIzaSyA...XYZ",<br>
+&nbsp;&nbsp;authDomain: "nikud-xxxxx.firebaseapp.com",<br>
+&nbsp;&nbsp;databaseURL: "https://nikud-xxxxx-default-rtdb.europe-west1.firebasedatabase.app",<br>
+&nbsp;&nbsp;projectId: "nikud-xxxxx",<br>
+&nbsp;&nbsp;storageBucket: "nikud-xxxxx.appspot.com",<br>
+&nbsp;&nbsp;messagingSenderId: "...",<br>
+&nbsp;&nbsp;appId: "..."<br>
+};
+</div>
+<ul>
+<li>סמן את כל הבלוק (מ-<code>const</code> עד <code>};</code>)</li>
+<li>Ctrl+C להעתיק</li>
+<li><b>הדבק לי כאן בצ'אט</b> והכל מסיים את עצמו</li>
+</ul>
+</div>
+
+<div class="note">
+💡 <b>אם אתה תקוע:</b> צלם מסך של איפה שאתה ושלח לי, אני אדריך מהמיקום המדויק.
+</div>
+
+</body>
+</html>
