@@ -1920,6 +1920,7 @@ function dropStudent(e, col) {
 }
 
 function addPoints(studentId, amount, fromX, fromY) {
+  if (APP_MODE === 'student') return; // students cannot add/remove points
   const s = getActiveClass().students.find(s => s.id === studentId);
   if (!s) return;
   const oldRank = getRank(s.points).current;
@@ -1935,6 +1936,7 @@ function addPoints(studentId, amount, fromX, fromY) {
 }
 
 function columnBonus(col) {
+  if (APP_MODE === 'student') return;
   const cls = getActiveClass();
   cls.students.filter(s => s.column === col).forEach(s => {
     s.points += 10;
@@ -1950,6 +1952,7 @@ let modalTab = 'points';
 let modalAnimId = null;
 
 function openStudent(id) {
+  if (APP_MODE === 'student') return; // never show teacher modal in home mode
   const s = getActiveClass().students.find(s => s.id === id);
   if (!s) return;
   const rank = getRank(s.points);
