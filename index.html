@@ -1,0 +1,2272 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ אקדמיית הכוכבים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&family=Rubik+Mono+One&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<style>
+:root {
+  --bg-1: #0a0e27;
+  --neon-pink: #ff2e93;
+  --neon-cyan: #00f5ff;
+  --neon-yellow: #ffe600;
+  --neon-green: #00ff88;
+  --neon-purple: #b829ff;
+  --neon-orange: #ff8c00;
+  --card: rgba(255,255,255,0.06);
+  --card-hover: rgba(255,255,255,0.12);
+  --text: #ffffff;
+  --text-dim: #a0a8c8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Heebo', sans-serif;
+  background: radial-gradient(ellipse at top, #1a1d3a 0%, #0a0e27 60%, #050714 100%);
+  color: var(--text);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(1px 1px at 60% 70%, white, transparent),
+    radial-gradient(2px 2px at 80% 10%, white, transparent),
+    radial-gradient(1px 1px at 30% 80%, white, transparent),
+    radial-gradient(2px 2px at 90% 60%, white, transparent),
+    radial-gradient(1px 1px at 50% 50%, white, transparent);
+  background-size: 250px 250px;
+  opacity: 0.4;
+  pointer-events: none;
+  animation: starsMove 120s linear infinite;
+}
+@keyframes starsMove { from {background-position: 0 0;} to {background-position: 250px 250px;} }
+
+header {
+  background: linear-gradient(90deg, rgba(255,46,147,0.15), rgba(0,245,255,0.15));
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid rgba(0,245,255,0.3);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-wrap: wrap;
+}
+.logo {
+  font-family: 'Rubik Mono One', sans-serif;
+  font-size: 1.5em;
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan), var(--neon-yellow));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 30px rgba(255,46,147,0.5);
+}
+.tabs { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.tab {
+  padding: 8px 14px;
+  background: var(--card);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-weight: 700;
+  transition: all 0.2s;
+  font-family: inherit;
+  font-size: 0.95em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab:hover { background: var(--card-hover); color: var(--text); }
+.tab.active {
+  background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
+  color: white;
+  box-shadow: 0 0 20px rgba(255,46,147,0.5);
+  border-color: var(--neon-pink);
+}
+.tab .x { opacity: 0.6; font-size: 0.8em; padding: 2px 4px; border-radius: 4px; }
+.tab .x:hover { opacity: 1; background: rgba(0,0,0,0.3); }
+.btn {
+  padding: 8px 16px;
+  background: var(--card);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.9em;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--card-hover); transform: translateY(-1px); }
+.btn-primary {
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-green));
+  color: #001020;
+  border-color: transparent;
+  box-shadow: 0 0 15px rgba(0,245,255,0.4);
+}
+.btn-danger { background: linear-gradient(135deg, #ff4444, #cc0066); color: white; border-color: transparent; }
+.btn-warning { background: linear-gradient(135deg, var(--neon-yellow), var(--neon-orange)); color: #000; border-color: transparent; }
+
+.classroom {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 20px;
+  max-width: 1700px;
+  margin: 0 auto;
+}
+.column {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 12px;
+  min-height: 200px;
+  border: 2px dashed transparent;
+  transition: all 0.2s;
+}
+.column.drag-over { border-color: var(--neon-cyan); background: rgba(0,245,255,0.08); }
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(184,41,255,0.3), rgba(255,46,147,0.3));
+  border-radius: 10px;
+  font-weight: 900;
+}
+.col-bonus {
+  font-size: 0.75em;
+  background: var(--neon-yellow);
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  font-weight: 900;
+}
+.col-bonus:hover { transform: scale(1.05); }
+
+.student {
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  border-radius: 14px;
+  padding: 10px;
+  margin-bottom: 10px;
+  cursor: grab;
+  transition: all 0.2s;
+  border: 1px solid rgba(255,255,255,0.08);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.student:active { cursor: grabbing; }
+.student:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,245,255,0.2);
+  border-color: var(--neon-cyan);
+}
+.student.dragging { opacity: 0.4; }
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 1.4em;
+  padding: 0 4px;
+  user-select: none;
+}
+.drag-handle:hover { color: var(--neon-cyan); }
+
+.avatar-canvas {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(0,245,255,0.15), transparent 70%);
+  cursor: pointer;
+  display: block;
+}
+.student-info { flex: 1; min-width: 0; cursor: pointer; }
+.student-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.student-name {
+  font-weight: 900;
+  font-size: 0.95em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.name-edit {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 0.75em;
+}
+.name-edit:hover { background: var(--neon-cyan); color: #000; }
+.student-rank {
+  font-size: 0.75em;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.student-points {
+  font-weight: 900;
+  font-size: 1.1em;
+  background: linear-gradient(90deg, var(--neon-yellow), var(--neon-orange));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.progress-bar {
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+  transition: width 0.5s;
+  box-shadow: 0 0 8px var(--neon-cyan);
+}
+.add-student-btn {
+  width: 100%;
+  padding: 10px;
+  background: rgba(0,245,255,0.1);
+  border: 2px dashed rgba(0,245,255,0.3);
+  border-radius: 10px;
+  color: var(--neon-cyan);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+.add-student-btn:hover { background: rgba(0,245,255,0.2); border-color: var(--neon-cyan); }
+
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.modal-bg.show { display: flex; animation: fadeIn 0.2s; }
+@keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
+.modal {
+  background: linear-gradient(135deg, #1a1d3a, #0a0e27);
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 2px solid rgba(0,245,255,0.3);
+  box-shadow: 0 20px 60px rgba(0,245,255,0.2), 0 0 100px rgba(255,46,147,0.1);
+  animation: slideUp 0.3s;
+}
+@keyframes slideUp { from {transform: translateY(40px); opacity:0;} to {transform: translateY(0); opacity:1;} }
+
+.modal-hero {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 16px;
+}
+#modalAvatar3D {
+  width: 160px; height: 160px;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 30%, rgba(0,245,255,0.2), transparent 70%);
+  flex-shrink: 0;
+}
+.modal-title { font-size: 1.6em; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+.modal-sub { color: var(--text-dim); font-size: 0.95em; line-height: 1.6; }
+
+.modal-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+.modal-tab {
+  padding: 8px 14px;
+  background: var(--card);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  border: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.9em;
+}
+.modal-tab.active { background: var(--neon-pink); color: white; }
+
+.point-buttons {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.point-btn {
+  padding: 16px 8px;
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: white;
+}
+.point-btn:hover { transform: scale(1.05); }
+.point-btn:active { transform: scale(0.95); }
+.point-btn.add-10  { background: linear-gradient(135deg, #00ff88, #00bb66); box-shadow: 0 4px 12px rgba(0,255,136,0.4); }
+.point-btn.add-20  { background: linear-gradient(135deg, #00f5ff, #0088ff); box-shadow: 0 4px 12px rgba(0,245,255,0.4); }
+.point-btn.add-50  { background: linear-gradient(135deg, #ffe600, #ff8c00); color: #000; box-shadow: 0 4px 12px rgba(255,230,0,0.4); }
+.point-btn.add-100 { background: linear-gradient(135deg, #ff2e93, #b829ff); box-shadow: 0 4px 12px rgba(255,46,147,0.5); }
+.point-btn.minus-10 { background: linear-gradient(135deg, #555, #333); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+.shop-item {
+  background: var(--card);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.shop-item:hover { border-color: var(--neon-cyan); transform: translateY(-2px); }
+.shop-item.owned { border-color: var(--neon-green); background: rgba(0,255,136,0.08); }
+.shop-item.equipped { border-color: var(--neon-yellow); background: rgba(255,230,0,0.12); box-shadow: 0 0 20px rgba(255,230,0,0.3); }
+.shop-item.locked { opacity: 0.5; cursor: not-allowed; }
+.shop-preview { width: 80px; height: 80px; margin: 0 auto 6px; border-radius: 10px; }
+.shop-name { font-size: 0.85em; font-weight: 700; margin-bottom: 4px; }
+.shop-price { font-size: 0.85em; color: var(--neon-yellow); font-weight: 900; }
+.shop-status { font-size: 0.75em; color: var(--neon-green); font-weight: 900; }
+
+.box-section {
+  background: linear-gradient(135deg, rgba(184,41,255,0.2), rgba(255,46,147,0.2));
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+  border: 1px solid rgba(184,41,255,0.4);
+}
+.box-emoji { font-size: 70px; animation: float 2s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+
+.rank-up-overlay {
+  position: fixed; inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(10px);
+}
+.rank-up-overlay.show { display: flex; }
+.rank-up-content { text-align: center; animation: rankUpZoom 0.6s ease-out; }
+@keyframes rankUpZoom {
+  0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+  60% { transform: scale(1.2) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+.rank-up-title {
+  font-family: 'Rubik Mono One';
+  font-size: 3.5em;
+  background: linear-gradient(90deg, var(--neon-yellow), var(--neon-orange), var(--neon-pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 60px var(--neon-yellow);
+  margin-bottom: 20px;
+}
+.rank-up-icon { font-size: 8em; filter: drop-shadow(0 0 30px var(--neon-yellow)); animation: spin 2s linear infinite; }
+@keyframes spin { from {transform: rotate(0);} to {transform: rotate(360deg);} }
+.rank-up-name { font-size: 2.2em; font-weight: 900; margin-top: 20px; }
+
+.confetti {
+  position: fixed;
+  width: 10px; height: 10px;
+  pointer-events: none;
+  z-index: 10000;
+  animation: confettiFall 3s ease-in forwards;
+}
+@keyframes confettiFall {
+  to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+.point-popup {
+  position: fixed;
+  font-size: 3em;
+  font-weight: 900;
+  pointer-events: none;
+  z-index: 9998;
+  animation: popupRise 1.2s ease-out forwards;
+  text-shadow: 0 0 20px currentColor;
+}
+@keyframes popupRise {
+  0% { transform: scale(0); opacity: 0; }
+  20% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1) translateY(-100px); opacity: 0; }
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--card);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.lb-row.top1 { background: linear-gradient(90deg, rgba(255,230,0,0.3), transparent); border: 1px solid var(--neon-yellow); }
+.lb-row.top2 { background: linear-gradient(90deg, rgba(192,192,192,0.2), transparent); }
+.lb-row.top3 { background: linear-gradient(90deg, rgba(205,127,50,0.2), transparent); }
+.lb-rank { font-size: 1.5em; font-weight: 900; min-width: 50px; text-align: center; }
+.lb-canvas { width: 50px; height: 50px; }
+
+.footer-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  background: rgba(255,255,255,0.02);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+@media (max-width: 1100px) { .classroom { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .classroom { grid-template-columns: 1fr; } .point-buttons { grid-template-columns: repeat(3, 1fr); } }
+
+input[type=text] {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  color: white;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 1em;
+  outline: none;
+}
+input[type=text]:focus { border-color: var(--neon-cyan); }
+</style>
+</head>
+<body>
+
+<div id="loadingScreen" style="position:fixed;inset:0;background:radial-gradient(ellipse at center, #1a1d3a 0%, #050714 100%);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px">
+  <div style="font-family:'Rubik Mono One';font-size:2.5em;background:linear-gradient(90deg,#ff2e93,#00f5ff,#ffe600);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 40px rgba(255,46,147,0.6)">⚡ אקדמיית הכוכבים</div>
+  <div style="font-size:1.2em;color:#a0a8c8" id="loadingText">טוען דמויות תלת מימד...</div>
+  <div style="width:300px;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden">
+    <div id="loadingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#00f5ff,#ff2e93);transition:width 0.3s;box-shadow:0 0 15px #00f5ff"></div>
+  </div>
+  <div style="font-size:0.85em;color:#666" id="loadingDetail">מתחיל...</div>
+</div>
+
+<header>
+  <div class="logo">⚡ אקדמיית הכוכבים</div>
+  <div class="tabs" id="tabs"></div>
+  <button class="btn btn-primary" onclick="addClass()">➕ כיתה</button>
+</header>
+
+<div class="classroom" id="classroom"></div>
+
+<div class="footer-actions">
+  <button class="btn btn-warning" onclick="openLeaderboard()">🏆 לוח שיא</button>
+  <button class="btn" onclick="resetWeek()">🔄 איפוס שבועי</button>
+  <button class="btn btn-danger" onclick="exportData()">💾 גיבוי</button>
+  <button class="btn" onclick="importData()">📂 שחזור</button>
+</div>
+
+<div class="modal-bg" id="studentModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<div class="rank-up-overlay" id="rankUpOverlay" onclick="this.classList.remove('show')">
+  <div class="rank-up-content" id="rankUpContent"></div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const RANKS = [
+  { name: 'ניצוץ',  icon: '✨', min: 0,    color: '#a0a8c8' },
+  { name: 'להבה',   icon: '🔥', min: 100,  color: '#ff8c00' },
+  { name: 'כוכב',   icon: '⭐', min: 300,  color: '#ffe600' },
+  { name: 'סופה',   icon: '🌪️', min: 600,  color: '#00f5ff' },
+  { name: 'ברק',    icon: '⚡', min: 1000, color: '#b829ff' },
+  { name: 'דרקון',  icon: '🐉', min: 1500, color: '#00ff88' },
+  { name: 'פניקס',  icon: '🦅', min: 2500, color: '#ff2e93' },
+  { name: 'אגדה',   icon: '👑', min: 4000, color: '#ffd700' },
+];
+
+const SHOP = {
+  bodies: [
+    { id: 'body-default',  name: 'קלאסי',     price: 0,    skin: 0xffd6b8, hair: 0x6b3410, hairStyle: 'short', shirt: 0xffe600, pants: 0x1e3a8a },
+    { id: 'body-blonde',   name: 'בלונדינית', price: 50,   skin: 0xffe0cc, hair: 0xffd166, hairStyle: 'long',  shirt: 0xff2e93, pants: 0x6a4c93 },
+    { id: 'body-redhead',  name: 'אדמוני',    price: 80,   skin: 0xffd0c0, hair: 0xff5500, hairStyle: 'curly', shirt: 0x00ff88, pants: 0x004422 },
+    { id: 'body-fire',     name: 'אש',        price: 100,  skin: 0xffb088, hair: 0xff2e93, hairStyle: 'spike', hairEmissive: 0xff2e93, shirt: 0xff4400, pants: 0x600000 },
+    { id: 'body-pink',     name: 'ורוד',      price: 120,  skin: 0xffc0cb, hair: 0xff69b4, hairStyle: 'curly', shirt: 0xff69b4, pants: 0xc71585 },
+    { id: 'body-curly',    name: 'מתולתל',    price: 150,  skin: 0xc68863, hair: 0x2a1810, hairStyle: 'curly', shirt: 0x00ff88, pants: 0xff8c00 },
+    { id: 'body-galaxy',   name: 'גלקסי',     price: 200,  skin: 0xb89cff, hair: 0xb829ff, hairStyle: 'long',  hairEmissive: 0xb829ff, shirt: 0x1a1d3a, pants: 0x0a0e27, metallic: true },
+    { id: 'body-ice',      name: 'קרח',       price: 250,  skin: 0xe8f4ff, hair: 0x80d8ff, hairStyle: 'long',  hairEmissive: 0x00f5ff, shirt: 0x4fc3f7, pants: 0x01579b },
+    { id: 'body-vampire',  name: 'ערפד',      price: 300,  skin: 0xeae0d5, hair: 0x000000, hairStyle: 'long',  shirt: 0x880000, pants: 0x111111 },
+    { id: 'body-alien',    name: 'חייזר',     price: 350,  skin: 0x88ff88, hair: 0x00ff88, hairStyle: 'short', hairEmissive: 0x00ff88, shirt: 0x00ff88, pants: 0x004422, metallic: true },
+    { id: 'body-zombie',   name: 'זומבי',     price: 400,  skin: 0x88a060, hair: 0x553311, hairStyle: 'spike', shirt: 0x445522, pants: 0x222211 },
+    { id: 'body-ninja',    name: 'נינג׳ה',    price: 500,  skin: 0xd4a373, hair: 0x111111, hairStyle: 'spike', shirt: 0x222222, pants: 0x111111 },
+    { id: 'body-mermaid',  name: 'בת-ים',     price: 600,  skin: 0xc8e0ff, hair: 0x00f5ff, hairStyle: 'long',  hairEmissive: 0x00f5ff, shirt: 0x9c27b0, pants: 0x004488 },
+    { id: 'body-rainbow',  name: 'קשת',       price: 700,  skin: 0xffd6b8, hair: 0xff2e93, hairStyle: 'curly', hairEmissive: 0xff2e93, shirt: 0xff2e93, pants: 0x00ff88 },
+    { id: 'body-gold',     name: 'מלך זהב',   price: 800,  skin: 0xffe0a8, hair: 0xffd700, hairStyle: 'long',  hairEmissive: 0xffd700, shirt: 0xffd700, pants: 0x884400, metallic: true },
+    { id: 'body-cyberpunk',name: 'סייברפאנק', price: 1000, skin: 0xc0d0ff, hair: 0xff00ff, hairStyle: 'spike', hairEmissive: 0xff00ff, shirt: 0x000033, pants: 0x000011, metallic: true },
+  ],
+  hats: [
+    { id: 'hat-none',       name: '— ללא —',     price: 0 },
+    { id: 'hat-cap',        name: 'כובע מצחיה',  price: 30 },
+    { id: 'hat-beanie',     name: 'כובע גרב',    price: 40 },
+    { id: 'hat-flower',     name: 'זר פרחים',    price: 50 },
+    { id: 'hat-graduation', name: 'בוגר',        price: 60 },
+    { id: 'hat-tophat',     name: 'צילינדר',     price: 80 },
+    { id: 'hat-helmet',     name: 'קסדת אופניים',price: 100 },
+    { id: 'hat-pirate',     name: 'פיראט',       price: 130 },
+    { id: 'hat-cat-ears',   name: 'אוזני חתול',  price: 150 },
+    { id: 'hat-crown',      name: 'כתר מלכותי',  price: 180 },
+    { id: 'hat-antenna',    name: 'אנטנה',       price: 200 },
+    { id: 'hat-viking',     name: 'ויקינג',      price: 250 },
+    { id: 'hat-wizard',     name: 'מכשף',        price: 300 },
+    { id: 'hat-horns',      name: 'קרני שטן',    price: 350 },
+    { id: 'hat-samurai',    name: 'סמוראי',      price: 450 },
+    { id: 'hat-halo',       name: 'הילה',        price: 600 },
+  ],
+  glasses: [
+    { id: 'gl-none',     name: '— ללא —',     price: 0 },
+    { id: 'gl-round',    name: 'עגולים',      price: 30 },
+    { id: 'gl-heart',    name: 'לבבות',       price: 60 },
+    { id: 'gl-cool',     name: 'קוול',        price: 80 },
+    { id: 'gl-monocle',  name: 'מונוקל',      price: 120 },
+    { id: 'gl-star',     name: 'סטאר',        price: 150 },
+    { id: 'gl-pixel',    name: 'פיקסלים',     price: 180 },
+    { id: 'gl-3d',       name: 'משקפי 3D',    price: 200 },
+    { id: 'gl-laser',    name: 'לייזר',       price: 350 },
+  ],
+  pets: [
+    { id: 'pet-none',      name: '— ללא —',  price: 0 },
+    { id: 'pet-cat',       name: 'חתול',     price: 80,  procedural: true },
+    { id: 'pet-dog',       name: 'כלב',      price: 90,  procedural: true },
+    { id: 'pet-duck',      name: 'ברווז',    price: 100, model: 'https://threejs.org/examples/models/gltf/Duck/glTF-Binary/Duck.glb', scale: 0.7, y: -1.0 },
+    { id: 'pet-bunny',     name: 'ארנב',     price: 110, procedural: true },
+    { id: 'pet-flamingo',  name: 'פלמינגו',  price: 120, model: 'https://threejs.org/examples/models/gltf/Flamingo.glb', scale: 0.012, y: -0.3 },
+    { id: 'pet-bear',      name: 'דוב',      price: 140, procedural: true },
+    { id: 'pet-parrot',    name: 'תוכי',     price: 150, model: 'https://threejs.org/examples/models/gltf/Parrot.glb',   scale: 0.012, y: 0.0 },
+    { id: 'pet-bee',       name: 'דבורה',    price: 160, procedural: true },
+    { id: 'pet-frog',      name: 'צפרדע',    price: 170, procedural: true },
+    { id: 'pet-stork',     name: 'חסידה',    price: 200, model: 'https://threejs.org/examples/models/gltf/Stork.glb',    scale: 0.012, y: -0.3 },
+    { id: 'pet-owl',       name: 'ינשוף',    price: 220, procedural: true },
+    { id: 'pet-penguin',   name: 'פינגווין', price: 240, procedural: true },
+    { id: 'pet-fox',       name: 'שועל',     price: 250, model: 'https://threejs.org/examples/models/gltf/Fox/Fox.glb',  scale: 0.012, y: -1.2 },
+    { id: 'pet-octopus',   name: 'תמנון',    price: 280, procedural: true },
+    { id: 'pet-robot',     name: 'רובוט מחמד', price: 320, procedural: true },
+    { id: 'pet-horse',     name: 'סוס',      price: 350, model: 'https://threejs.org/examples/models/gltf/Horse.glb',    scale: 0.008, y: -1.0 },
+    { id: 'pet-ghost',     name: 'רוח רפאים',price: 400, procedural: true },
+    { id: 'pet-dragon',    name: 'דרקון',    price: 600, procedural: true },
+  ],
+  auras: [
+    { id: 'aura-none',     name: '— ללא —',  price: 0 },
+    { id: 'aura-fire',     name: 'אש',       price: 200, color: 0xff4400 },
+    { id: 'aura-ice',      name: 'קרח',      price: 200, color: 0x00f5ff },
+    { id: 'aura-electric', name: 'חשמל',     price: 300, color: 0xb829ff },
+    { id: 'aura-rainbow',  name: 'קשת',      price: 500, color: 0xff2e93 },
+    { id: 'aura-holy',     name: 'קדושה',    price: 700, color: 0xffe600 },
+  ],
+};
+
+const MYSTERY_BOX_PRICE = 75;
+
+// ==================== STATE ====================
+let state = JSON.parse(localStorage.getItem('cps_state_v2') || 'null') || {
+  classes: [createClass('כיתה א׳')],
+  activeClassId: null,
+};
+if (!state.activeClassId) state.activeClassId = state.classes[0].id;
+// migrate old states without aura
+state.classes.forEach(c => c.students.forEach(s => {
+  if (!s.equipped.aura) s.equipped.aura = 'aura-none';
+  if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
+}));
+
+function createClass(name) {
+  const id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  const sample = ['דניאל','מאיה','יונתן','נועה','איתי','שירה','אריאל','תמר','עומר','יעל','גיא','אביב','רוני','ליאם','עדי','אלון','הילה','עמית','שני','נדב','רותם','יובל','מיכאל','סהר'];
+  const students = [];
+  for (let i = 0; i < 24; i++) students.push(createStudent(sample[i] || `תלמיד ${i+1}`, i % 4));
+  return { id, name, students };
+}
+
+function createStudent(name, column) {
+  return {
+    id: 's_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    name,
+    column: column ?? 0,
+    points: 0,
+    weeklyPoints: 0,
+    equipped: { body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' },
+    owned: ['body-default','hat-none','gl-none','pet-none','aura-none'],
+  };
+}
+
+function save() { localStorage.setItem('cps_state_v2', JSON.stringify(state)); }
+function getActiveClass() { return state.classes.find(c => c.id === state.activeClassId); }
+function getRank(p) {
+  let r = RANKS[0], next = RANKS[1];
+  for (let i = 0; i < RANKS.length; i++) {
+    if (p >= RANKS[i].min) { r = RANKS[i]; next = RANKS[i+1]; }
+  }
+  return { current: r, next, progress: next ? ((p - r.min) / (next.min - r.min)) * 100 : 100 };
+}
+function findItem(id) {
+  for (const cat of Object.values(SHOP)) {
+    const item = cat.find(i => i.id === id);
+    if (item) return item;
+  }
+  return null;
+}
+
+// ==================== 3D RENDERER ====================
+const sharedRenderer = (() => {
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  r.setPixelRatio(window.devicePixelRatio);
+  r.outputEncoding = THREE.sRGBEncoding;
+  return r;
+})();
+
+const modelCache = {};
+const gltfLoader = new THREE.GLTFLoader();
+
+function loadModel(url) {
+  if (modelCache[url]) return Promise.resolve(modelCache[url]);
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(url, (gltf) => {
+      modelCache[url] = gltf.scene;
+      resolve(gltf.scene);
+    }, undefined, reject);
+  });
+}
+
+function cloneModel(url) {
+  const src = modelCache[url];
+  if (!src) return null;
+  const clone = src.clone(true);
+  clone.traverse(node => {
+    if (node.isMesh && node.material) {
+      node.material = node.material.clone();
+    }
+  });
+  return clone;
+}
+
+async function preloadAllModels(progressCb) {
+  const urls = SHOP.pets.filter(p => p.model).map(p => p.model);
+  let done = 0;
+  for (const url of urls) {
+    try { await loadModel(url); } catch(e) { console.warn('Failed to load', url, e); }
+    done++;
+    progressCb(done, urls.length, url);
+  }
+}
+
+// === PROCEDURAL PET BUILDERS ===
+const M = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, ...opts });
+const E = (color, intensity = 0.6) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensity, roughness: 0.4 });
+const Sphere = (r, mat, segs = 16) => new THREE.Mesh(new THREE.SphereGeometry(r, segs, segs), mat);
+const Cone = (r, h, mat, segs = 12) => new THREE.Mesh(new THREE.ConeGeometry(r, h, segs), mat);
+const Box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+const Cyl = (rt, rb, h, mat, segs = 12) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, segs), mat);
+const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
+const rot = (m, x, y, z) => { m.rotation.set(x, y, z); return m; };
+const scl = (m, x, y, z) => { m.scale.set(x, y, z); return m; };
+
+const PETS_BUILD = {
+  'pet-cat': (g) => {
+    const orange = M(0xff8c00); const dark = M(0x4a2c1a); const pink = M(0xff8aa0);
+    g.add(scl(Sphere(0.5, orange), 1, 0.85, 1.4));
+    g.add(at(Sphere(0.36, orange), 0, 0.3, 0.55));
+    for (const x of [-0.2, 0.22]) {
+      g.add(rot(at(Cone(0.13, 0.25, orange, 4), x, 0.58, 0.5), 0, Math.PI/4, 0));
+      g.add(rot(at(Cone(0.07, 0.16, pink, 4), x, 0.58, 0.55), 0, Math.PI/4, 0));
+    }
+    for (const x of [-0.13, 0.13]) g.add(at(Sphere(0.07, E(0x88ff00, 0.7)), x, 0.32, 0.85));
+    g.add(at(Sphere(0.045, M(0xff4488)), 0, 0.2, 0.92));
+    for (let i = 0; i < 6; i++) g.add(at(Sphere(0.1 - i*0.012, orange), 0, 0.05 + i*0.13, -0.55 - i*0.04 + Math.sin(i*0.6)*0.15));
+    for (const [x, z] of [[-0.22, 0.4],[0.22, 0.4],[-0.22, -0.4],[0.22, -0.4]]) g.add(at(Cyl(0.09, 0.08, 0.25, orange), x, -0.4, z));
+  },
+  'pet-dog': (g) => {
+    const brown = M(0x8b4513); const cream = M(0xffe4b5);
+    g.add(scl(Sphere(0.55, brown), 1, 0.85, 1.5));
+    g.add(at(Sphere(0.4, brown), 0, 0.2, 0.65));
+    g.add(scl(at(Sphere(0.2, cream), 0, 0.05, 0.95), 1, 0.7, 1));
+    for (const x of [-0.3, 0.3]) g.add(scl(at(Sphere(0.18, brown), x, 0.05, 0.6), 1, 1.6, 0.6));
+    for (const x of [-0.14, 0.14]) g.add(at(Sphere(0.07, M(0x000000)), x, 0.3, 0.92));
+    g.add(at(Sphere(0.05, M(0x111111)), 0, 0.1, 1.05));
+    for (let i = 0; i < 4; i++) g.add(rot(at(Sphere(0.11 - i*0.015, brown), 0, 0.2 + i*0.1, -0.6 - i*0.1), 0, 0, i*0.2));
+    for (const [x, z] of [[-0.25, 0.45],[0.25, 0.45],[-0.25, -0.4],[0.25, -0.4]]) g.add(at(Cyl(0.1, 0.09, 0.3, brown), x, -0.42, z));
+  },
+  'pet-bunny': (g) => {
+    const white = M(0xffffff); const pink = M(0xff8aa0); const gray = M(0xeeeeee);
+    g.add(scl(Sphere(0.5, white), 1, 0.95, 1.2));
+    g.add(at(Sphere(0.38, white), 0, 0.35, 0.4));
+    for (const x of [-0.15, 0.15]) {
+      g.add(scl(at(Cyl(0.1, 0.08, 0.7, white), x, 0.85, 0.3), 1, 1, 0.5));
+      g.add(scl(at(Cyl(0.06, 0.04, 0.55, pink), x, 0.85, 0.32), 1, 1, 0.5));
+    }
+    for (const x of [-0.14, 0.14]) g.add(at(Sphere(0.07, M(0xff2e93)), x, 0.4, 0.7));
+    g.add(at(Sphere(0.05, pink), 0, 0.25, 0.78));
+    g.add(at(Sphere(0.18, white), 0, -0.05, -0.6));
+    for (const [x, z] of [[-0.22, 0.35],[0.22, 0.35]]) g.add(at(Cyl(0.1, 0.1, 0.2, white), x, -0.4, z));
+    for (const [x, z] of [[-0.22, -0.3],[0.22, -0.3]]) g.add(scl(at(Sphere(0.15, white), x, -0.42, z), 1, 0.6, 1.2));
+  },
+  'pet-bear': (g) => {
+    const brown = M(0x8b4513); const tan = M(0xc89880);
+    g.add(scl(Sphere(0.6, brown), 1, 0.95, 1.2));
+    g.add(at(Sphere(0.42, brown), 0, 0.3, 0.5));
+    g.add(scl(at(Sphere(0.18, tan), 0, 0.18, 0.8), 1, 0.7, 0.9));
+    for (const x of [-0.28, 0.28]) g.add(at(Sphere(0.16, brown), x, 0.6, 0.4));
+    for (const x of [-0.28, 0.28]) g.add(at(Sphere(0.08, tan), x, 0.6, 0.43));
+    for (const x of [-0.13, 0.13]) g.add(at(Sphere(0.06, M(0x000000)), x, 0.4, 0.8));
+    g.add(at(Sphere(0.05, M(0x000000)), 0, 0.18, 0.95));
+    g.add(scl(at(Sphere(0.3, tan), 0, -0.1, 0.55), 1, 0.85, 0.5));
+    for (const [x, z] of [[-0.3, 0.4],[0.3, 0.4],[-0.3, -0.35],[0.3, -0.35]]) g.add(at(Cyl(0.16, 0.14, 0.3, brown), x, -0.42, z));
+  },
+  'pet-owl': (g) => {
+    const brown = M(0x8b6914); const cream = M(0xffe4b5);
+    g.add(scl(Sphere(0.55, brown), 1, 1.2, 0.95));
+    g.add(scl(at(Sphere(0.35, cream), 0, -0.1, 0.5), 1, 1.1, 0.4));
+    g.add(at(Sphere(0.5, brown), 0, 0.5, 0.05));
+    for (const x of [-0.18, 0.18]) {
+      g.add(at(Sphere(0.16, M(0xffffff)), x, 0.5, 0.4));
+      g.add(at(Sphere(0.1, M(0xffe600, { emissive: 0xffe600, emissiveIntensity: 0.6 })), x, 0.5, 0.5));
+      g.add(at(Sphere(0.06, M(0x000000)), x, 0.5, 0.55));
+    }
+    for (const x of [-0.3, 0.3]) g.add(rot(at(Cone(0.12, 0.25, brown, 4), x, 0.85, 0), 0, 0, -Math.sign(x) * 0.3));
+    g.add(rot(at(Cone(0.07, 0.18, M(0xff8c00), 4), 0, 0.45, 0.55), Math.PI/2, 0, 0));
+    for (const x of [-0.45, 0.45]) g.add(scl(at(Sphere(0.15, brown), x, 0.05, 0), 0.4, 1.5, 1));
+    for (const x of [-0.15, 0.15]) g.add(at(Cyl(0.06, 0.05, 0.15, M(0xff8c00)), x, -0.55, 0));
+  },
+  'pet-penguin': (g) => {
+    const black = M(0x111111); const white = M(0xffffff); const orange = M(0xff8c00);
+    g.add(scl(Sphere(0.5, black), 1, 1.3, 0.9));
+    g.add(scl(at(Sphere(0.4, white), 0, -0.1, 0.3), 1, 1.2, 0.4));
+    g.add(at(Sphere(0.4, black), 0, 0.55, 0.1));
+    for (const x of [-0.13, 0.13]) {
+      g.add(at(Sphere(0.08, white), x, 0.6, 0.3));
+      g.add(at(Sphere(0.05, black), x, 0.6, 0.36));
+    }
+    g.add(rot(at(Cone(0.08, 0.22, orange, 4), 0, 0.5, 0.45), Math.PI/2, 0, 0));
+    for (const x of [-0.5, 0.5]) g.add(rot(scl(at(Box(0.1, 0.5, 0.25, black), x, 0.05, 0), 1, 1, 1), 0, 0, -Math.sign(x) * 0.3));
+    for (const x of [-0.15, 0.15]) g.add(at(Box(0.18, 0.06, 0.3, orange), x, -0.65, 0.05));
+  },
+  'pet-frog': (g) => {
+    const green = M(0x4caf50); const lime = M(0x8bc34a);
+    g.add(scl(Sphere(0.5, green), 1.3, 0.85, 1.1));
+    g.add(scl(at(Sphere(0.4, lime), 0, -0.05, 0.05), 1.3, 0.5, 1.1));
+    for (const x of [-0.25, 0.25]) {
+      g.add(at(Sphere(0.18, green), x, 0.4, 0.2));
+      g.add(at(Sphere(0.13, M(0xffffff)), x, 0.42, 0.3));
+      g.add(at(Sphere(0.08, M(0x000000)), x, 0.42, 0.38));
+    }
+    g.add(rot(at(new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.04, 8, 16, Math.PI), M(0x222222)), 0, 0.05, 0.5), Math.PI, 0, 0));
+    for (const [x, z] of [[-0.5, 0.3],[0.5, 0.3]]) {
+      g.add(rot(at(Cyl(0.08, 0.06, 0.3, green), x, -0.15, z), 0, 0, -Math.sign(x) * 0.3));
+      g.add(scl(at(Sphere(0.18, green), x + Math.sign(x)*0.1, -0.35, z+0.1), 1, 0.4, 1.5));
+    }
+    for (const [x, z] of [[-0.35, -0.3],[0.35, -0.3]]) g.add(at(Cyl(0.1, 0.08, 0.25, green), x, -0.4, z));
+  },
+  'pet-bee': (g) => {
+    const yellow = M(0xffe600); const black = M(0x111111);
+    g.add(scl(Sphere(0.45, yellow), 1, 0.95, 1.4));
+    for (let i = 0; i < 3; i++) g.add(scl(at(new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.06, 8, 24), black), 0, 0, -0.3 + i * 0.3), 1, 0.95, 1));
+    g.add(at(Sphere(0.32, yellow), 0, 0.05, 0.65));
+    for (const x of [-0.12, 0.12]) g.add(at(Sphere(0.06, black), x, 0.1, 0.85));
+    for (const x of [-0.1, 0.1]) {
+      g.add(at(Cyl(0.012, 0.012, 0.25, black), x, 0.35, 0.55));
+      g.add(at(Sphere(0.04, black), x, 0.5, 0.5));
+    }
+    for (const x of [-0.4, 0.4]) {
+      const wing = scl(at(new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 8), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, emissive: 0xaaccff, emissiveIntensity: 0.3 })), x, 0.4, -0.1), 1, 0.1, 1.3);
+      g.add(wing);
+    }
+    g.add(rot(at(Cone(0.06, 0.15, black, 4), 0, 0, -0.55), Math.PI/2, 0, 0));
+  },
+  'pet-octopus': (g) => {
+    const purple = M(0xaa00ff); const lightPurple = E(0xff44ff, 0.4);
+    g.add(scl(Sphere(0.55, purple), 1, 1.1, 1));
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      for (let j = 0; j < 4; j++) {
+        const ball = at(Sphere(0.13 - j * 0.022, purple), Math.cos(a) * (0.4 + j * 0.15), -0.2 - j * 0.15, Math.sin(a) * (0.4 + j * 0.15));
+        g.add(ball);
+      }
+    }
+    for (const x of [-0.18, 0.18]) {
+      g.add(at(Sphere(0.13, M(0xffffff)), x, 0.25, 0.45));
+      g.add(at(Sphere(0.07, M(0x000000)), x, 0.25, 0.55));
+    }
+    for (let i = 0; i < 5; i++) g.add(at(Sphere(0.06, lightPurple), Math.random()*0.3-0.15, Math.random()*0.3+0.1, Math.random()*0.3+0.1));
+  },
+  'pet-robot': (g) => {
+    const silver = M(0xcccccc, { metalness: 0.7, roughness: 0.3 }); const blue = E(0x00f5ff, 1);
+    g.add(Box(0.7, 0.6, 0.5, silver));
+    g.add(at(Box(0.55, 0.5, 0.45, silver), 0, 0.55, 0));
+    for (const x of [-0.13, 0.13]) g.add(at(Sphere(0.08, blue), x, 0.6, 0.25));
+    g.add(at(Box(0.2, 0.05, 0.05, M(0x222222)), 0, 0.45, 0.25));
+    g.add(at(Cyl(0.04, 0.04, 0.2, silver), 0, 0.9, 0));
+    g.add(at(Sphere(0.08, blue), 0, 1.05, 0));
+    for (const x of [-0.45, 0.45]) {
+      g.add(at(Cyl(0.08, 0.08, 0.4, silver), x, 0, 0));
+      g.add(at(Box(0.18, 0.1, 0.15, silver), x, -0.3, 0));
+    }
+    for (const x of [-0.2, 0.2]) g.add(at(Box(0.2, 0.3, 0.18, silver), x, -0.45, 0));
+    for (const x of [-0.2, 0.2]) g.add(at(Box(0.25, 0.08, 0.3, M(0x222222)), x, -0.65, 0.05));
+  },
+  'pet-ghost': (g) => {
+    const ghostMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, emissive: 0xaaccff, emissiveIntensity: 0.5 });
+    g.add(scl(Sphere(0.5, ghostMat), 1, 1.3, 1));
+    g.add(scl(at(Sphere(0.55, ghostMat), 0, -0.4, 0), 1, 0.6, 1));
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      g.add(at(Sphere(0.12, ghostMat), Math.cos(a) * 0.45, -0.7, Math.sin(a) * 0.45));
+    }
+    for (const x of [-0.18, 0.18]) g.add(at(Sphere(0.08, M(0x000000)), x, 0.2, 0.42));
+    g.add(scl(at(Sphere(0.1, M(0x000000)), 0, -0.05, 0.42), 1, 0.6, 1));
+    g.add(at(new THREE.PointLight(0xaaccff, 1, 3), 0, 0, 0));
+  },
+  'pet-dragon': (g) => {
+    const red = M(0xcc0000); const dark = M(0x660000); const yellow = E(0xffe600, 0.8);
+    g.add(scl(Sphere(0.55, red), 1.1, 0.95, 1.4));
+    g.add(at(Sphere(0.4, red), 0, 0.25, 0.55));
+    g.add(scl(at(Sphere(0.25, dark), 0, 0.15, 0.85), 1, 0.7, 0.8));
+    for (const x of [-0.2, 0.2]) g.add(rot(at(Cone(0.08, 0.3, M(0xeeeeee), 6), x, 0.55, 0.4), 0, 0, -Math.sign(x) * 0.4));
+    for (const x of [-0.13, 0.13]) g.add(at(Sphere(0.07, yellow), x, 0.35, 0.85));
+    g.add(at(Cone(0.07, 0.2, yellow, 6), 0, 0.05, 1.1));
+    for (let i = 0; i < 6; i++) g.add(at(Cone(0.1 - i*0.012, 0.15, dark, 4), 0, 0.3 + i*0.1, -0.5 - i*0.1));
+    for (let i = 0; i < 8; i++) {
+      const t = at(Sphere(0.12 - i * 0.012, red), 0, 0.05 - i*0.05, -0.6 - i*0.13);
+      g.add(t);
+    }
+    for (const x of [-0.55, 0.55]) {
+      const wing = scl(at(Sphere(0.4, M(0x880000)), x, 0.25, -0.1), 0.15, 1.2, 1.4);
+      g.add(rot(wing, 0, 0, -Math.sign(x) * 0.3));
+    }
+    for (const [x, z] of [[-0.3, 0.4],[0.3, 0.4],[-0.3, -0.3],[0.3, -0.3]]) g.add(at(Cyl(0.1, 0.08, 0.3, red), x, -0.4, z));
+  },
+};
+
+function buildAura(scene, charGroup, aura) {
+  if (!aura || aura.id === 'aura-none') return;
+  const color = aura.color;
+  const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.2, transparent: true, opacity: 0.7 });
+
+  if (aura.id === 'aura-fire') {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const flame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55 + Math.random() * 0.3, 6),
+        new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff8800, emissiveIntensity: 1.4, transparent: true, opacity: 0.85 }));
+      flame.position.set(Math.cos(a) * 1.6, -1.0 + Math.random() * 0.2, Math.sin(a) * 1.6);
+      charGroup.add(flame);
+    }
+    scene.add(new THREE.PointLight(0xff4400, 1.5, 5));
+  } else if (aura.id === 'aura-ice') {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.18),
+        new THREE.MeshStandardMaterial({ color: 0xaaeeff, emissive: 0x00f5ff, emissiveIntensity: 1.0, transparent: true, opacity: 0.85, metalness: 0.3 }));
+      shard.position.set(Math.cos(a) * 1.6, -0.5 + Math.sin(i) * 0.6, Math.sin(a) * 1.6);
+      shard.rotation.set(Math.random(), Math.random(), Math.random());
+      charGroup.add(shard);
+    }
+    scene.add(new THREE.PointLight(0x00f5ff, 1.5, 5));
+  } else if (aura.id === 'aura-electric') {
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      const bolt = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.4, 4),
+        new THREE.MeshStandardMaterial({ color: 0xb829ff, emissive: 0xb829ff, emissiveIntensity: 1.5 }));
+      bolt.position.set(Math.cos(a) * (1.4 + Math.random() * 0.3), -0.5 + Math.random() * 2, Math.sin(a) * (1.4 + Math.random() * 0.3));
+      bolt.rotation.set(Math.random() * Math.PI, 0, Math.random() * Math.PI);
+      charGroup.add(bolt);
+    }
+    scene.add(new THREE.PointLight(0xb829ff, 2, 5));
+  } else if (aura.id === 'aura-rainbow') {
+    const colors = [0xff2e93, 0xff8c00, 0xffe600, 0x00ff88, 0x00f5ff, 0xb829ff];
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12),
+        new THREE.MeshStandardMaterial({ color: colors[i % 6], emissive: colors[i % 6], emissiveIntensity: 1.2 }));
+      orb.position.set(Math.cos(a) * 1.5, -0.5 + Math.sin(a * 3) * 0.7, Math.sin(a) * 1.5);
+      charGroup.add(orb);
+    }
+    scene.add(new THREE.PointLight(0xff2e93, 1.2, 5));
+    scene.add(new THREE.PointLight(0x00f5ff, 1.2, 5));
+  } else if (aura.id === 'aura-holy') {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.1, 16, 48),
+      new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 1.6 }));
+    ring.position.y = -0.9;
+    ring.rotation.x = Math.PI / 2;
+    charGroup.add(ring);
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const ray = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.5, 6),
+        new THREE.MeshStandardMaterial({ color: 0xffffaa, emissive: 0xffe600, emissiveIntensity: 1.2 }));
+      ray.position.set(Math.cos(a) * 1.4, -0.9, Math.sin(a) * 1.4);
+      ray.rotation.z = -Math.cos(a) * 0.5;
+      ray.rotation.x = Math.sin(a) * 0.5;
+      charGroup.add(ray);
+    }
+    scene.add(new THREE.PointLight(0xffe600, 2, 6));
+  }
+}
+
+function buildHair(group, body) {
+  const hairMat = new THREE.MeshStandardMaterial({
+    color: body.hair,
+    emissive: body.hairEmissive || 0,
+    emissiveIntensity: body.hairEmissive ? 0.4 : 0,
+    roughness: 0.5,
+  });
+  if (body.hairStyle === 'spike') {
+    // spiky hair - cones around top
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const r = 0.55 + Math.random() * 0.1;
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 8), hairMat);
+      spike.position.set(Math.cos(a) * r, 2.55 + Math.random() * 0.15, Math.sin(a) * r);
+      spike.rotation.z = -Math.cos(a) * 0.4;
+      spike.rotation.x = Math.sin(a) * 0.4;
+      group.add(spike);
+    }
+    const top = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 10), hairMat);
+    top.position.y = 2.95;
+    group.add(top);
+  } else if (body.hairStyle === 'long') {
+    // cap of hair
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.92, 32, 24, 0, Math.PI*2, 0, Math.PI/1.7),
+      hairMat
+    );
+    cap.position.y = 2.0;
+    group.add(cap);
+    // long strands on sides
+    for (const x of [-0.78, 0.78]) {
+      const strand = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.1, 1.0, 16),
+        hairMat
+      );
+      strand.position.set(x, 1.55, 0.15);
+      group.add(strand);
+    }
+    // back strand
+    const back = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.18, 0.9, 16),
+      hairMat
+    );
+    back.position.set(0, 1.6, -0.7);
+    group.add(back);
+  } else if (body.hairStyle === 'curly') {
+    // multiple small spheres for curly afro
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2;
+      const r = 0.78 + Math.random() * 0.12;
+      const ring = i < 9 ? 2.45 : 2.7;
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), hairMat);
+      ball.position.set(Math.cos(a) * r, ring + Math.random() * 0.15, Math.sin(a) * r * 0.85);
+      group.add(ball);
+    }
+    const topCurl = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), hairMat);
+    topCurl.position.y = 2.85;
+    group.add(topCurl);
+  } else {
+    // short — simple cap
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.9, 28, 20, 0, Math.PI*2, 0, Math.PI/2.2),
+      hairMat
+    );
+    cap.position.y = 2.05;
+    group.add(cap);
+    // small front bangs
+    const bang = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 16, 12, 0, Math.PI*2, 0, Math.PI/2),
+      hairMat
+    );
+    bang.position.set(0, 2.32, 0.55);
+    bang.scale.set(1.2, 0.6, 0.7);
+    group.add(bang);
+  }
+}
+
+function build3DCharacter(scene, equipped) {
+  while (scene.children.length > 0) scene.remove(scene.children[0]);
+
+  const body = findItem(equipped.body) || SHOP.bodies[0];
+  const hat = findItem(equipped.hat);
+  const glasses = findItem(equipped.glasses);
+  const pet = findItem(equipped.pet);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const dir = new THREE.DirectionalLight(0xffffff, 0.95);
+  dir.position.set(2, 5, 4);
+  scene.add(dir);
+  const rim = new THREE.PointLight(0x00f5ff, 0.7);
+  rim.position.set(-3, 3, -2);
+  scene.add(rim);
+  const fill = new THREE.PointLight(0xff2e93, 0.5);
+  fill.position.set(3, 0, 2);
+  scene.add(fill);
+
+  const charGroup = new THREE.Group();
+  scene.add(charGroup);
+
+  // === MATERIALS ===
+  const skinMat = new THREE.MeshStandardMaterial({
+    color: body.skin,
+    roughness: 0.55,
+    metalness: body.metallic ? 0.4 : 0.05,
+  });
+  const shirtMat = new THREE.MeshStandardMaterial({
+    color: body.shirt,
+    emissive: body.metallic ? body.shirt : 0,
+    emissiveIntensity: body.metallic ? 0.2 : 0,
+    roughness: 0.45,
+    metalness: body.metallic ? 0.7 : 0.1,
+  });
+  const pantsMat = new THREE.MeshStandardMaterial({
+    color: body.pants,
+    roughness: 0.6,
+    metalness: body.metallic ? 0.4 : 0.05,
+  });
+  const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 });
+
+  // === HEAD === (center y=2.0, radius 0.85, top y=2.85)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), skinMat);
+  head.position.y = 2.0;
+  head.scale.set(1, 1.05, 0.96);
+  charGroup.add(head);
+
+  // ears
+  const earGeo = new THREE.SphereGeometry(0.16, 16, 16);
+  for (const x of [-0.83, 0.83]) {
+    const ear = new THREE.Mesh(earGeo, skinMat);
+    ear.position.set(x, 2.0, 0);
+    ear.scale.set(0.6, 1.2, 1);
+    charGroup.add(ear);
+  }
+
+  // hair
+  buildHair(charGroup, body);
+
+  // === EYES === (at y=2.05, z=0.7 forward of face)
+  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 });
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.2 });
+  const sparkleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.2 });
+  for (const x of [-0.3, 0.3]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), eyeWhiteMat);
+    eye.position.set(x, 2.05, 0.7);
+    eye.scale.set(1, 1.15, 0.7);
+    charGroup.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), pupilMat);
+    pupil.position.set(x, 2.05, 0.84);
+    charGroup.add(pupil);
+    const sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), sparkleMat);
+    sparkle.position.set(x + 0.04, 2.11, 0.93);
+    charGroup.add(sparkle);
+  }
+
+  // eyebrows
+  const browMat = new THREE.MeshStandardMaterial({ color: body.hair, roughness: 0.6 });
+  for (const x of [-0.3, 0.3]) {
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), browMat);
+    brow.position.set(x, 2.3, 0.78);
+    brow.rotation.z = -Math.sign(x) * 0.15;
+    charGroup.add(brow);
+  }
+
+  // === MOUTH ===
+  const mouth = new THREE.Mesh(
+    new THREE.TorusGeometry(0.15, 0.04, 8, 16, Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0x882233 })
+  );
+  mouth.position.set(0, 1.65, 0.78);
+  mouth.rotation.z = Math.PI;
+  charGroup.add(mouth);
+
+  // cheeks
+  const cheekMat = new THREE.MeshStandardMaterial({ color: 0xff7a92, transparent: true, opacity: 0.5 });
+  for (const x of [-0.5, 0.5]) {
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), cheekMat);
+    cheek.position.set(x, 1.78, 0.65);
+    charGroup.add(cheek);
+  }
+
+  // === NECK ===
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.3, 16), skinMat);
+  neck.position.y = 1.4;
+  charGroup.add(neck);
+
+  // === TORSO === (jelly-bean style)
+  const torso = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.5, 1.0, 24),
+    shirtMat
+  );
+  torso.position.y = 0.75;
+  charGroup.add(torso);
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.6, 24, 16), shirtMat);
+  shoulders.position.y = 1.25;
+  shoulders.scale.set(1, 0.6, 1);
+  charGroup.add(shoulders);
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.55, 24, 16), shirtMat);
+  hips.position.y = 0.25;
+  hips.scale.set(1, 0.55, 1);
+  charGroup.add(hips);
+
+  // === ARMS ===
+  for (const x of [-0.78, 0.78]) {
+    const upperArm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.14, 0.55, 16),
+      shirtMat
+    );
+    upperArm.position.set(x, 1.0, 0);
+    upperArm.rotation.z = -Math.sign(x) * 0.2;
+    charGroup.add(upperArm);
+    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), shirtMat);
+    elbow.position.set(x + Math.sign(x) * 0.1, 0.72, 0);
+    charGroup.add(elbow);
+    const forearm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.12, 0.4, 16),
+      skinMat
+    );
+    forearm.position.set(x + Math.sign(x) * 0.15, 0.5, 0);
+    forearm.rotation.z = -Math.sign(x) * 0.1;
+    charGroup.add(forearm);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), skinMat);
+    hand.position.set(x + Math.sign(x) * 0.2, 0.28, 0);
+    charGroup.add(hand);
+  }
+
+  // === LEGS ===
+  for (const x of [-0.22, 0.22]) {
+    const thigh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.16, 0.5, 16),
+      pantsMat
+    );
+    thigh.position.set(x, -0.05, 0);
+    charGroup.add(thigh);
+    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), pantsMat);
+    knee.position.set(x, -0.32, 0);
+    charGroup.add(knee);
+    const calf = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.13, 0.4, 16),
+      pantsMat
+    );
+    calf.position.set(x, -0.55, 0);
+    charGroup.add(calf);
+    const shoe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.28, 0.16, 0.45),
+      shoesMat
+    );
+    shoe.position.set(x, -0.78, 0.08);
+    charGroup.add(shoe);
+  }
+
+  // === HAT === (group origin = head top y=2.85)
+  if (hat && hat.id !== 'hat-none') {
+    const hatRoot = new THREE.Group();
+    hatRoot.position.y = 2.85;
+    addHat(hatRoot, hat.id);
+    charGroup.add(hatRoot);
+  }
+  // === GLASSES === (eye level, in front of face)
+  if (glasses && glasses.id !== 'gl-none') {
+    const glRoot = new THREE.Group();
+    glRoot.position.set(0, 2.05, 0.85);
+    addGlasses(glRoot, glasses.id);
+    charGroup.add(glRoot);
+  }
+
+  // center character vertically (it spans ~y=-0.95 to 3.5, mid ~1.3)
+  charGroup.position.y = -1.3;
+
+  // === PET ===
+  if (pet && pet.id !== 'pet-none') {
+    if (pet.model) {
+      const petClone = cloneModel(pet.model);
+      if (petClone) {
+        petClone.scale.setScalar(pet.scale || 0.5);
+        petClone.position.set(2.0, (pet.y || 0) - 0.5, 0.3);
+        petClone.rotation.y = -0.6;
+        scene.add(petClone);
+      }
+    } else if (pet.procedural && PETS_BUILD[pet.id]) {
+      const petGroup = new THREE.Group();
+      PETS_BUILD[pet.id](petGroup);
+      petGroup.position.set(2.1, -0.55, 0.4);
+      petGroup.rotation.y = -0.5;
+      scene.add(petGroup);
+    }
+  }
+
+  // === AURA ===
+  const aura = findItem(equipped.aura);
+  if (aura && aura.id !== 'aura-none') {
+    buildAura(scene, charGroup, aura);
+  }
+
+  return charGroup;
+}
+
+function addHat(group, id) {
+  // group origin = top of head (y=2.85 in char space)
+  if (id === 'hat-cap') {
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.78, 28, 18, 0, Math.PI*2, 0, Math.PI/1.7),
+      new THREE.MeshStandardMaterial({ color: 0xff2e93, roughness: 0.5 })
+    );
+    cap.position.y = -0.45;
+    group.add(cap);
+    const visor = new THREE.Mesh(
+      new THREE.BoxGeometry(0.95, 0.06, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0xff2e93, roughness: 0.5 })
+    );
+    visor.position.set(0, -0.45, 0.65);
+    group.add(visor);
+    const logo = new THREE.Mesh(
+      new THREE.CircleGeometry(0.12, 16),
+      new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 0.3 })
+    );
+    logo.position.set(0, -0.05, 0.78);
+    group.add(logo);
+  } else if (id === 'hat-graduation') {
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7, 24, 16, 0, Math.PI*2, 0, Math.PI/2.2),
+      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 })
+    );
+    cap.position.y = -0.3;
+    group.add(cap);
+    const top = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.07, 1.4),
+      new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.4 })
+    );
+    top.position.y = 0.3;
+    group.add(top);
+    const string = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8),
+      new THREE.MeshStandardMaterial({ color: 0xffe600 })
+    );
+    string.position.set(0.5, 0.45, 0.5);
+    group.add(string);
+    const tassel = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 12, 12),
+      new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 0.4 })
+    );
+    tassel.position.set(0.65, 0.3, 0.65);
+    group.add(tassel);
+  } else if (id === 'hat-tophat') {
+    const brim = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.05, 1.05, 0.1, 32),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.3 })
+    );
+    brim.position.y = 0;
+    group.add(brim);
+    const cyl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.65, 0.65, 1.2, 32),
+      new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.3, metalness: 0.3 })
+    );
+    cyl.position.y = 0.65;
+    group.add(cyl);
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.66, 0.66, 0.18, 32),
+      new THREE.MeshStandardMaterial({ color: 0xff2e93, emissive: 0xff2e93, emissiveIntensity: 0.2 })
+    );
+    band.position.y = 0.18;
+    group.add(band);
+  } else if (id === 'hat-helmet') {
+    const h = new THREE.Mesh(
+      new THREE.SphereGeometry(0.95, 28, 20, 0, Math.PI*2, 0, Math.PI/1.5),
+      new THREE.MeshStandardMaterial({ color: 0xff8c00, metalness: 0.7, roughness: 0.25 })
+    );
+    h.position.y = -0.35;
+    group.add(h);
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(1.95, 0.1, 0.18),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.2 })
+    );
+    stripe.position.set(0, 0.35, 0);
+    group.add(stripe);
+    // visor
+    const visor = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7, 24, 12, 0, Math.PI*2, 0, Math.PI/3),
+      new THREE.MeshStandardMaterial({ color: 0x000033, transparent: true, opacity: 0.7, metalness: 0.8, roughness: 0.1 })
+    );
+    visor.position.set(0, 0.05, 0.45);
+    visor.rotation.x = 0.4;
+    group.add(visor);
+  } else if (id === 'hat-crown') {
+    const ring = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 0.72, 0.4, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.15, emissive: 0xffd700, emissiveIntensity: 0.2 })
+    );
+    ring.position.y = 0.05;
+    group.add(ring);
+    const gemColors = [0xff2e93, 0x00f5ff, 0xff8c00, 0x00ff88, 0xb829ff];
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const spike = new THREE.Mesh(
+        new THREE.ConeGeometry(0.16, 0.5, 8),
+        new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.15, emissive: 0xffd700, emissiveIntensity: 0.2 })
+      );
+      spike.position.set(Math.cos(a) * 0.65, 0.5, Math.sin(a) * 0.65);
+      group.add(spike);
+      const gem = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.14),
+        new THREE.MeshStandardMaterial({ color: gemColors[i], emissive: gemColors[i], emissiveIntensity: 0.7, metalness: 0.5, roughness: 0.1 })
+      );
+      gem.position.set(Math.cos(a) * 0.65, 0.78, Math.sin(a) * 0.65);
+      group.add(gem);
+    }
+    // central jewel on the band
+    const centerGem = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.16),
+      new THREE.MeshStandardMaterial({ color: 0xff2e93, emissive: 0xff2e93, emissiveIntensity: 0.8 })
+    );
+    centerGem.position.set(0, 0.05, 0.72);
+    group.add(centerGem);
+  } else if (id === 'hat-wizard') {
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.75, 1.9, 32),
+      new THREE.MeshStandardMaterial({ color: 0x4a2e7a, emissive: 0x6a4c93, emissiveIntensity: 0.3, roughness: 0.55 })
+    );
+    cone.position.y = 0.95;
+    group.add(cone);
+    const brim = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.1, 1.1, 0.1, 32),
+      new THREE.MeshStandardMaterial({ color: 0x4a2e7a, roughness: 0.55 })
+    );
+    brim.position.y = 0;
+    group.add(brim);
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.66, 0.7, 0.15, 32),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.6, emissive: 0xffd700, emissiveIntensity: 0.3 })
+    );
+    band.position.y = 0.1;
+    group.add(band);
+    // stars on cone
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.2;
+      const star = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.13),
+        new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 0.9 })
+      );
+      const r = 0.55 - i * 0.07;
+      star.position.set(Math.cos(a) * r, 0.5 + i * 0.25, Math.sin(a) * r);
+      group.add(star);
+    }
+  } else if (id === 'hat-halo') {
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.55, 0.08, 16, 48),
+      new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 1.4 })
+    );
+    halo.position.y = 0.55;
+    halo.rotation.x = Math.PI / 2;
+    group.add(halo);
+    const light = new THREE.PointLight(0xffe600, 1.5, 4);
+    light.position.y = 0.55;
+    group.add(light);
+  } else if (id === 'hat-horns') {
+    // headband
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(0.72, 0.07, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4 })
+    );
+    band.position.y = -0.25;
+    band.rotation.x = Math.PI / 2;
+    group.add(band);
+    for (const x of [-0.45, 0.45]) {
+      const horn = new THREE.Mesh(
+        new THREE.ConeGeometry(0.16, 0.65, 12),
+        new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3, metalness: 0.4 })
+      );
+      horn.position.set(x, 0.25, 0);
+      horn.rotation.z = -Math.sign(x) * 0.35;
+      group.add(horn);
+    }
+  } else if (id === 'hat-beanie') {
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.78, 28, 18, 0, Math.PI*2, 0, Math.PI/1.4),
+      new THREE.MeshStandardMaterial({ color: 0x00aaff, roughness: 0.7 })
+    );
+    cap.position.y = -0.25;
+    group.add(cap);
+    // pompom
+    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 }));
+    pom.position.y = 0.5;
+    group.add(pom);
+    // stripes
+    for (let i = 0; i < 3; i++) {
+      const stripe = new THREE.Mesh(
+        new THREE.TorusGeometry(0.78, 0.04, 8, 32),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      stripe.position.y = -0.2 + i * 0.18;
+      stripe.rotation.x = Math.PI / 2;
+      group.add(stripe);
+    }
+  } else if (id === 'hat-flower') {
+    const colors = [0xff2e93, 0xffe600, 0xff8c00, 0x00ff88, 0xb829ff, 0xff69b4, 0x00f5ff];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const r = 0.7;
+      const flowerGroup = new THREE.Group();
+      flowerGroup.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r);
+      const petalMat = new THREE.MeshStandardMaterial({ color: colors[i % colors.length], emissive: colors[i % colors.length], emissiveIntensity: 0.3 });
+      for (let p = 0; p < 5; p++) {
+        const pa = (p / 5) * Math.PI * 2;
+        const petal = new THREE.Mesh(new THREE.SphereGeometry(0.09, 12, 12), petalMat);
+        petal.position.set(Math.cos(pa) * 0.1, 0, Math.sin(pa) * 0.1);
+        petal.scale.set(1, 0.4, 1);
+        flowerGroup.add(petal);
+      }
+      const center = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 0.5 }));
+      flowerGroup.add(center);
+      group.add(flowerGroup);
+    }
+  } else if (id === 'hat-pirate') {
+    // tricorn-style
+    const base = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7, 24, 16, 0, Math.PI*2, 0, Math.PI/2.2),
+      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 })
+    );
+    base.position.y = -0.2;
+    group.add(base);
+    // wide flat brim
+    const brim = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.0, 0.08, 32),
+      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 })
+    );
+    brim.position.y = 0;
+    group.add(brim);
+    // skull and crossbones
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    skull.position.set(0, 0.3, 0.65);
+    group.add(skull);
+    for (const x of [-0.05, 0.05]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x000000 }));
+      eye.position.set(x, 0.3, 0.78);
+      group.add(eye);
+    }
+    // red bandana strip
+    const band = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.71, 0.71, 0.1, 32),
+      new THREE.MeshStandardMaterial({ color: 0xcc0000 })
+    );
+    band.position.y = 0.05;
+    group.add(band);
+  } else if (id === 'hat-cat-ears') {
+    // headband
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(0.72, 0.05, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0xff69b4 })
+    );
+    band.position.y = -0.2;
+    band.rotation.x = Math.PI / 2;
+    group.add(band);
+    // ears
+    for (const x of [-0.4, 0.4]) {
+      const ear = new THREE.Mesh(
+        new THREE.ConeGeometry(0.18, 0.4, 4),
+        new THREE.MeshStandardMaterial({ color: 0xff69b4, roughness: 0.5 })
+      );
+      ear.position.set(x, 0.2, 0);
+      ear.rotation.y = Math.PI / 4;
+      group.add(ear);
+      const inner = new THREE.Mesh(
+        new THREE.ConeGeometry(0.1, 0.27, 4),
+        new THREE.MeshStandardMaterial({ color: 0xffaaee })
+      );
+      inner.position.set(x, 0.2, 0.05);
+      inner.rotation.y = Math.PI / 4;
+      group.add(inner);
+    }
+  } else if (id === 'hat-viking') {
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.78, 28, 18, 0, Math.PI*2, 0, Math.PI/1.7),
+      new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7, roughness: 0.3 })
+    );
+    cap.position.y = -0.4;
+    group.add(cap);
+    // rim ring
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.75, 0.06, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0xaa8800, metalness: 0.8 })
+    );
+    ring.position.y = -0.1;
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    // horns
+    for (const x of [-0.65, 0.65]) {
+      const horn = new THREE.Mesh(
+        new THREE.ConeGeometry(0.15, 0.7, 12),
+        new THREE.MeshStandardMaterial({ color: 0xeeeebb, roughness: 0.4 })
+      );
+      horn.position.set(x, 0.05, 0);
+      horn.rotation.z = -Math.sign(x) * Math.PI / 2.3;
+      group.add(horn);
+    }
+  } else if (id === 'hat-samurai') {
+    // wide rim disc
+    const rim = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.05, 1.0, 0.1, 32),
+      new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.5 })
+    );
+    rim.position.y = 0;
+    group.add(rim);
+    // dome
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(0.7, 28, 18, 0, Math.PI*2, 0, Math.PI/2),
+      new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.5, metalness: 0.3 })
+    );
+    dome.position.y = 0;
+    group.add(dome);
+    // gold ornament
+    const ornament = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.18),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, emissive: 0xffd700, emissiveIntensity: 0.3 })
+    );
+    ornament.position.y = 0.7;
+    group.add(ornament);
+    // horn-blades
+    for (const x of [-0.65, 0.65]) {
+      const blade = new THREE.Mesh(
+        new THREE.ConeGeometry(0.08, 0.55, 4),
+        new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, emissive: 0xffd700, emissiveIntensity: 0.2 })
+      );
+      blade.position.set(x, 0.4, 0);
+      blade.rotation.z = -Math.sign(x) * 0.6;
+      group.add(blade);
+    }
+  } else if (id === 'hat-antenna') {
+    const band = new THREE.Mesh(
+      new THREE.TorusGeometry(0.72, 0.05, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8, roughness: 0.3 })
+    );
+    band.position.y = -0.25;
+    band.rotation.x = Math.PI / 2;
+    group.add(band);
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 0.95, 12),
+      new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8, roughness: 0.3 })
+    );
+    stem.position.y = 0.4;
+    group.add(stem);
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 24, 24),
+      new THREE.MeshStandardMaterial({ color: 0x00f5ff, emissive: 0x00f5ff, emissiveIntensity: 1.4 })
+    );
+    ball.position.y = 0.95;
+    group.add(ball);
+    const light = new THREE.PointLight(0x00f5ff, 1.2, 3);
+    light.position.y = 0.95;
+    group.add(light);
+  }
+}
+
+function addGlasses(group, id) {
+  // Special glasses with custom geometry
+  if (id === 'gl-heart') {
+    const heartMat = new THREE.MeshStandardMaterial({ color: 0xff2e93, emissive: 0xff2e93, emissiveIntensity: 0.6 });
+    for (const x of [-0.3, 0.3]) {
+      // heart = two spheres + one cone
+      const l = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), heartMat);
+      l.position.set(x - 0.07, 0.05, 0);
+      group.add(l);
+      const r = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), heartMat);
+      r.position.set(x + 0.07, 0.05, 0);
+      group.add(r);
+      const t = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.18, 4), heartMat);
+      t.position.set(x, -0.1, 0);
+      t.rotation.set(Math.PI, Math.PI/4, 0);
+      group.add(t);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.04), heartMat);
+    group.add(bridge);
+    return;
+  }
+  if (id === 'gl-monocle') {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.9, roughness: 0.15 });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 12, 24), mat);
+    ring.position.x = 0.3;
+    group.add(ring);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.2, 24),
+      new THREE.MeshStandardMaterial({ color: 0xaaffff, transparent: true, opacity: 0.4 }));
+    lens.position.set(0.3, 0, 0.01);
+    group.add(lens);
+    // chain
+    for (let i = 0; i < 6; i++) {
+      const link = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), mat);
+      link.position.set(0.5 + i * 0.04, -0.05 - i * 0.05, 0);
+      group.add(link);
+    }
+    return;
+  }
+  if (id === 'gl-pixel') {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
+    for (const x of [-0.3, 0.3]) {
+      // square frame
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const side = new THREE.Mesh(new THREE.BoxGeometry(i % 2 === 0 ? 0.4 : 0.04, 0.04, 0.04), mat);
+        side.position.set(x + Math.cos(a) * 0.18, Math.sin(a) * 0.18, 0);
+        if (i % 2 === 1) side.scale.set(1, 10, 1);
+        group.add(side);
+      }
+      // pixel eyes (white squares)
+      for (const dx of [-0.06, 0.06]) {
+        const px = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.02), eyeMat);
+        px.position.set(x + dx, 0, 0.02);
+        group.add(px);
+      }
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.04), mat);
+    group.add(bridge);
+    return;
+  }
+  if (id === 'gl-laser') {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x550000, metalness: 0.6, roughness: 0.3 });
+    const visor = new THREE.Mesh(
+      new THREE.BoxGeometry(0.95, 0.18, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.4, transparent: true, opacity: 0.85 })
+    );
+    visor.position.set(0, 0, 0.04);
+    group.add(visor);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.22, 0.06), mat);
+    group.add(frame);
+    // laser beams
+    for (const x of [-0.25, 0.25]) {
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 0.6, 8),
+        new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1.5 })
+      );
+      beam.position.set(x, 0, 0.3);
+      beam.rotation.x = Math.PI / 2;
+      group.add(beam);
+    }
+    group.add(new THREE.PointLight(0xff0000, 0.6, 2));
+    return;
+  }
+
+  // Standard glasses with rings
+  const ringGeo = new THREE.TorusGeometry(0.2, 0.045, 12, 24);
+  let mat;
+  if (id === 'gl-cool')      mat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.6, roughness: 0.3 });
+  else if (id === 'gl-3d')   mat = new THREE.MeshStandardMaterial({ color: 0xff2e93, emissive: 0x00f5ff, emissiveIntensity: 0.5, metalness: 0.4 });
+  else if (id === 'gl-star') mat = new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 0.5 });
+  else                       mat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.4, roughness: 0.3 });
+
+  const left = new THREE.Mesh(ringGeo, mat); left.position.x = -0.3; group.add(left);
+  const right = new THREE.Mesh(ringGeo, mat); right.position.x = 0.3; group.add(right);
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.045), mat);
+  group.add(bridge);
+
+  // arms going back over the ears
+  for (const x of [-0.5, 0.5]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.7), mat);
+    arm.position.set(x, 0, -0.35);
+    group.add(arm);
+  }
+
+  // lens fills
+  if (id === 'gl-cool') {
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.85, metalness: 0.5 });
+    for (const x of [-0.3, 0.3]) {
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.18, 24), lensMat);
+      lens.position.set(x, 0, 0.01);
+      group.add(lens);
+    }
+  } else if (id === 'gl-3d') {
+    const redMat  = new THREE.MeshStandardMaterial({ color: 0xff0000, transparent: true, opacity: 0.55, emissive: 0xff0000, emissiveIntensity: 0.4 });
+    const blueMat = new THREE.MeshStandardMaterial({ color: 0x0088ff, transparent: true, opacity: 0.55, emissive: 0x0088ff, emissiveIntensity: 0.4 });
+    const ll = new THREE.Mesh(new THREE.CircleGeometry(0.18, 24), redMat);  ll.position.set(-0.3, 0, 0.015); group.add(ll);
+    const rl = new THREE.Mesh(new THREE.CircleGeometry(0.18, 24), blueMat); rl.position.set( 0.3, 0, 0.015); group.add(rl);
+  } else if (id === 'gl-star') {
+    for (const x of [-0.3, 0.3]) {
+      const s = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.13),
+        new THREE.MeshStandardMaterial({ color: 0xffe600, emissive: 0xffe600, emissiveIntensity: 1.1 })
+      );
+      s.position.set(x + Math.sign(x) * 0.18, 0.18, 0.05);
+      group.add(s);
+    }
+  } else if (id === 'gl-round') {
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0xaaffff, transparent: true, opacity: 0.35 });
+    for (const x of [-0.3, 0.3]) {
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.18, 24), lensMat);
+      lens.position.set(x, 0, 0.01);
+      group.add(lens);
+    }
+  }
+}
+
+function renderToCanvas(canvas, equipped, rotation = 0) {
+  const w = canvas.width || 144;
+  const h = canvas.height || 144;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
+  camera.position.set(0, 0.2, 6.5);
+  camera.lookAt(0, 0.2, 0);
+  const charGroup = build3DCharacter(scene, equipped);
+  charGroup.rotation.y = rotation;
+
+  sharedRenderer.setSize(w, h, false);
+  sharedRenderer.setClearColor(0x000000, 0);
+  sharedRenderer.render(scene, camera);
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(sharedRenderer.domElement, 0, 0, w, h);
+}
+
+function queueRender(canvas, equipped) {
+  requestAnimationFrame(() => renderToCanvas(canvas, equipped));
+}
+
+// ==================== UI RENDER ====================
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = state.classes.map(c => `
+    <span class="tab ${c.id === state.activeClassId ? 'active' : ''}" onclick="switchClass('${c.id}')">
+      ${escapeHtml(c.name)}
+      <span class="x" onclick="event.stopPropagation();renameClass('${c.id}')" title="שנה שם">✏️</span>
+      ${state.classes.length > 1 ? `<span class="x" onclick="event.stopPropagation();deleteClass('${c.id}')" title="מחק">✕</span>` : ''}
+    </span>
+  `).join('');
+}
+
+function renderClassroom() {
+  const cls = getActiveClass();
+  if (!cls) return;
+  const root = document.getElementById('classroom');
+  const cols = [[],[],[],[]];
+  cls.students.forEach(s => { if (s.column < 0) s.column = 0; if (s.column > 3) s.column = 3; cols[s.column].push(s); });
+
+  root.innerHTML = cols.map((studs, ci) => `
+    <div class="column" data-col="${ci}"
+         ondragover="event.preventDefault();this.classList.add('drag-over')"
+         ondragleave="this.classList.remove('drag-over')"
+         ondrop="dropStudent(event, ${ci})">
+      <div class="column-header">
+        <span>טור ${ci+1} · ${studs.length}</span>
+        <button class="col-bonus" onclick="columnBonus(${ci})">+10 לכולם</button>
+      </div>
+      ${studs.map(renderStudent).join('')}
+      <button class="add-student-btn" onclick="addStudent(${ci})">➕ הוסף תלמיד</button>
+    </div>
+  `).join('');
+
+  // Render 3D for each student
+  cls.students.forEach(s => {
+    const canvas = document.querySelector(`canvas[data-student="${s.id}"]`);
+    if (canvas) queueRender(canvas, s.equipped);
+  });
+}
+
+function renderStudent(s) {
+  const rank = getRank(s.points);
+  return `
+    <div class="student" draggable="true" data-id="${s.id}"
+         ondragstart="dragStart(event, '${s.id}')"
+         ondragend="this.classList.remove('dragging')">
+      <span class="drag-handle" title="גרור להעברה">⋮⋮</span>
+      <canvas class="avatar-canvas" data-student="${s.id}" width="144" height="144"
+              onclick="openStudent('${s.id}')"></canvas>
+      <div class="student-info" onclick="openStudent('${s.id}')">
+        <div class="student-name-row">
+          <span class="student-name">${escapeHtml(s.name)}</span>
+          <button class="name-edit" onclick="event.stopPropagation();renameStudent('${s.id}')" title="שנה שם">✏️</button>
+        </div>
+        <div class="student-rank">
+          <span>${rank.current.icon}</span>
+          <span style="color:${rank.current.color}">${rank.current.name}</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${rank.progress}%"></div></div>
+      </div>
+      <div class="student-points">${s.points}</div>
+    </div>
+  `;
+}
+
+// ==================== ACTIONS ====================
+function addClass() {
+  const name = prompt('שם הכיתה החדשה?', 'כיתה ' + String.fromCharCode(1488 + state.classes.length));
+  if (!name) return;
+  const c = createClass(name);
+  state.classes.push(c);
+  state.activeClassId = c.id;
+  save(); renderAll();
+}
+function renameClass(id) {
+  const c = state.classes.find(c => c.id === id);
+  const name = prompt('שם חדש לכיתה:', c.name);
+  if (name) { c.name = name; save(); renderAll(); }
+}
+function deleteClass(id) {
+  if (!confirm('למחוק את הכיתה? הכל יימחק לצמיתות!')) return;
+  state.classes = state.classes.filter(c => c.id !== id);
+  if (state.activeClassId === id) state.activeClassId = state.classes[0].id;
+  save(); renderAll();
+}
+function switchClass(id) { state.activeClassId = id; save(); renderAll(); }
+
+function addStudent(col) {
+  const name = prompt('שם התלמיד החדש?');
+  if (!name) return;
+  getActiveClass().students.push(createStudent(name, col));
+  save(); renderClassroom();
+}
+
+function dragStart(e, id) {
+  e.dataTransfer.setData('text/plain', id);
+  e.target.classList.add('dragging');
+}
+function dropStudent(e, col) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const id = e.dataTransfer.getData('text/plain');
+  const s = getActiveClass().students.find(s => s.id === id);
+  if (s) { s.column = col; save(); renderClassroom(); }
+}
+
+function addPoints(studentId, amount, fromX, fromY) {
+  const s = getActiveClass().students.find(s => s.id === studentId);
+  if (!s) return;
+  const oldRank = getRank(s.points).current;
+  s.points = Math.max(0, s.points + amount);
+  s.weeklyPoints = (s.weeklyPoints || 0) + amount;
+  const newRank = getRank(s.points).current;
+  showPointPopup(amount, fromX, fromY);
+  if (newRank.name !== oldRank.name && amount > 0) showRankUp(s, newRank);
+  else playSound(amount > 0 ? 'point' : 'minus');
+  save();
+  renderClassroom();
+  if (document.getElementById('studentModal').classList.contains('show')) openStudent(s.id);
+}
+
+function columnBonus(col) {
+  const cls = getActiveClass();
+  cls.students.filter(s => s.column === col).forEach(s => {
+    s.points += 10;
+    s.weeklyPoints = (s.weeklyPoints || 0) + 10;
+  });
+  playSound('bonus');
+  burstConfetti(window.innerWidth/2, window.innerHeight/2);
+  save(); renderClassroom();
+}
+
+// ==================== STUDENT MODAL ====================
+let modalTab = 'points';
+let modalAnimId = null;
+
+function openStudent(id) {
+  const s = getActiveClass().students.find(s => s.id === id);
+  if (!s) return;
+  const rank = getRank(s.points);
+  const m = document.getElementById('modalContent');
+  m.innerHTML = `
+    <div class="modal-hero">
+      <canvas id="modalAvatar3D" width="320" height="320"></canvas>
+      <div style="flex:1">
+        <div class="modal-title">
+          <span>${escapeHtml(s.name)}</span>
+          <button class="btn" onclick="renameStudent('${s.id}')" style="font-size:0.7em;padding:4px 10px">✏️</button>
+        </div>
+        <div class="modal-sub">
+          <span style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</span> ·
+          <span style="color:var(--neon-yellow)">${s.points} נקודות</span>
+          ${rank.next ? `<br><small>עוד ${rank.next.min - s.points} ל${rank.next.name} ${rank.next.icon}</small>` : '<br><small>🏆 דרגה מקסימלית!</small>'}
+          <br><small>השבוע: <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b></small>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-danger" onclick="deleteStudent('${s.id}')" style="font-size:0.8em">🗑️ מחק</button>
+          <button class="btn" onclick="closeModal()" style="font-size:0.8em">✕ סגור</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab ${modalTab==='points'?'active':''}" onclick="setModalTab('points','${s.id}')">⭐ ניקוד</button>
+      <button class="modal-tab ${modalTab==='shop'?'active':''}" onclick="setModalTab('shop','${s.id}')">🛍️ חנות</button>
+      <button class="modal-tab ${modalTab==='box'?'active':''}" onclick="setModalTab('box','${s.id}')">🎁 הפתעה</button>
+    </div>
+    <div id="modalBody"></div>
+  `;
+  renderModalBody(s);
+  document.getElementById('studentModal').classList.add('show');
+
+  // animate the 3D avatar (rotation)
+  const canvas = document.getElementById('modalAvatar3D');
+  if (modalAnimId) cancelAnimationFrame(modalAnimId);
+  let rot = 0;
+  function animate() {
+    rot += 0.012;
+    renderToCanvas(canvas, s.equipped, rot);
+    modalAnimId = requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+function setModalTab(t, sid) { modalTab = t; openStudent(sid); }
+function closeModal() {
+  document.getElementById('studentModal').classList.remove('show');
+  if (modalAnimId) { cancelAnimationFrame(modalAnimId); modalAnimId = null; }
+}
+
+function renderModalBody(s) {
+  const body = document.getElementById('modalBody');
+  if (modalTab === 'points') {
+    body.innerHTML = `
+      <div class="point-buttons">
+        <button class="point-btn add-10"  onclick="addPoints('${s.id}', 10, event.clientX, event.clientY)">+10</button>
+        <button class="point-btn add-20"  onclick="addPoints('${s.id}', 20, event.clientX, event.clientY)">+20</button>
+        <button class="point-btn add-50"  onclick="addPoints('${s.id}', 50, event.clientX, event.clientY)">+50</button>
+        <button class="point-btn add-100" onclick="addPoints('${s.id}', 100, event.clientX, event.clientY)">+100</button>
+        <button class="point-btn minus-10" onclick="addPoints('${s.id}', -10, event.clientX, event.clientY)">-10</button>
+      </div>
+    `;
+  } else if (modalTab === 'shop') {
+    body.innerHTML = ['bodies','hats','glasses','pets','auras'].map(cat => {
+      const slot = ({bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
+      return `
+        <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({bodies:'🎨 דמות',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
+        <div class="shop-grid">
+          ${SHOP[cat].map(item => renderShopItem(s, item, slot, cat)).join('')}
+        </div>
+      `;
+    }).join('');
+
+    // render previews
+    requestAnimationFrame(() => {
+      document.querySelectorAll('canvas[data-shop]').forEach(c => {
+        const sid = c.dataset.shop;
+        const slot = c.dataset.slot;
+        const itemId = c.dataset.item;
+        const previewEquipped = { ...s.equipped, [slot]: itemId };
+        renderToCanvas(c, previewEquipped);
+      });
+    });
+  } else if (modalTab === 'box') {
+    body.innerHTML = `
+      <div class="box-section">
+        <div class="box-emoji">🎁</div>
+        <h2 style="margin:12px 0">תיבת הפתעה!</h2>
+        <p style="color:var(--text-dim);margin-bottom:14px">פותחים ומקבלים פריט אקראי. אם כבר יש לך אותו — תקבל ${MYSTERY_BOX_PRICE/2} נקודות בחזרה!</p>
+        <button class="btn btn-warning" style="font-size:1.1em;padding:14px 32px"
+                onclick="openMysteryBox('${s.id}')"
+                ${s.points < MYSTERY_BOX_PRICE ? 'disabled style="opacity:0.5"' : ''}>
+          🎲 פתח · ${MYSTERY_BOX_PRICE} נקודות
+        </button>
+      </div>
+    `;
+  }
+}
+
+function renderShopItem(s, item, slot, cat) {
+  const owned = s.owned.includes(item.id);
+  const equipped = s.equipped[slot] === item.id;
+  const canAfford = s.points >= item.price;
+  const cls = equipped ? 'equipped' : owned ? 'owned' : (canAfford ? '' : 'locked');
+  const action = equipped ? '' : owned
+    ? `onclick="equipItem('${s.id}','${slot}','${item.id}')"`
+    : (canAfford ? `onclick="buyItem('${s.id}','${slot}','${item.id}')"` : '');
+  const isNone = item.id.endsWith('-none');
+  return `
+    <div class="shop-item ${cls}" ${action}>
+      ${isNone
+        ? '<div class="shop-preview" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#666">🚫</div>'
+        : `<canvas class="shop-preview" data-shop="${s.id}" data-slot="${slot}" data-item="${item.id}" width="160" height="160"></canvas>`}
+      <div class="shop-name">${escapeHtml(item.name)}</div>
+      ${equipped ? '<div class="shop-status">✓ לבוש</div>'
+        : owned ? '<div class="shop-status">קליק להלביש</div>'
+        : `<div class="shop-price">⭐ ${item.price}</div>`}
+    </div>
+  `;
+}
+
+function buyItem(sid, slot, itemId) {
+  const s = getActiveClass().students.find(s => s.id === sid);
+  const item = findItem(itemId);
+  if (s.points < item.price) return;
+  s.points -= item.price;
+  s.owned.push(itemId);
+  s.equipped[slot] = itemId;
+  playSound('buy');
+  burstConfetti(window.innerWidth/2, window.innerHeight/2, 30);
+  save(); renderClassroom(); openStudent(sid);
+}
+function equipItem(sid, slot, itemId) {
+  const s = getActiveClass().students.find(s => s.id === sid);
+  s.equipped[slot] = itemId;
+  playSound('equip');
+  save(); renderClassroom(); openStudent(sid);
+}
+
+function openMysteryBox(sid) {
+  const s = getActiveClass().students.find(s => s.id === sid);
+  if (s.points < MYSTERY_BOX_PRICE) return;
+  s.points -= MYSTERY_BOX_PRICE;
+  const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)];
+  const item = allItems[Math.floor(Math.random() * allItems.length)];
+  let resultMsg;
+  if (s.owned.includes(item.id)) {
+    s.points += MYSTERY_BOX_PRICE / 2;
+    resultMsg = `כבר יש לך את "${item.name}"! הוחזרו ${MYSTERY_BOX_PRICE/2} נקודות.`;
+  } else {
+    s.owned.push(item.id);
+    resultMsg = `🎉 מזל טוב! קיבלת: ${item.name}`;
+  }
+  burstConfetti(window.innerWidth/2, window.innerHeight/2, 50);
+  playSound('box');
+  alert(resultMsg);
+  save(); renderClassroom(); openStudent(sid);
+}
+
+function renameStudent(sid) {
+  const s = getActiveClass().students.find(s => s.id === sid);
+  const n = prompt('שם חדש:', s.name);
+  if (n) {
+    s.name = n; save(); renderClassroom();
+    if (document.getElementById('studentModal').classList.contains('show')) openStudent(sid);
+  }
+}
+function deleteStudent(sid) {
+  if (!confirm('למחוק את התלמיד? כל הניקוד והפריטים יימחקו!')) return;
+  const cls = getActiveClass();
+  cls.students = cls.students.filter(s => s.id !== sid);
+  save(); renderClassroom(); closeModal();
+}
+
+// ==================== EFFECTS ====================
+function showPointPopup(amount, x, y) {
+  const el = document.createElement('div');
+  el.className = 'point-popup';
+  el.textContent = (amount > 0 ? '+' : '') + amount;
+  el.style.left = (x || window.innerWidth/2) + 'px';
+  el.style.top = (y || window.innerHeight/2) + 'px';
+  el.style.color = amount > 0 ? '#00ff88' : '#ff4444';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1300);
+}
+
+function showRankUp(s, rank) {
+  const o = document.getElementById('rankUpOverlay');
+  const c = document.getElementById('rankUpContent');
+  c.innerHTML = `
+    <div class="rank-up-title">דרגה חדשה!</div>
+    <div class="rank-up-icon">${rank.icon}</div>
+    <div class="rank-up-name" style="color:${rank.color}">${rank.name}</div>
+    <div style="margin-top:14px;font-size:1.3em">${escapeHtml(s.name)}</div>
+  `;
+  o.classList.add('show');
+  burstConfetti(window.innerWidth/2, window.innerHeight/3, 80);
+  playSound('rankup');
+  setTimeout(() => o.classList.remove('show'), 4000);
+}
+
+function burstConfetti(x, y, count = 40) {
+  const colors = ['#ff2e93','#00f5ff','#ffe600','#00ff88','#b829ff','#ff8c00'];
+  for (let i = 0; i < count; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.left = x + 'px';
+    c.style.top = y + 'px';
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    c.style.transform = `translate(${(Math.random()-0.5)*400}px, 0)`;
+    c.style.animationDuration = (2 + Math.random()*2) + 's';
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4000);
+  }
+}
+
+let audioCtx;
+function playSound(type) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = {
+      point:  [[523, 0.08],[784, 0.1]],
+      minus:  [[300, 0.1],[200, 0.15]],
+      bonus:  [[523,0.08],[659,0.08],[784,0.08],[1047,0.15]],
+      buy:    [[659, 0.06],[988, 0.1]],
+      equip:  [[784, 0.06]],
+      box:    [[523,0.06],[659,0.06],[784,0.06],[1047,0.06],[1319,0.15]],
+      rankup: [[523,0.1],[659,0.1],[784,0.1],[1047,0.2],[1319,0.3]],
+    };
+    const seq = notes[type] || [[440,0.1]];
+    let t = audioCtx.currentTime;
+    for (const [freq, dur] of seq) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'square';
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      osc.start(t); osc.stop(t + dur);
+      t += dur;
+    }
+  } catch(e) {}
+}
+
+// ==================== LEADERBOARD ====================
+function openLeaderboard() {
+  const cls = getActiveClass();
+  const sorted = [...cls.students].sort((a,b) => (b.weeklyPoints||0) - (a.weeklyPoints||0)).slice(0, 10);
+  const allTime = [...cls.students].sort((a,b) => b.points - a.points).slice(0, 10);
+  const m = document.getElementById('modalContent');
+  m.innerHTML = `
+    <div class="modal-hero" style="padding-bottom:10px">
+      <div style="font-size:60px">🏆</div>
+      <div style="flex:1">
+        <div class="modal-title">לוח שיא — ${escapeHtml(cls.name)}</div>
+        <div class="modal-sub">הכוכבים של הכיתה</div>
+      </div>
+      <button class="btn" onclick="closeModal()">✕</button>
+    </div>
+    <h3 style="color:var(--neon-yellow);margin:10px 0">🌟 השבוע</h3>
+    <div>
+      ${sorted.map((s,i) => `
+        <div class="lb-row ${i<3?'top'+(i+1):''}">
+          <div class="lb-rank">${['🥇','🥈','🥉'][i] || '#'+(i+1)}</div>
+          <canvas class="lb-canvas" data-lb="${s.id}" width="100" height="100"></canvas>
+          <div style="flex:1"><b>${escapeHtml(s.name)}</b></div>
+          <div style="color:var(--neon-yellow);font-weight:900">${s.weeklyPoints||0}</div>
+        </div>
+      `).join('')}
+    </div>
+    <h3 style="color:var(--neon-cyan);margin:18px 0 10px">💎 כל הזמנים</h3>
+    <div>
+      ${allTime.map((s,i) => `
+        <div class="lb-row ${i<3?'top'+(i+1):''}">
+          <div class="lb-rank">${['🥇','🥈','🥉'][i] || '#'+(i+1)}</div>
+          <canvas class="lb-canvas" data-lb="${s.id}-all" width="100" height="100"></canvas>
+          <div style="flex:1"><b>${escapeHtml(s.name)}</b></div>
+          <div style="color:var(--neon-cyan);font-weight:900">${s.points}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('studentModal').classList.add('show');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('canvas[data-lb]').forEach(c => {
+      const id = c.dataset.lb.replace(/-all$/, '');
+      const stu = cls.students.find(x => x.id === id);
+      if (stu) renderToCanvas(c, stu.equipped);
+    });
+  });
+}
+
+function resetWeek() {
+  if (!confirm('לאפס את הניקוד השבועי? (הניקוד הכולל לא יושפע)')) return;
+  getActiveClass().students.forEach(s => s.weeklyPoints = 0);
+  save(); alert('✅ הניקוד השבועי אופס');
+}
+
+// ==================== BACKUP ====================
+function exportData() {
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'classroom-points-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json';
+  input.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!confirm('לטעון נתונים? כל המצב הנוכחי יוחלף!')) return;
+        state = imported;
+        save(); renderAll();
+        alert('✅ הנתונים נטענו');
+      } catch(err) { alert('❌ שגיאה: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function renderAll() { renderTabs(); renderClassroom(); }
+
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+// ==================== INIT ====================
+async function init() {
+  const text = document.getElementById('loadingText');
+  const bar = document.getElementById('loadingBar');
+  const detail = document.getElementById('loadingDetail');
+  const labels = {
+    'Flamingo': '🦩 פלמינגו',
+    'Parrot':   '🦜 תוכי',
+    'Stork':    '🐦 חסידה',
+    'Fox':      '🦊 שועל',
+    'Horse':    '🐴 סוס',
+    'Duck':     '🦆 ברווז',
+  };
+  await preloadAllModels((done, total, url) => {
+    const pct = Math.round((done / total) * 100);
+    bar.style.width = pct + '%';
+    const key = Object.keys(labels).find(k => url.includes(k));
+    detail.textContent = `${labels[key] || url} · ${done}/${total}`;
+  });
+  text.textContent = '✓ הכל מוכן!';
+  detail.textContent = '';
+  setTimeout(() => {
+    document.getElementById('loadingScreen').style.display = 'none';
+    renderAll();
+  }, 400);
+}
+
+init();
+</script>
+</body>
+</html>

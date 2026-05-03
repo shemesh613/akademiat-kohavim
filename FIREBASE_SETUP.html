@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>הגדרת Firebase — מדריך</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Heebo', sans-serif; background: linear-gradient(135deg, #1a1d3a, #0a0e27); color: #e8e8f0; padding: 40px; max-width: 950px; margin: 0 auto; line-height: 1.75; }
+h1 { color: #ffe600; border-bottom: 3px solid #ff2e93; padding-bottom: 10px; }
+h2 { color: #00f5ff; margin-top: 30px; }
+.step { background: rgba(255,255,255,0.06); border-right: 4px solid #00ff88; padding: 18px 24px; border-radius: 12px; margin: 16px 0; }
+.step-num { background: linear-gradient(135deg, #00ff88, #00f5ff); color: #001020; padding: 4px 12px; border-radius: 8px; font-weight: 900; margin-left: 10px; }
+code { background: rgba(0,0,0,0.5); padding: 3px 10px; border-radius: 4px; color: #00ff88; font-family: monospace; font-size: 0.95em; }
+pre { background: rgba(0,0,0,0.5); padding: 14px; border-radius: 8px; overflow-x: auto; color: #ffe600; font-size: 0.9em; }
+a { color: #00f5ff; }
+.warn { background: rgba(255,140,0,0.12); border-right: 4px solid #ff8c00; padding: 12px 18px; border-radius: 10px; }
+.success { background: rgba(0,255,136,0.12); border-right: 4px solid #00ff88; padding: 14px 20px; border-radius: 10px; margin-top: 24px; font-size: 1.05em; }
+b { color: #ffe600; }
+ul { padding-right: 24px; }
+li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>🔥 הגדרת Firebase — 5 דקות</h1>
+<p>צריך פרויקט Firebase ריק כדי שילדים יוכלו להתחבר מהבית. זה חינם.</p>
+
+<div class="step">
+<span class="step-num">1</span><b>צור פרויקט</b><br>
+היכנס ל-<a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a><br>
+לחץ <b>"Add project"</b> → תן שם (למשל <code>akademiat-kohavim</code>) → <b>Continue</b><br>
+<b>בטל</b> Google Analytics (לא צריך) → <b>Create project</b>
+</div>
+
+<div class="step">
+<span class="step-num">2</span><b>הפעל Realtime Database</b><br>
+בתפריט השמאלי: <b>Build</b> → <b>Realtime Database</b> → <b>Create Database</b><br>
+בחר <b>europe-west1</b> (קרוב לישראל) → <b>Next</b><br>
+בחר <b>Start in test mode</b> → <b>Enable</b>
+</div>
+
+<div class="step">
+<span class="step-num">3</span><b>הוסף "אפליקציית web"</b><br>
+חזור לעמוד הראשי של הפרויקט (סמל הבית בצד שמאל למעלה)<br>
+לחץ על סמל <b>&lt;/&gt;</b> (Web) שמופיע בעמוד<br>
+תן כינוי (למשל <code>kohavim-web</code>) → <b>Register app</b><br>
+<b>תקבל בלוק קוד שנראה ככה:</b>
+<pre>const firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "...firebaseapp.com",
+  databaseURL: "https://...firebaseio.com",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};</pre>
+</div>
+
+<div class="step">
+<span class="step-num">4</span><b>שלח לי את ה-config</b><br>
+העתק את כל הבלוק (מ-<code>const firebaseConfig = {</code> עד <code>};</code>) <b>והדבק לי כאן בצ'אט</b>.<br>
+אני אטמיע את זה באפליקציה ואסיים את הסנכרון.
+</div>
+
+<div class="warn">
+🔒 <b>אבטחה:</b> בהמשך נשנה את ה-Database Rules כדי שתלמיד יוכל לקנות רק לעצמו. נטפל בזה אחרי שהקוד מותקן.
+</div>
+
+<div class="success">
+✅ <b>אחרי שתשלח לי את ה-config, אני:</b>
+<ul>
+<li>אטמיע את Firebase באפליקציה</li>
+<li>אוסיף לכל תלמיד טוקן אישי + כפתור 📲 ליצירת קישור</li>
+<li>אבנה מסך תלמיד נפרד שמראה רק את הפרופיל שלו</li>
+<li>אגדיר חוקי אבטחה כך שתלמיד לא יוכל להוסיף ניקוד לעצמו (רק לקנות)</li>
+</ul>
+</div>
+
+</body>
+</html>
