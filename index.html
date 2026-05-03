@@ -531,7 +531,6 @@ const RANKS = [
 const SHOP = {
   bodies: [
     { id: 'body-default',  name: 'קלאסי',     price: 0,    skin: 0xffd6b8, hair: 0x6b3410, hairStyle: 'short', shirt: 0xffe600, pants: 0x1e3a8a },
-    { id: 'body-blonde',   name: 'בלונדינית', price: 50,   skin: 0xffe0cc, hair: 0xffd166, hairStyle: 'long',  shirt: 0xff2e93, pants: 0x6a4c93 },
     { id: 'body-redhead',  name: 'אדמוני',    price: 80,   skin: 0xffd0c0, hair: 0xff5500, hairStyle: 'curly', shirt: 0x00ff88, pants: 0x004422 },
     { id: 'body-fire',     name: 'אש',        price: 100,  skin: 0xffb088, hair: 0xff2e93, hairStyle: 'spike', hairEmissive: 0xff2e93, shirt: 0xff4400, pants: 0x600000 },
     { id: 'body-pink',     name: 'ורוד',      price: 120,  skin: 0xffc0cb, hair: 0xff69b4, hairStyle: 'curly', shirt: 0xff69b4, pants: 0xc71585 },
@@ -1308,18 +1307,21 @@ function build3DCharacter(scene, equipped) {
     if (pet.model) {
       const petClone = cloneModel(pet.model);
       if (petClone) {
-        petClone.scale.setScalar(pet.scale || 0.5);
-        petClone.position.set(2.0, (pet.y || 0) - 0.5, 0.3);
+        petClone.scale.setScalar((pet.scale || 0.5) * 0.85);
+        petClone.position.set(1.5, (pet.y || 0) - 0.5, 0.3);
         petClone.rotation.y = -0.6;
         scene.add(petClone);
       }
     } else if (pet.procedural && PETS_BUILD[pet.id]) {
       const petGroup = new THREE.Group();
       PETS_BUILD[pet.id](petGroup);
-      petGroup.position.set(2.1, -0.55, 0.4);
+      petGroup.scale.setScalar(0.7);
+      petGroup.position.set(1.5, -0.4, 0.4);
       petGroup.rotation.y = -0.5;
       scene.add(petGroup);
     }
+    // shift character slightly left so pet+char fit together
+    charGroup.position.x = -0.4;
   }
 
   // === AURA ===
