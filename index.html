@@ -716,13 +716,21 @@ const sharedRenderer = (() => {
 const modelCache = {};
 const gltfLoader = new THREE.GLTFLoader();
 
-function loadModel(url) {
+function loadModel(url, timeoutMs = 6000) {
   if (modelCache[url]) return Promise.resolve(modelCache[url]);
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, timeoutMs);
     gltfLoader.load(url, (gltf) => {
+      if (done) return;
+      done = true; clearTimeout(t);
       modelCache[url] = gltf.scene;
       resolve(gltf.scene);
-    }, undefined, reject);
+    }, undefined, () => {
+      if (done) return;
+      done = true; clearTimeout(t);
+      resolve(null);
+    });
   });
 }
 
@@ -741,11 +749,12 @@ function cloneModel(url) {
 async function preloadAllModels(progressCb) {
   const urls = SHOP.pets.filter(p => p.model).map(p => p.model);
   let done = 0;
-  for (const url of urls) {
-    try { await loadModel(url); } catch(e) { console.warn('Failed to load', url, e); }
+  // load all in parallel with timeout, no blocking on failures
+  await Promise.all(urls.map(async url => {
+    try { await loadModel(url, 6000); } catch(e) { console.warn('Failed', url, e); }
     done++;
     progressCb(done, urls.length, url);
-  }
+  }));
 }
 
 // === PROCEDURAL PET BUILDERS ===
