@@ -652,18 +652,40 @@ function startCloudPoll() {
 }
 
 // ==================== STATE ====================
-let state = JSON.parse(localStorage.getItem('cps_state_v2') || 'null') || {
-  classes: [createClass('כיתה א׳')],
-  activeClassId: null,
-  pending: [],
-};
-if (!state.activeClassId) state.activeClassId = state.classes[0].id;
+let state;
+try {
+  state = JSON.parse(localStorage.getItem('cps_state_v2') || 'null');
+} catch(e) {
+  console.warn('Bad localStorage, resetting', e);
+  state = null;
+}
+if (!state || !state.classes || !Array.isArray(state.classes) || state.classes.length === 0) {
+  state = { classes: [createClass('כיתה א׳')], activeClassId: null, pending: [] };
+}
+if (!state.activeClassId || !state.classes.find(c => c.id === state.activeClassId)) {
+  state.activeClassId = state.classes[0].id;
+}
 if (!state.pending) state.pending = [];
-// migrate old states without aura
-state.classes.forEach(c => c.students.forEach(s => {
-  if (!s.equipped.aura) s.equipped.aura = 'aura-none';
-  if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
-}));
+// migrate old states
+state.classes.forEach(c => {
+  if (!c.students) c.students = [];
+  c.students.forEach(s => {
+    if (!s.equipped) s.equipped = { body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' };
+    if (!s.owned) s.owned = ['body-default','hat-none','gl-none','pet-none','aura-none'];
+    if (!s.equipped.aura) s.equipped.aura = 'aura-none';
+    if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
+  });
+});
+
+// Safety: force-hide loading screen no matter what, after 8 seconds
+setTimeout(() => {
+  const ls = document.getElementById('loadingScreen');
+  if (ls && ls.style.display !== 'none') {
+    console.warn('Force-hiding loading screen via safety timer');
+    ls.style.display = 'none';
+    try { renderAll(); } catch(e) { console.error(e); document.body.innerHTML += '<div style="position:fixed;top:0;left:0;background:#f00;color:#fff;padding:10px;z-index:99999">' + e.message + '</div>'; }
+  }
+}, 8000);
 
 function createClass(name) {
   const id = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
