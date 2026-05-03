@@ -639,7 +639,7 @@ function queueCloudSave() {
 function startCloudPoll() {
   setInterval(async () => {
     const remote = await cloudLoad();
-    if (!remote) return;
+    if (!remote || !remote.classes) return; // ignore null/errors
     const hash = JSON.stringify(remote);
     if (hash === lastCloudHash) return;
     if (hash === JSON.stringify(state)) { lastCloudHash = hash; return; }
@@ -2648,37 +2648,45 @@ async function init() {
     'Horse':    '🐴 סוס',
     'Duck':     '🦆 ברווז',
   };
-  await preloadAllModels((done, total, url) => {
+  // load pet GLBs in background — never block startup
+  preloadAllModels((done, total, url) => {
     const pct = Math.round((done / total) * 100);
     bar.style.width = pct + '%';
     const key = Object.keys(labels).find(k => url.includes(k));
     detail.textContent = `${labels[key] || url} · ${done}/${total}`;
+    // re-render any visible avatars when a model finishes loading
+    if (typeof renderAll === 'function' && document.getElementById('loadingScreen').style.display === 'none') {
+      renderAll();
+    }
   });
 
-  // load latest from cloud (overrides local if exists)
-  text.textContent = '☁️ מסנכרן עם הענן...';
-  const cloud = await cloudLoad();
-  if (cloud && cloud.classes) {
-    state = cloud;
-    if (!state.pending) state.pending = [];
-    state.classes.forEach(c => c.students.forEach(s => {
-      if (!s.equipped.aura) s.equipped.aura = 'aura-none';
-      if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
-    }));
-    lastCloudHash = JSON.stringify(state);
-    localStorage.setItem('cps_state_v2', lastCloudHash);
-  } else {
-    // first run — push local to cloud
-    cloudSave(state);
-  }
+  // try cloud (with timeout) — don't block on it
+  text.textContent = '☁️ מסנכרן...';
+  try {
+    const cloudPromise = cloudLoad();
+    const timeout = new Promise(r => setTimeout(() => r(null), 4000));
+    const cloud = await Promise.race([cloudPromise, timeout]);
+    if (cloud && cloud.classes) {
+      state = cloud;
+      if (!state.pending) state.pending = [];
+      state.classes.forEach(c => c.students.forEach(s => {
+        if (!s.equipped.aura) s.equipped.aura = 'aura-none';
+        if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
+      }));
+      lastCloudHash = JSON.stringify(state);
+      localStorage.setItem('cps_state_v2', lastCloudHash);
+    } else if (cloud && cloud.error) {
+      console.warn('Firebase access denied — running offline');
+    } else {
+      cloudSave(state);
+    }
+  } catch (e) { console.warn('cloud err', e); }
 
-  text.textContent = '✓ הכל מוכן!';
+  text.textContent = '✓ מוכן!';
   detail.textContent = APP_MODE === 'student' ? '🏠 מצב בית' : '🧑‍🏫 מצב כיתה';
-  setTimeout(() => {
-    document.getElementById('loadingScreen').style.display = 'none';
-    renderAll();
-    startCloudPoll();
-  }, 400);
+  document.getElementById('loadingScreen').style.display = 'none';
+  renderAll();
+  startCloudPoll();
 }
 
 init();
