@@ -613,6 +613,10 @@ const FIREBASE_DB = 'https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatab
 const FIREBASE_PATH = 'cps_v1';
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const APP_MODE = URL_PARAMS.get('home') === '1' ? 'student' : 'teacher';
+if (URL_PARAMS.get('reset') === '1') {
+  localStorage.removeItem('cps_state_v2');
+  window.location.replace(window.location.pathname);
+}
 
 let cloudPushTimer = null;
 let lastCloudHash = '';
