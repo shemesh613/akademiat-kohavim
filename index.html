@@ -3094,8 +3094,8 @@ function createParticle(layer) {
   setTimeout(() => p.remove(), dur * 1000);
 }
 
-// ==================== AMBIENT MUSIC (Web Audio synth loop) ====================
-let musicCtx = null, musicGain = null, musicPlaying = false, musicNodes = [];
+// ==================== AMBIENT MUSIC v2 (full band) ====================
+let musicCtx = null, musicMaster = null, musicDryGain = null, musicWetGain = null, musicPlaying = false, musicTimeout = null;
 const MUSIC_KEY = 'cps_music_on_v1';
 
 function startMusic() {
@@ -3104,87 +3104,243 @@ function startMusic() {
   if (!musicCtx) musicCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (musicCtx.state === 'suspended') musicCtx.resume();
 
-  musicGain = musicCtx.createGain();
-  musicGain.gain.value = 0;
-  musicGain.gain.linearRampToValueAtTime(0.12, musicCtx.currentTime + 1.5);
-  musicGain.connect(musicCtx.destination);
+  musicMaster = musicCtx.createGain();
+  musicMaster.gain.value = 0;
+  musicMaster.gain.linearRampToValueAtTime(0.7, musicCtx.currentTime + 1.5);
+  musicMaster.connect(musicCtx.destination);
 
-  // chord progression: C - Am - F - G  (kid-friendly major)
-  const progressions = [
-    [261.63, 329.63, 392.00], // C major
-    [220.00, 261.63, 329.63], // A minor
-    [174.61, 220.00, 261.63], // F major
-    [196.00, 246.94, 293.66], // G major
+  // light reverb via feedback delay
+  const delay = musicCtx.createDelay(0.6);
+  delay.delayTime.value = 0.22;
+  const feedback = musicCtx.createGain();
+  feedback.gain.value = 0.35;
+  const wet = musicCtx.createGain();
+  wet.gain.value = 0.25;
+  delay.connect(feedback); feedback.connect(delay);
+  delay.connect(wet); wet.connect(musicMaster);
+  musicWetGain = wet;
+  musicDryGain = musicMaster;
+
+  // chord progression: C - G - Am - F (pop classic)
+  const N = {
+    C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196.00, A3:220.00, B3:246.94,
+    C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
+    C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00, B5:987.77,
+    C6:1046.50, D6:1174.66, E6:1318.51,
+  };
+  const chords = [
+    { bass: N.C3, notes: [N.C4, N.E4, N.G4] },
+    { bass: N.G3, notes: [N.G3, N.B3, N.D4] },
+    { bass: N.A3, notes: [N.A3, N.C4, N.E4] },
+    { bass: N.F3, notes: [N.F3, N.A3, N.C4] },
   ];
-  const beatDur = 1.6;
+  // melody phrase per bar — kid-friendly hook
+  const melodies = [
+    [[N.E5,1],[N.G5,0.5],[N.E5,0.5],[N.C5,1],[N.D5,1]],            // over C
+    [[N.D5,0.5],[N.G5,0.5],[N.B5,0.5],[N.D6,0.5],[N.B5,1],[N.G5,1]],// over G
+    [[N.A4,1],[N.C5,0.5],[N.E5,0.5],[N.A5,1],[N.E5,1]],             // over Am
+    [[N.F5,0.5],[N.A5,0.5],[N.C6,1],[N.A5,1],[N.F5,1]],             // over F
+  ];
+
+  const tempo = 108;
+  const beat = 60 / tempo;
+  const bar = beat * 4;
   let measure = 0;
 
   function playMeasure() {
     if (!musicPlaying) return;
-    const t0 = musicCtx.currentTime;
-    const chord = progressions[measure % progressions.length];
+    const t0 = musicCtx.currentTime + 0.05;
+    const idx = measure % chords.length;
+    const chord = chords[idx];
+    const mel = melodies[idx];
 
-    // pad: warm sustained chord
-    chord.forEach(freq => {
-      const osc = musicCtx.createOscillator();
-      const g = musicCtx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(0.06, t0 + 0.3);
-      g.gain.linearRampToValueAtTime(0.04, t0 + beatDur * 0.8);
-      g.gain.linearRampToValueAtTime(0, t0 + beatDur);
-      osc.connect(g); g.connect(musicGain);
-      osc.start(t0); osc.stop(t0 + beatDur + 0.1);
-      // octave overlay
-      const osc2 = musicCtx.createOscillator();
-      const g2 = musicCtx.createGain();
-      osc2.frequency.value = freq * 2;
-      osc2.type = 'triangle';
-      g2.gain.setValueAtTime(0, t0);
-      g2.gain.linearRampToValueAtTime(0.025, t0 + 0.3);
-      g2.gain.linearRampToValueAtTime(0, t0 + beatDur);
-      osc2.connect(g2); g2.connect(musicGain);
-      osc2.start(t0); osc2.stop(t0 + beatDur + 0.1);
+    // ===== drums =====
+    for (let b = 0; b < 4; b++) {
+      const tb = t0 + b * beat;
+      // kick on 1 and 3
+      if (b === 0 || b === 2) playKick(tb);
+      // snare on 2 and 4
+      if (b === 1 || b === 3) playSnare(tb);
+      // hi-hat 8th notes
+      playHat(tb, b === 0);
+      playHat(tb + beat / 2, false);
+    }
+    // tiny hihat fills on bar 4
+    if (idx === 3) {
+      playHat(t0 + bar - beat * 0.25, false);
+      playHat(t0 + bar - beat * 0.125, false);
+    }
+
+    // ===== bass groove =====
+    playBass(t0, chord.bass, beat * 1.5);
+    playBass(t0 + beat * 1.75, chord.bass, beat * 0.25);
+    playBass(t0 + beat * 2, chord.bass, beat * 0.75);
+    playBass(t0 + beat * 3, chord.bass * 1.498, beat * 0.5); // 5th up
+    playBass(t0 + beat * 3.5, chord.bass, beat * 0.5);
+
+    // ===== pad: sustained chord =====
+    chord.notes.forEach(freq => playPad(t0, freq, bar * 0.95));
+
+    // ===== melody (lead) =====
+    let mt = t0;
+    mel.forEach(([f, d]) => {
+      playLead(mt, f, beat * d);
+      mt += beat * d;
     });
 
-    // bass — root note
-    const bass = musicCtx.createOscillator();
-    const bg = musicCtx.createGain();
-    bass.frequency.value = chord[0] / 2;
-    bass.type = 'triangle';
-    bg.gain.setValueAtTime(0.1, t0);
-    bg.gain.exponentialRampToValueAtTime(0.001, t0 + beatDur * 0.6);
-    bass.connect(bg); bg.connect(musicGain);
-    bass.start(t0); bass.stop(t0 + beatDur);
-
-    // melody — playful arpeggio
-    const melodyNotes = [chord[0]*2, chord[1]*2, chord[2]*2, chord[1]*2];
-    melodyNotes.forEach((f, i) => {
-      const m = musicCtx.createOscillator();
-      const mg = musicCtx.createGain();
-      m.frequency.value = f;
-      m.type = 'sine';
-      const start = t0 + i * (beatDur / 4);
-      const dur = beatDur / 4 * 0.8;
-      mg.gain.setValueAtTime(0, start);
-      mg.gain.linearRampToValueAtTime(0.04, start + 0.05);
-      mg.gain.exponentialRampToValueAtTime(0.001, start + dur);
-      m.connect(mg); mg.connect(musicGain);
-      m.start(start); m.stop(start + dur + 0.05);
-    });
+    // ===== sparkle accents on bars 2 and 4 =====
+    if (idx === 1 || idx === 3) {
+      playSparkle(t0 + bar - beat * 0.5, [N.E6, N.G5, N.C6][idx % 3] || N.E6);
+    }
 
     measure++;
-    setTimeout(playMeasure, beatDur * 1000);
+    musicTimeout = setTimeout(playMeasure, bar * 1000);
   }
   playMeasure();
+}
+
+function playKick(t) {
+  const osc = musicCtx.createOscillator();
+  const g = musicCtx.createGain();
+  osc.frequency.setValueAtTime(160, t);
+  osc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+  osc.type = 'sine';
+  g.gain.setValueAtTime(0.55, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  osc.connect(g); g.connect(musicDryGain);
+  osc.start(t); osc.stop(t + 0.22);
+}
+function playSnare(t) {
+  // body
+  const osc = musicCtx.createOscillator();
+  const og = musicCtx.createGain();
+  osc.frequency.value = 200;
+  osc.type = 'triangle';
+  og.gain.setValueAtTime(0.16, t);
+  og.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  osc.connect(og); og.connect(musicDryGain);
+  osc.start(t); osc.stop(t + 0.1);
+  // noise
+  const noise = createNoise(0.13);
+  const filter = musicCtx.createBiquadFilter();
+  filter.type = 'bandpass'; filter.frequency.value = 2200; filter.Q.value = 1.0;
+  const ng = musicCtx.createGain();
+  ng.gain.setValueAtTime(0.15, t);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+  noise.connect(filter); filter.connect(ng); ng.connect(musicDryGain);
+  noise.start(t); noise.stop(t + 0.15);
+}
+function playHat(t, accent) {
+  const noise = createNoise(0.06);
+  const filter = musicCtx.createBiquadFilter();
+  filter.type = 'highpass'; filter.frequency.value = 7500;
+  const g = musicCtx.createGain();
+  const vol = accent ? 0.07 : 0.04;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+  noise.connect(filter); filter.connect(g); g.connect(musicDryGain);
+  noise.start(t); noise.stop(t + 0.07);
+}
+function createNoise(dur) {
+  const buf = musicCtx.createBuffer(1, Math.max(1, Math.floor(musicCtx.sampleRate * dur)), musicCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = musicCtx.createBufferSource();
+  src.buffer = buf;
+  return src;
+}
+function playBass(t, freq, dur) {
+  const osc = musicCtx.createOscillator();
+  osc.frequency.value = freq;
+  osc.type = 'triangle';
+  const sub = musicCtx.createOscillator();
+  sub.frequency.value = freq;
+  sub.type = 'sine';
+  const filter = musicCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(800, t);
+  filter.frequency.exponentialRampToValueAtTime(300, t + dur);
+  const g = musicCtx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.18, t + 0.01);
+  g.gain.linearRampToValueAtTime(0.14, t + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(filter); sub.connect(filter); filter.connect(g); g.connect(musicDryGain);
+  osc.start(t); osc.stop(t + dur + 0.05);
+  sub.start(t); sub.stop(t + dur + 0.05);
+}
+function playPad(t, freq, dur) {
+  // layered: sine + slightly detuned sine (for chorus) + triangle harmonic
+  for (const conf of [
+    {type:'sine', detune: 0,    vol: 0.04},
+    {type:'sine', detune: 7,    vol: 0.025},
+    {type:'sine', detune: -7,   vol: 0.025},
+    {type:'triangle', detune: 0, mul: 2, vol: 0.018},
+  ]) {
+    const osc = musicCtx.createOscillator();
+    osc.frequency.value = freq * (conf.mul || 1);
+    osc.detune.value = conf.detune;
+    osc.type = conf.type;
+    const filter = musicCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 2200;
+    const g = musicCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(conf.vol, t + 0.5);
+    g.gain.linearRampToValueAtTime(conf.vol * 0.7, t + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(filter); filter.connect(g); g.connect(musicDryGain);
+    g.connect(musicWetGain); // also send to reverb
+    osc.start(t); osc.stop(t + dur + 0.1);
+  }
+}
+function playLead(t, freq, dur) {
+  const osc = musicCtx.createOscillator();
+  osc.frequency.value = freq;
+  osc.type = 'sawtooth';
+  // detuned 2nd osc for thickness
+  const osc2 = musicCtx.createOscillator();
+  osc2.frequency.value = freq;
+  osc2.detune.value = 8;
+  osc2.type = 'sawtooth';
+  const filter = musicCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.Q.value = 3;
+  filter.frequency.setValueAtTime(freq * 2, t);
+  filter.frequency.exponentialRampToValueAtTime(freq * 5, t + 0.1);
+  filter.frequency.exponentialRampToValueAtTime(freq * 3, t + dur);
+  const g = musicCtx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.06, t + 0.02);
+  g.gain.linearRampToValueAtTime(0.04, t + dur * 0.7);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.connect(filter); osc2.connect(filter); filter.connect(g);
+  g.connect(musicDryGain);
+  g.connect(musicWetGain);
+  osc.start(t); osc.stop(t + dur + 0.05);
+  osc2.start(t); osc2.stop(t + dur + 0.05);
+}
+function playSparkle(t, freq) {
+  // bell tone: fundamental + 3rd + 5th harmonic
+  for (const [mul, vol] of [[1, 0.05], [3, 0.025], [5, 0.015]]) {
+    const osc = musicCtx.createOscillator();
+    osc.frequency.value = freq * mul;
+    osc.type = 'sine';
+    const g = musicCtx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    osc.connect(g); g.connect(musicDryGain);
+    g.connect(musicWetGain);
+    osc.start(t); osc.stop(t + 1.1);
+  }
 }
 
 function stopMusic() {
   if (!musicPlaying) return;
   musicPlaying = false;
-  if (musicGain) {
-    musicGain.gain.linearRampToValueAtTime(0, musicCtx.currentTime + 0.5);
+  if (musicTimeout) { clearTimeout(musicTimeout); musicTimeout = null; }
+  if (musicMaster) {
+    musicMaster.gain.linearRampToValueAtTime(0, musicCtx.currentTime + 0.5);
   }
 }
 
