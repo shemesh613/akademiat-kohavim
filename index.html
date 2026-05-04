@@ -196,12 +196,13 @@ header {
   animation: idleBob 3s ease-in-out infinite;
   transition: transform 0.2s;
 }
-.avatar-canvas:hover { transform: scale(1.18) rotate(-3deg); animation-play-state: paused; }
+.avatar-canvas:hover { transform: scale(1.25) rotate(-5deg); animation-play-state: paused; filter: drop-shadow(0 0 20px var(--neon-cyan)); }
 @keyframes idleBob {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25%      { transform: translateY(-3px) rotate(-1.5deg); }
-  50%      { transform: translateY(0) rotate(0deg); }
-  75%      { transform: translateY(-2px) rotate(1.5deg); }
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  20%      { transform: translateY(-7px) rotate(-3deg) scale(1.02); }
+  40%      { transform: translateY(-2px) rotate(0deg) scale(1); }
+  60%      { transform: translateY(-7px) rotate(3deg) scale(1.02); }
+  80%      { transform: translateY(-2px) rotate(0deg) scale(1); }
 }
 .student.celebrating .avatar-canvas {
   animation: celebrate 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -432,6 +433,40 @@ header {
   0%   { transform: scale(0) rotate(-360deg); opacity: 0; }
   60%  { transform: scale(1.2) rotate(20deg); opacity: 1; }
   100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes achSlideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes achSlideOut {
+  to { transform: translateX(120%); opacity: 0; }
+}
+.shop-item.rarity-rare   { box-shadow: 0 0 18px rgba(0,245,255,0.4); border-color: #00f5ff !important; }
+.shop-item.rarity-epic   { box-shadow: 0 0 22px rgba(184,41,255,0.5); border-color: #b829ff !important; }
+.shop-item.rarity-mythic {
+  box-shadow: 0 0 30px rgba(255,215,0,0.7); border-color: #ffd700 !important;
+  animation: mythicPulse 2s ease-in-out infinite;
+}
+@keyframes mythicPulse {
+  0%, 100% { box-shadow: 0 0 30px rgba(255,215,0,0.7); }
+  50%      { box-shadow: 0 0 50px rgba(255,215,0,1), 0 0 80px rgba(255,46,147,0.5); }
+}
+.rarity-badge {
+  position: absolute; top: 4px; right: 4px;
+  font-size: 0.65em; font-weight: 900;
+  padding: 2px 8px; border-radius: 6px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.collection-bar {
+  background: rgba(0,0,0,0.3); border-radius: 12px; padding: 10px 16px;
+  margin: 10px 0; display: flex; align-items: center; gap: 12px;
+}
+.collection-bar .progress {
+  flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;
+}
+.collection-bar .progress .fill {
+  height: 100%; background: linear-gradient(90deg, var(--neon-green), var(--neon-yellow));
+  box-shadow: 0 0 10px var(--neon-green); transition: width 0.5s;
 }
 
 .rank-up-overlay {
@@ -673,6 +708,61 @@ const SHOP = {
 };
 
 const MYSTERY_BOX_PRICE = 75;
+
+// ==================== ACHIEVEMENTS ====================
+const ACHIEVEMENTS = [
+  { id: 'first-buy',     name: 'קנייה ראשונה!',     desc: 'קנית את הפריט הראשון', icon: '🛍️',  check: s => s.owned.length > 5 },
+  { id: 'collector-5',   name: 'אספן מתחיל',        desc: '5 פריטים בארון',       icon: '📦',   check: s => s.owned.length >= 9 },
+  { id: 'collector-15',  name: 'אספן מקצועי',       desc: '15 פריטים בארון',      icon: '🎁',   check: s => s.owned.length >= 19 },
+  { id: 'collector-30',  name: 'מאסטר אספנות',      desc: '30 פריטים בארון',      icon: '👑',   check: s => s.owned.length >= 34 },
+  { id: 'rich-100',      name: 'מאה ראשונה',        desc: 'הגעת ל-100 נקודות',    icon: '💯',   check: s => s.points >= 100 },
+  { id: 'rich-500',      name: 'איש עשיר',          desc: '500 נקודות',           icon: '💰',   check: s => s.points >= 500 },
+  { id: 'rich-1000',     name: 'מיליונר',           desc: '1,000 נקודות',         icon: '💎',   check: s => s.points >= 1000 },
+  { id: 'streak-3',      name: '3 ימים ברצף',       desc: 'נכנסת 3 ימים ברצף',    icon: '🔥',   check: s => (s.streak || 0) >= 3 },
+  { id: 'streak-7',      name: 'שבוע מלא!',         desc: '7 ימים ברצף',          icon: '⚡',   check: s => (s.streak || 0) >= 7 },
+  { id: 'streak-30',     name: 'אגדה!',             desc: '30 ימים ברצף',         icon: '🌟',   check: s => (s.streak || 0) >= 30 },
+  { id: 'pet-lover',     name: 'אוהב חיות',         desc: '3 חיות מחמד',          icon: '🐾',   check: s => s.owned.filter(i => i.startsWith('pet-')).length >= 4 },
+  { id: 'fashion',       name: 'פאשניסטה',          desc: '5 כובעים',             icon: '🎩',   check: s => s.owned.filter(i => i.startsWith('hat-')).length >= 6 },
+  { id: 'rank-up-3',     name: 'עולה',              desc: 'הגעת לדרגה 3',         icon: '⭐',   check: s => getRank(s.points).current.min >= 300 },
+  { id: 'rank-up-5',     name: 'מתעלה',             desc: 'הגעת לדרגה 5',         icon: '⚡',   check: s => getRank(s.points).current.min >= 1000 },
+  { id: 'legend',        name: 'אגדת הכוכבים',      desc: 'הגעת לדרגה האחרונה',   icon: '👑',   check: s => getRank(s.points).current.min >= 4000 },
+];
+
+function checkAchievements(student) {
+  if (!student.achievements) student.achievements = [];
+  const newOnes = [];
+  for (const a of ACHIEVEMENTS) {
+    if (!student.achievements.includes(a.id) && a.check(student)) {
+      student.achievements.push(a.id);
+      newOnes.push(a);
+    }
+  }
+  return newOnes;
+}
+
+function showAchievement(ach) {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:80px;right:20px;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#000;padding:14px 22px;border-radius:14px;box-shadow:0 10px 40px rgba(255,215,0,0.6);z-index:9999;display:flex;align-items:center;gap:14px;animation:achSlideIn 0.5s ease-out,achSlideOut 0.5s ease-in 3.5s forwards;font-weight:900';
+  el.innerHTML = `<div style="font-size:2.5em">${ach.icon}</div><div><div style="font-size:0.85em;opacity:0.7">🏆 הישג חדש!</div><div style="font-size:1.1em">${ach.name}</div><div style="font-size:0.8em;font-weight:400">${ach.desc}</div></div>`;
+  document.body.appendChild(el);
+  playSound('rankup');
+  setTimeout(() => el.remove(), 4500);
+}
+
+// rare items get a sparkle aura in shop
+const RARITY = {
+  common: { min: 0,   max: 100,  color: '#888',     name: 'רגיל',  glow: false },
+  rare:   { min: 100, max: 300,  color: '#00f5ff',  name: 'נדיר',   glow: true  },
+  epic:   { min: 300, max: 600,  color: '#b829ff',  name: 'אפי',    glow: true  },
+  mythic: { min: 600, max: 9999, color: '#ffd700',  name: 'מיתי',   glow: true  },
+};
+function getItemRarity(item) {
+  if (!item.price) return RARITY.common;
+  for (const r of Object.values(RARITY)) {
+    if (item.price >= r.min && item.price < r.max) return r;
+  }
+  return RARITY.common;
+}
 
 // ==================== CLOUD SYNC (Firebase RTDB via REST) ====================
 const FIREBASE_DB = 'https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatabase.app';
@@ -2035,9 +2125,11 @@ function addPoints(studentId, amount, fromX, fromY) {
   showPointPopup(amount, fromX, fromY);
   if (newRank.name !== oldRank.name && amount > 0) showRankUp(s, newRank);
   else playSound(amount > 0 ? 'point' : 'minus');
+  // check achievements
+  const newAchs = checkAchievements(s);
+  newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 500 + i * 1500));
   save();
   renderClassroom();
-  // 🎉 avatar reaction
   setTimeout(() => celebrateStudent(studentId, amount > 0 ? 'celebrating' : 'disappointed'), 30);
   if (document.getElementById('studentModal').classList.contains('show')) openStudent(s.id);
 }
@@ -2576,6 +2668,8 @@ function approvePending(pid) {
       if (!stu.owned.includes(p.itemId)) stu.owned.push(p.itemId);
     }
     if (p.slot) stu.equipped[p.slot] = p.itemId;
+    const newAchs = checkAchievements(stu);
+    newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 500 + i * 1500));
   }
   state.pending = state.pending.filter(x => x.id !== pid);
   playSound('buy');
@@ -2649,6 +2743,8 @@ function claimDailyBonus(sid) {
   const totalBonus = baseBonus + streakBonus;
   s.points += totalBonus;
   s.weeklyPoints = (s.weeklyPoints || 0) + totalBonus;
+  const newAchs = checkAchievements(s);
+  newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 1500 + i * 1500));
   save();
   // show celebration
   document.getElementById('dailyText').innerHTML = `+${totalBonus} <span style="color:var(--neon-yellow)">נקודות</span>`;
@@ -2708,6 +2804,7 @@ function renderStudentProfile() {
       <div class="modal-tabs" style="border:none;padding:0">
         <button class="modal-tab active" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
         <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
+        <button class="modal-tab" id="stTabAch" onclick="setStudentTab('ach')">🏆 הישגים</button>
       </div>
       <div id="studentBody"></div>
     </div>
@@ -2734,8 +2831,9 @@ function setStudentTab(t) {
   if (!found) return;
   const { student: s } = found;
   const body = document.getElementById('studentBody');
-  ['stTabShop','stTabBox'].forEach(id => document.getElementById(id)?.classList.remove('active'));
-  document.getElementById(t === 'shop' ? 'stTabShop' : 'stTabBox')?.classList.add('active');
+  ['stTabShop','stTabBox','stTabAch'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  const tabId = t === 'shop' ? 'stTabShop' : t === 'box' ? 'stTabBox' : 'stTabAch';
+  document.getElementById(tabId)?.classList.add('active');
 
   if (t === 'shop') {
     const previewOw = previewOwned(s);
@@ -2743,8 +2841,16 @@ function setStudentTab(t) {
     const previewPts = previewPoints(s);
     body.innerHTML = ['bodies','hats','glasses','pets','auras'].map(cat => {
       const slot = ({bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
+      const total = SHOP[cat].length - 1; // exclude "none"
+      const ownedInCat = SHOP[cat].filter(i => !i.id.endsWith('-none') && previewOw.includes(i.id)).length;
+      const pct = total > 0 ? (ownedInCat / total) * 100 : 0;
       return `
         <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({bodies:'🎨 דמות',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
+        <div class="collection-bar">
+          <span style="font-weight:900">${ownedInCat}/${total}</span>
+          <div class="progress"><div class="fill" style="width:${pct}%"></div></div>
+          <span style="font-size:0.85em;color:var(--neon-yellow)">${Math.round(pct)}%</span>
+        </div>
         <div class="shop-grid">
           ${SHOP[cat].map(item => renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts)).join('')}
         </div>
@@ -2770,6 +2876,28 @@ function setStudentTab(t) {
         </button>
       </div>
     `;
+  } else if (t === 'ach') {
+    const earned = s.achievements || [];
+    const total = ACHIEVEMENTS.length;
+    body.innerHTML = `
+      <div class="collection-bar" style="margin-bottom:16px">
+        <span style="font-weight:900;font-size:1.1em">${earned.length}/${total} הישגים</span>
+        <div class="progress"><div class="fill" style="width:${(earned.length/total)*100}%"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+        ${ACHIEVEMENTS.map(a => {
+          const got = earned.includes(a.id);
+          return `
+            <div style="background:${got ? 'linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,140,0,0.1))' : 'rgba(255,255,255,0.04)'};border:2px solid ${got ? '#ffd700' : 'rgba(255,255,255,0.08)'};border-radius:12px;padding:12px;text-align:center;${got ? 'box-shadow:0 0 20px rgba(255,215,0,0.3)' : 'opacity:0.5'}">
+              <div style="font-size:2.5em;${got ? '' : 'filter:grayscale(1)'}">${a.icon}</div>
+              <div style="font-weight:900;font-size:0.9em;margin-top:4px">${escapeHtml(a.name)}</div>
+              <div style="font-size:0.75em;color:var(--text-dim);margin-top:2px">${escapeHtml(a.desc)}</div>
+              ${got ? '<div style="font-size:0.7em;color:var(--neon-yellow);margin-top:4px;font-weight:900">✓ הושג</div>' : '<div style="font-size:0.7em;color:#666;margin-top:4px">🔒 נעול</div>'}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 }
 
@@ -2778,16 +2906,19 @@ function renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts) 
   const equipped = previewEq[slot] === item.id;
   const canAfford = previewPts >= item.price;
   const pendingThis = pendingForStudent(s.id).some(p => p.itemId === item.id);
+  const rarity = getItemRarity(item);
   let cls = '';
   if (equipped) cls = 'equipped';
   else if (owned) cls = 'owned';
   else if (!canAfford) cls = 'locked';
+  if (rarity !== RARITY.common) cls += ' rarity-' + (rarity === RARITY.rare ? 'rare' : rarity === RARITY.epic ? 'epic' : 'mythic');
   const action = equipped ? ''
     : owned ? `onclick="studentEquip('${slot}','${item.id}')"`
     : (canAfford ? `onclick="studentBuy('${slot}','${item.id}', ${item.price})"` : '');
   const isNone = item.id.endsWith('-none');
   return `
     <div class="shop-item ${cls}" ${action} style="position:relative">
+      ${rarity !== RARITY.common ? `<div class="rarity-badge" style="background:${rarity.color};color:#000">${rarity.name}</div>` : ''}
       ${pendingThis ? '<div style="position:absolute;top:4px;left:4px;font-size:0.7em;background:#ff8c00;color:#000;padding:2px 6px;border-radius:6px;font-weight:900">⏳</div>' : ''}
       ${isNone
         ? '<div class="shop-preview" style="display:flex;align-items:center;justify-content:center;font-size:32px;color:#666">🚫</div>'
