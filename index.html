@@ -209,13 +209,28 @@ header {
   font-size: 0.75em;
   background: var(--neon-yellow);
   color: #000;
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
   cursor: pointer;
   border: none;
   font-weight: 900;
 }
 .col-bonus:hover { transform: scale(1.05); }
+.col-input {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: #fff;
+  padding: 4px 8px;
+  width: 56px;
+  font-family: inherit;
+  font-size: 0.85em;
+  font-weight: 700;
+  text-align: center;
+}
+.col-input:focus { border-color: var(--neon-yellow); outline: none; }
+.col-input::-webkit-outer-spin-button,
+.col-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .student {
   background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03));
@@ -1345,48 +1360,57 @@ function build3DCharacter(scene, equipped) {
   const glasses = findItem(equipped.glasses);
   const pet = findItem(equipped.pet);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const dir = new THREE.DirectionalLight(0xffffff, 0.95);
+  // pro-grade lighting setup
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1d3a, 0.5));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
   dir.position.set(2, 5, 4);
   scene.add(dir);
-  const rim = new THREE.PointLight(0x00f5ff, 0.7);
+  const rim = new THREE.PointLight(0x00f5ff, 0.8);
   rim.position.set(-3, 3, -2);
   scene.add(rim);
-  const fill = new THREE.PointLight(0xff2e93, 0.5);
+  const fill = new THREE.PointLight(0xff2e93, 0.55);
   fill.position.set(3, 0, 2);
   scene.add(fill);
+  // soft top accent
+  const top = new THREE.PointLight(0xffe600, 0.4);
+  top.position.set(0, 6, 1);
+  scene.add(top);
 
   const charGroup = new THREE.Group();
   scene.add(charGroup);
 
-  // === MATERIALS ===
+  // === MATERIALS === (smoother plastic-like with low roughness)
   const skinMat = new THREE.MeshStandardMaterial({
     color: body.skin,
-    roughness: 0.55,
-    metalness: body.metallic ? 0.4 : 0.05,
+    roughness: 0.35,
+    metalness: body.metallic ? 0.45 : 0.1,
+    flatShading: false,
   });
   const shirtMat = new THREE.MeshStandardMaterial({
     color: body.shirt,
     emissive: body.metallic ? body.shirt : 0,
     emissiveIntensity: body.metallic ? 0.2 : 0,
-    roughness: 0.45,
-    metalness: body.metallic ? 0.7 : 0.1,
+    roughness: 0.3,
+    metalness: body.metallic ? 0.75 : 0.15,
+    flatShading: false,
   });
   const pantsMat = new THREE.MeshStandardMaterial({
     color: body.pants,
-    roughness: 0.6,
-    metalness: body.metallic ? 0.4 : 0.05,
+    roughness: 0.45,
+    metalness: body.metallic ? 0.45 : 0.1,
+    flatShading: false,
   });
-  const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 });
+  const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.3 });
 
-  // === HEAD === (center y=2.0, radius 0.85, top y=2.85)
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), skinMat);
+  // === HEAD === smoother (48 segments)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 48, 48), skinMat);
   head.position.y = 2.0;
   head.scale.set(1, 1.05, 0.96);
   charGroup.add(head);
 
-  // ears
-  const earGeo = new THREE.SphereGeometry(0.16, 16, 16);
+  // ears — higher-poly + better blending
+  const earGeo = new THREE.SphereGeometry(0.16, 24, 24);
   for (const x of [-0.83, 0.83]) {
     const ear = new THREE.Mesh(earGeo, skinMat);
     ear.position.set(x, 2.0, 0);
@@ -1397,21 +1421,25 @@ function build3DCharacter(scene, equipped) {
   // hair
   buildHair(charGroup, body);
 
-  // === EYES === (at y=2.05, z=0.7 forward of face)
-  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 });
-  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.2 });
-  const sparkleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.2 });
+  // === EYES === high-poly + glossy
+  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.1 });
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x0a0a1a, roughness: 0.1, metalness: 0.3 });
+  const sparkleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.4 });
   for (const x of [-0.3, 0.3]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), eyeWhiteMat);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 32, 32), eyeWhiteMat);
     eye.position.set(x, 2.05, 0.7);
     eye.scale.set(1, 1.15, 0.7);
     charGroup.add(eye);
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), pupilMat);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 24), pupilMat);
     pupil.position.set(x, 2.05, 0.84);
     charGroup.add(pupil);
-    const sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), sparkleMat);
+    const sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), sparkleMat);
     sparkle.position.set(x + 0.04, 2.11, 0.93);
     charGroup.add(sparkle);
+    // small secondary highlight
+    const sparkle2 = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), sparkleMat);
+    sparkle2.position.set(x - 0.03, 2.0, 0.93);
+    charGroup.add(sparkle2);
   }
 
   // eyebrows
@@ -1440,73 +1468,65 @@ function build3DCharacter(scene, equipped) {
     charGroup.add(cheek);
   }
 
+  // helper: capsule = cylinder with sphere ends (smooth no-seam joint)
+  const capsule = (rTop, rBot, len, mat, segs = 32) => {
+    const g = new THREE.Group();
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, len, segs, 1, true), mat);
+    g.add(cyl);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(rTop, segs, segs/2), mat);
+    top.position.y = len/2;
+    g.add(top);
+    const bot = new THREE.Mesh(new THREE.SphereGeometry(rBot, segs, segs/2), mat);
+    bot.position.y = -len/2;
+    g.add(bot);
+    return g;
+  };
+
   // === NECK ===
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.3, 16), skinMat);
+  const neck = capsule(0.22, 0.26, 0.3, skinMat, 24);
   neck.position.y = 1.4;
   charGroup.add(neck);
 
-  // === TORSO === (jelly-bean style)
-  const torso = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 0.5, 1.0, 24),
-    shirtMat
-  );
+  // === TORSO === smooth jelly-bean
+  const torso = capsule(0.55, 0.5, 1.0, shirtMat, 32);
   torso.position.y = 0.75;
   charGroup.add(torso);
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.6, 24, 16), shirtMat);
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 32), shirtMat);
   shoulders.position.y = 1.25;
   shoulders.scale.set(1, 0.6, 1);
   charGroup.add(shoulders);
-  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.55, 24, 16), shirtMat);
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), shirtMat);
   hips.position.y = 0.25;
   hips.scale.set(1, 0.55, 1);
   charGroup.add(hips);
 
-  // === ARMS ===
+  // === ARMS === smooth capsule arms
   for (const x of [-0.78, 0.78]) {
-    const upperArm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.16, 0.14, 0.55, 16),
-      shirtMat
-    );
+    const upperArm = capsule(0.16, 0.14, 0.55, shirtMat, 24);
     upperArm.position.set(x, 1.0, 0);
     upperArm.rotation.z = -Math.sign(x) * 0.2;
     charGroup.add(upperArm);
-    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), shirtMat);
-    elbow.position.set(x + Math.sign(x) * 0.1, 0.72, 0);
-    charGroup.add(elbow);
-    const forearm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.13, 0.12, 0.4, 16),
-      skinMat
-    );
+    const forearm = capsule(0.14, 0.12, 0.45, skinMat, 24);
     forearm.position.set(x + Math.sign(x) * 0.15, 0.5, 0);
     forearm.rotation.z = -Math.sign(x) * 0.1;
     charGroup.add(forearm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), skinMat);
-    hand.position.set(x + Math.sign(x) * 0.2, 0.28, 0);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.17, 24, 24), skinMat);
+    hand.position.set(x + Math.sign(x) * 0.2, 0.25, 0);
     charGroup.add(hand);
   }
 
-  // === LEGS ===
+  // === LEGS === smooth capsule legs
   for (const x of [-0.22, 0.22]) {
-    const thigh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.16, 0.5, 16),
-      pantsMat
-    );
+    const thigh = capsule(0.18, 0.16, 0.5, pantsMat, 24);
     thigh.position.set(x, -0.05, 0);
     charGroup.add(thigh);
-    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), pantsMat);
-    knee.position.set(x, -0.32, 0);
-    charGroup.add(knee);
-    const calf = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.15, 0.13, 0.4, 16),
-      pantsMat
-    );
-    calf.position.set(x, -0.55, 0);
+    const calf = capsule(0.16, 0.14, 0.45, pantsMat, 24);
+    calf.position.set(x, -0.5, 0);
     charGroup.add(calf);
-    const shoe = new THREE.Mesh(
-      new THREE.BoxGeometry(0.28, 0.16, 0.45),
-      shoesMat
-    );
-    shoe.position.set(x, -0.78, 0.08);
+    // smoother shoe — stretched ovoid
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), shoesMat);
+    shoe.position.set(x, -0.78, 0.1);
+    shoe.scale.set(1, 0.5, 1.5);
     charGroup.add(shoe);
   }
 
@@ -2104,7 +2124,10 @@ function renderClassroom() {
          ondrop="dropStudent(event, ${ci})">
       <div class="column-header">
         <span>טור ${ci+1} · ${studs.length}</span>
-        <button class="col-bonus" onclick="columnBonus(${ci})">+10 לכולם</button>
+        <div style="display:flex;gap:4px;align-items:center">
+          <input type="number" class="col-input" id="colInput${ci}" placeholder="10" value="10" onkeydown="if(event.key==='Enter')columnBonus(${ci})" onclick="event.stopPropagation()" />
+          <button class="col-bonus" onclick="columnBonus(${ci})" title="תן לכל הטור">תן</button>
+        </div>
       </div>
       ${studs.map(renderStudent).join('')}
       <button class="add-student-btn" onclick="addStudent(${ci})">➕ הוסף תלמיד</button>
@@ -2215,14 +2238,25 @@ function celebrateStudent(sid, klass) {
 
 function columnBonus(col) {
   if (APP_MODE === 'student') return;
+  const input = document.getElementById('colInput' + col);
+  const amount = parseInt(input?.value, 10) || 10;
+  if (amount === 0) return;
   const cls = getActiveClass();
+  const studentIds = [];
   cls.students.filter(s => s.column === col).forEach(s => {
-    s.points += 10;
-    s.weeklyPoints = (s.weeklyPoints || 0) + 10;
+    s.points = Math.max(0, s.points + amount);
+    s.weeklyPoints = (s.weeklyPoints || 0) + amount;
+    studentIds.push(s.id);
+    const newAchs = checkAchievements(s);
+    newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 800 + i * 1500));
   });
-  playSound('bonus');
-  burstConfetti(window.innerWidth/2, window.innerHeight/2);
+  playSound(amount > 0 ? 'bonus' : 'minus');
+  burstConfetti(window.innerWidth/2, window.innerHeight/2, amount > 0 ? 50 : 20);
   save(); renderClassroom();
+  // celebrate every student in the column with a stagger
+  setTimeout(() => {
+    studentIds.forEach((sid, i) => setTimeout(() => celebrateStudent(sid, amount > 0 ? 'celebrating' : 'disappointed'), i * 60));
+  }, 50);
 }
 
 // ==================== STUDENT MODAL ====================
