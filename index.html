@@ -193,7 +193,37 @@ header {
   background: radial-gradient(circle at 50% 30%, rgba(0,245,255,0.15), transparent 70%);
   cursor: pointer;
   display: block;
+  animation: idleBob 3s ease-in-out infinite;
+  transition: transform 0.2s;
 }
+.avatar-canvas:hover { transform: scale(1.18) rotate(-3deg); animation-play-state: paused; }
+@keyframes idleBob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25%      { transform: translateY(-3px) rotate(-1.5deg); }
+  50%      { transform: translateY(0) rotate(0deg); }
+  75%      { transform: translateY(-2px) rotate(1.5deg); }
+}
+.student.celebrating .avatar-canvas {
+  animation: celebrate 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.student.disappointed .avatar-canvas {
+  animation: shake 0.5s ease-in-out;
+}
+@keyframes celebrate {
+  0%   { transform: scale(1) translateY(0) rotate(0); }
+  30%  { transform: scale(1.35) translateY(-18px) rotate(-12deg); }
+  60%  { transform: scale(1.1) translateY(-6px) rotate(8deg); }
+  100% { transform: scale(1) translateY(0) rotate(0); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20%      { transform: translateX(-10px) rotate(-8deg); }
+  40%      { transform: translateX(10px) rotate(8deg); }
+  60%      { transform: translateX(-7px) rotate(-5deg); }
+  80%      { transform: translateX(7px) rotate(5deg); }
+}
+.student.celebrating { box-shadow: 0 0 40px rgba(0,255,136,0.6); border-color: var(--neon-green) !important; }
+.student.disappointed { box-shadow: 0 0 30px rgba(255,68,68,0.5); }
 .student-info { flex: 1; min-width: 0; cursor: pointer; }
 .student-name-row {
   display: flex;
@@ -382,6 +412,27 @@ header {
 }
 .box-emoji { font-size: 70px; animation: float 2s ease-in-out infinite; }
 @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+@keyframes boxShake {
+  0%, 100% { transform: translate(0,0) rotate(0); }
+  20%      { transform: translate(-4px,2px) rotate(-3deg); }
+  40%      { transform: translate(4px,-2px) rotate(3deg); }
+  60%      { transform: translate(-3px,3px) rotate(-2deg); }
+  80%      { transform: translate(3px,-3px) rotate(2deg); }
+}
+@keyframes flashBurst {
+  0%   { transform: scale(0); opacity: 1; }
+  50%  { transform: scale(1.5); opacity: 0.9; }
+  100% { transform: scale(3); opacity: 0; }
+}
+@keyframes particleFly {
+  0%   { transform: translate(0,0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx),var(--ty)) scale(0.3); opacity: 0; }
+}
+@keyframes itemReveal {
+  0%   { transform: scale(0) rotate(-360deg); opacity: 0; }
+  60%  { transform: scale(1.2) rotate(20deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
 
 .rank-up-overlay {
   position: fixed; inset: 0;
@@ -509,6 +560,21 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 
 <div class="modal-bg" id="studentModal" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalContent"></div>
+</div>
+
+<div id="boxOpenOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(10px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;cursor:pointer" onclick="this.style.display='none'">
+  <div id="boxStage" style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center"></div>
+  <div id="boxResultText" style="margin-top:30px;font-size:2em;font-weight:900;text-align:center;background:linear-gradient(90deg,#ffe600,#ff8c00);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 60px #ffe600"></div>
+  <div style="margin-top:20px;color:#888;font-size:0.9em">לחץ במקום כלשהו להמשך</div>
+</div>
+
+<div id="dailyBonusOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(10px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;cursor:pointer" onclick="this.style.display='none'">
+  <div style="text-align:center;animation:rankUpZoom 0.6s ease-out">
+    <div style="font-size:7em;animation:float 1.2s ease-in-out infinite">🎁</div>
+    <div style="font-family:'Rubik Mono One';font-size:3em;background:linear-gradient(90deg,#ffe600,#ff8c00,#ff2e93);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 60px #ffe600;margin:20px 0">בונוס יומי!</div>
+    <div id="dailyText" style="font-size:1.5em;color:#fff"></div>
+    <div id="dailyStreak" style="margin-top:14px;font-size:1.2em;color:#ff8c00"></div>
+  </div>
 </div>
 
 <div class="rank-up-overlay" id="rankUpOverlay" onclick="this.classList.remove('show')">
@@ -1959,7 +2025,7 @@ function dropStudent(e, col) {
 }
 
 function addPoints(studentId, amount, fromX, fromY) {
-  if (APP_MODE === 'student') return; // students cannot add/remove points
+  if (APP_MODE === 'student') return;
   const s = getActiveClass().students.find(s => s.id === studentId);
   if (!s) return;
   const oldRank = getRank(s.points).current;
@@ -1971,7 +2037,18 @@ function addPoints(studentId, amount, fromX, fromY) {
   else playSound(amount > 0 ? 'point' : 'minus');
   save();
   renderClassroom();
+  // 🎉 avatar reaction
+  setTimeout(() => celebrateStudent(studentId, amount > 0 ? 'celebrating' : 'disappointed'), 30);
   if (document.getElementById('studentModal').classList.contains('show')) openStudent(s.id);
+}
+
+function celebrateStudent(sid, klass) {
+  const card = document.querySelector(`.student[data-id="${sid}"]`);
+  if (!card) return;
+  card.classList.remove('celebrating', 'disappointed');
+  void card.offsetWidth; // restart animation
+  card.classList.add(klass);
+  setTimeout(() => card.classList.remove(klass), 800);
 }
 
 function columnBonus(col) {
@@ -2139,18 +2216,58 @@ function openMysteryBox(sid) {
   s.points -= MYSTERY_BOX_PRICE;
   const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)];
   const item = allItems[Math.floor(Math.random() * allItems.length)];
-  let resultMsg;
-  if (s.owned.includes(item.id)) {
-    s.points += MYSTERY_BOX_PRICE / 2;
-    resultMsg = `כבר יש לך את "${item.name}"! הוחזרו ${MYSTERY_BOX_PRICE/2} נקודות.`;
-  } else {
-    s.owned.push(item.id);
-    resultMsg = `🎉 מזל טוב! קיבלת: ${item.name}`;
-  }
-  burstConfetti(window.innerWidth/2, window.innerHeight/2, 50);
-  playSound('box');
-  alert(resultMsg);
-  save(); renderClassroom(); openStudent(sid);
+  const isDuplicate = s.owned.includes(item.id);
+  if (isDuplicate) s.points += MYSTERY_BOX_PRICE / 2;
+  else s.owned.push(item.id);
+  save(); renderClassroom();
+  playBoxCinematic(item, isDuplicate, () => { openStudent(sid); });
+}
+
+function playBoxCinematic(item, isDuplicate, onDone) {
+  const overlay = document.getElementById('boxOpenOverlay');
+  const stage = document.getElementById('boxStage');
+  const result = document.getElementById('boxResultText');
+  result.textContent = '';
+  stage.innerHTML = `<div id="boxBox" style="font-size:160px;animation:boxShake 0.15s linear infinite;filter:drop-shadow(0 0 30px #ff8c00)">🎁</div>`;
+  overlay.style.display = 'flex';
+  playSound('boxStart');
+  // shake for 1.5s
+  setTimeout(() => {
+    // explosion of light
+    stage.innerHTML = '';
+    const flash = document.createElement('div');
+    flash.style.cssText = 'position:absolute;inset:0;background:radial-gradient(circle,#fff 0%,#ffe600 30%,transparent 70%);border-radius:50%;animation:flashBurst 0.6s ease-out forwards';
+    stage.appendChild(flash);
+    burstConfetti(window.innerWidth/2, window.innerHeight/2, 80);
+    playSound('boxBurst');
+    // particles
+    for (let i = 0; i < 16; i++) {
+      const p = document.createElement('div');
+      const a = (i / 16) * Math.PI * 2;
+      p.style.cssText = `position:absolute;width:14px;height:14px;background:hsl(${i*22},90%,60%);border-radius:50%;box-shadow:0 0 20px currentColor;color:hsl(${i*22},90%,60%);animation:particleFly 0.9s ease-out forwards;--tx:${Math.cos(a)*250}px;--ty:${Math.sin(a)*250}px`;
+      stage.appendChild(p);
+    }
+    // reveal item
+    setTimeout(() => {
+      stage.innerHTML = '';
+      const reveal = document.createElement('div');
+      reveal.style.cssText = 'font-size:200px;animation:itemReveal 0.8s cubic-bezier(0.34,1.56,0.64,1);filter:drop-shadow(0 0 40px #ffe600)';
+      // emoji proxy for item visual
+      const emoji = item.emoji || ({body:'🎨',hat:'🎩',gl:'👓',pet:'🐾',aura:'✨'})[Object.keys({body:1,hat:1,gl:1,pet:1,aura:1}).find(k => item.id.startsWith(k))] || '🎁';
+      reveal.textContent = emoji;
+      stage.appendChild(reveal);
+      result.textContent = isDuplicate
+        ? `כבר יש לך ${item.name}! הוחזרו ${MYSTERY_BOX_PRICE/2} נק׳`
+        : `🎉 קיבלת: ${item.name}!`;
+      playSound('boxItem');
+    }, 600);
+  }, 1500);
+  // dismiss handler
+  overlay.onclick = () => {
+    overlay.style.display = 'none';
+    overlay.onclick = () => overlay.style.display = 'none';
+    onDone && onDone();
+  };
 }
 
 function renameStudent(sid) {
@@ -2211,29 +2328,44 @@ function burstConfetti(x, y, count = 40) {
 }
 
 let audioCtx;
+function playTone(freq, dur, startTime, type = 'sine', vol = 0.18) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.setValueAtTime(freq, startTime);
+  osc.type = type;
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(vol, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+  osc.start(startTime); osc.stop(startTime + dur + 0.05);
+}
 function playSound(type) {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = {
-      point:  [[523, 0.08],[784, 0.1]],
-      minus:  [[300, 0.1],[200, 0.15]],
-      bonus:  [[523,0.08],[659,0.08],[784,0.08],[1047,0.15]],
-      buy:    [[659, 0.06],[988, 0.1]],
-      equip:  [[784, 0.06]],
-      box:    [[523,0.06],[659,0.06],[784,0.06],[1047,0.06],[1319,0.15]],
-      rankup: [[523,0.1],[659,0.1],[784,0.1],[1047,0.2],[1319,0.3]],
-    };
-    const seq = notes[type] || [[440,0.1]];
     let t = audioCtx.currentTime;
-    for (const [freq, dur] of seq) {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'square';
-      osc.connect(gain); gain.connect(audioCtx.destination);
-      gain.gain.setValueAtTime(0.15, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      osc.start(t); osc.stop(t + dur);
+    const tunes = {
+      point:    [[659,0.1],[988,0.15]],     // C-G ascending happy
+      minus:    [[392,0.1],[294,0.18]],     // descending sad
+      bonus:    [[523,0.08],[659,0.08],[784,0.08],[1047,0.18]],
+      buy:      [[784,0.06],[988,0.06],[1319,0.15]],  // ka-ching
+      equip:    [[988,0.05],[1319,0.08]],
+      rankup:   [[523,0.1],[659,0.1],[784,0.1],[1047,0.15],[1319,0.25]],
+      boxStart: [[392,0.1],[440,0.1],[494,0.1]],  // suspense rise
+      boxBurst: [[1047,0.05],[1319,0.05],[1568,0.15]],
+      boxItem:  [[523,0.08],[659,0.08],[784,0.08],[1047,0.08],[1319,0.2]],
+      daily:    [[523,0.1],[784,0.1],[1047,0.1],[1319,0.1],[1568,0.25]],  // fanfare
+    };
+    const notes = tunes[type] || [[440,0.1]];
+    for (const [freq, dur] of notes) {
+      // base tone (sine — warm)
+      playTone(freq, dur, t, 'sine', 0.2);
+      // octave below for fullness
+      playTone(freq / 2, dur, t, 'triangle', 0.08);
+      // slight detune for thickness on big sounds
+      if (['rankup','daily','boxItem','boxBurst'].includes(type)) {
+        playTone(freq * 1.005, dur, t, 'sine', 0.1);
+        playTone(freq * 2, dur * 0.6, t, 'sine', 0.05);  // sparkle
+      }
       t += dur;
     }
   } catch(e) {}
@@ -2498,7 +2630,34 @@ function renderStudentPicker() {
 
 function enterStudentMode(sid) {
   studentSelectedId = sid;
+  claimDailyBonus(sid);
   renderStudentProfile();
+}
+
+function claimDailyBonus(sid) {
+  const found = findStudent(sid);
+  if (!found) return;
+  const s = found.student;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  if (s.lastDaily === today) return; // already claimed today
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (s.lastDaily === yesterday) s.streak = (s.streak || 0) + 1;
+  else s.streak = 1;
+  s.lastDaily = today;
+  const baseBonus = 20;
+  const streakBonus = Math.min(50, (s.streak - 1) * 5);
+  const totalBonus = baseBonus + streakBonus;
+  s.points += totalBonus;
+  s.weeklyPoints = (s.weeklyPoints || 0) + totalBonus;
+  save();
+  // show celebration
+  document.getElementById('dailyText').innerHTML = `+${totalBonus} <span style="color:var(--neon-yellow)">נקודות</span>`;
+  document.getElementById('dailyStreak').innerHTML = s.streak >= 2
+    ? `🔥 ${s.streak} ימים ברצף! בונוס +${streakBonus}`
+    : `התחלת רצף — בוא מחר ל-x2!`;
+  document.getElementById('dailyBonusOverlay').style.display = 'flex';
+  burstConfetti(window.innerWidth/2, window.innerHeight/3, 60);
+  playSound('daily');
 }
 
 function exitStudentMode() {
