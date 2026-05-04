@@ -42,11 +42,65 @@ body::before {
     radial-gradient(2px 2px at 90% 60%, white, transparent),
     radial-gradient(1px 1px at 50% 50%, white, transparent);
   background-size: 250px 250px;
-  opacity: 0.4;
+  opacity: 0.5;
   pointer-events: none;
   animation: starsMove 120s linear infinite;
+  z-index: 0;
 }
 @keyframes starsMove { from {background-position: 0 0;} to {background-position: 250px 250px;} }
+
+#particleLayer {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(1px);
+}
+@keyframes floatUp {
+  from { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  to   { transform: translateY(-20vh) rotate(360deg); opacity: 0; }
+}
+.bubble1 { width: 20px; height: 20px; background: radial-gradient(circle at 30% 30%, rgba(0,245,255,0.6), rgba(0,245,255,0)); }
+.bubble2 { width: 14px; height: 14px; background: radial-gradient(circle at 30% 30%, rgba(255,46,147,0.6), rgba(255,46,147,0)); }
+.bubble3 { width: 8px; height: 8px; background: radial-gradient(circle at 30% 30%, rgba(255,230,0,0.7), rgba(255,230,0,0)); }
+.bubble4 { width: 12px; height: 12px; background: radial-gradient(circle at 30% 30%, rgba(0,255,136,0.6), rgba(0,255,136,0)); }
+.bubble5 { width: 16px; height: 16px; background: radial-gradient(circle at 30% 30%, rgba(184,41,255,0.6), rgba(184,41,255,0)); }
+
+header, .classroom, .footer-actions { position: relative; z-index: 5; }
+
+.page-fade { animation: pageFade 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes pageFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+button:active { transform: scale(0.95); }
+
+.music-btn {
+  position: fixed; bottom: 20px; left: 20px;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff2e93, #b829ff);
+  border: 2px solid rgba(255,255,255,0.3);
+  color: white;
+  font-size: 1.6em;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 8px 30px rgba(255,46,147,0.5);
+  transition: transform 0.2s;
+}
+.music-btn:hover { transform: scale(1.1); }
+.music-btn.playing { animation: musicPulse 1.5s ease-in-out infinite; }
+@keyframes musicPulse {
+  0%, 100% { box-shadow: 0 8px 30px rgba(255,46,147,0.5); }
+  50%      { box-shadow: 0 8px 40px rgba(255,46,147,0.9), 0 0 60px rgba(0,245,255,0.5); }
+}
 
 header {
   background: linear-gradient(90deg, rgba(255,46,147,0.15), rgba(0,245,255,0.15));
@@ -64,11 +118,16 @@ header {
 .logo {
   font-family: 'Rubik Mono One', sans-serif;
   font-size: 1.5em;
-  background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan), var(--neon-yellow));
+  background: linear-gradient(90deg, #ff2e93, #b829ff, #00f5ff, #00ff88, #ffe600, #ff8c00, #ff2e93);
+  background-size: 400% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow: 0 0 30px rgba(255,46,147,0.5);
+  animation: gradFlow 8s linear infinite;
+}
+@keyframes gradFlow {
+  to { background-position: 400% 0; }
 }
 .tabs { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
 .tab {
@@ -126,11 +185,13 @@ header {
   margin: 0 auto;
 }
 .column {
-  background: var(--card);
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 12px;
   min-height: 200px;
-  border: 2px dashed transparent;
   transition: all 0.2s;
 }
 .column.drag-over { border-color: var(--neon-cyan); background: rgba(0,245,255,0.08); }
@@ -157,13 +218,15 @@ header {
 .col-bonus:hover { transform: scale(1.05); }
 
 .student {
-  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+  background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03));
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
   border-radius: 14px;
   padding: 10px;
   margin-bottom: 10px;
   cursor: grab;
-  transition: all 0.2s;
-  border: 1px solid rgba(255,255,255,0.08);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid rgba(255,255,255,0.12);
   position: relative;
   display: flex;
   align-items: center;
@@ -303,16 +366,18 @@ header {
 .modal-bg.show { display: flex; animation: fadeIn 0.2s; }
 @keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
 .modal {
-  background: linear-gradient(135deg, #1a1d3a, #0a0e27);
-  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(26,29,58,0.85), rgba(10,14,39,0.85));
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-radius: 24px;
   padding: 24px;
   max-width: 700px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  border: 2px solid rgba(0,245,255,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
   box-shadow: 0 20px 60px rgba(0,245,255,0.2), 0 0 100px rgba(255,46,147,0.1);
-  animation: slideUp 0.3s;
+  animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 @keyframes slideUp { from {transform: translateY(40px); opacity:0;} to {transform: translateY(0); opacity:1;} }
 
@@ -385,13 +450,15 @@ header {
   gap: 10px;
 }
 .shop-item {
-  background: var(--card);
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 2px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 10px 8px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
 }
 .shop-item:hover { border-color: var(--neon-cyan); transform: translateY(-2px); }
@@ -596,6 +663,9 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 <div class="modal-bg" id="studentModal" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalContent"></div>
 </div>
+
+<div id="particleLayer"></div>
+<button class="music-btn" id="musicBtn" onclick="toggleMusic()" title="מוזיקת רקע">🎵</button>
 
 <div id="boxOpenOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(10px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;cursor:pointer" onclick="this.style.display='none'">
   <div id="boxStage" style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center"></div>
@@ -2968,6 +3038,153 @@ function studentOpenBox() {
 }
 
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+// ==================== PARTICLE LAYER ====================
+function spawnParticles() {
+  const layer = document.getElementById('particleLayer');
+  if (!layer) return;
+  for (let i = 0; i < 25; i++) {
+    setTimeout(() => createParticle(layer), i * 800);
+  }
+  setInterval(() => createParticle(layer), 1200);
+}
+function createParticle(layer) {
+  const p = document.createElement('div');
+  const variant = 1 + Math.floor(Math.random() * 5);
+  p.className = 'particle bubble' + variant;
+  p.style.left = (Math.random() * 100) + '%';
+  const dur = 14 + Math.random() * 14;
+  p.style.animation = `floatUp ${dur}s linear`;
+  p.style.animationDelay = (-Math.random() * dur) + 's';
+  layer.appendChild(p);
+  setTimeout(() => p.remove(), dur * 1000);
+}
+
+// ==================== AMBIENT MUSIC (Web Audio synth loop) ====================
+let musicCtx = null, musicGain = null, musicPlaying = false, musicNodes = [];
+const MUSIC_KEY = 'cps_music_on_v1';
+
+function startMusic() {
+  if (musicPlaying) return;
+  musicPlaying = true;
+  if (!musicCtx) musicCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (musicCtx.state === 'suspended') musicCtx.resume();
+
+  musicGain = musicCtx.createGain();
+  musicGain.gain.value = 0;
+  musicGain.gain.linearRampToValueAtTime(0.12, musicCtx.currentTime + 1.5);
+  musicGain.connect(musicCtx.destination);
+
+  // chord progression: C - Am - F - G  (kid-friendly major)
+  const progressions = [
+    [261.63, 329.63, 392.00], // C major
+    [220.00, 261.63, 329.63], // A minor
+    [174.61, 220.00, 261.63], // F major
+    [196.00, 246.94, 293.66], // G major
+  ];
+  const beatDur = 1.6;
+  let measure = 0;
+
+  function playMeasure() {
+    if (!musicPlaying) return;
+    const t0 = musicCtx.currentTime;
+    const chord = progressions[measure % progressions.length];
+
+    // pad: warm sustained chord
+    chord.forEach(freq => {
+      const osc = musicCtx.createOscillator();
+      const g = musicCtx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.06, t0 + 0.3);
+      g.gain.linearRampToValueAtTime(0.04, t0 + beatDur * 0.8);
+      g.gain.linearRampToValueAtTime(0, t0 + beatDur);
+      osc.connect(g); g.connect(musicGain);
+      osc.start(t0); osc.stop(t0 + beatDur + 0.1);
+      // octave overlay
+      const osc2 = musicCtx.createOscillator();
+      const g2 = musicCtx.createGain();
+      osc2.frequency.value = freq * 2;
+      osc2.type = 'triangle';
+      g2.gain.setValueAtTime(0, t0);
+      g2.gain.linearRampToValueAtTime(0.025, t0 + 0.3);
+      g2.gain.linearRampToValueAtTime(0, t0 + beatDur);
+      osc2.connect(g2); g2.connect(musicGain);
+      osc2.start(t0); osc2.stop(t0 + beatDur + 0.1);
+    });
+
+    // bass — root note
+    const bass = musicCtx.createOscillator();
+    const bg = musicCtx.createGain();
+    bass.frequency.value = chord[0] / 2;
+    bass.type = 'triangle';
+    bg.gain.setValueAtTime(0.1, t0);
+    bg.gain.exponentialRampToValueAtTime(0.001, t0 + beatDur * 0.6);
+    bass.connect(bg); bg.connect(musicGain);
+    bass.start(t0); bass.stop(t0 + beatDur);
+
+    // melody — playful arpeggio
+    const melodyNotes = [chord[0]*2, chord[1]*2, chord[2]*2, chord[1]*2];
+    melodyNotes.forEach((f, i) => {
+      const m = musicCtx.createOscillator();
+      const mg = musicCtx.createGain();
+      m.frequency.value = f;
+      m.type = 'sine';
+      const start = t0 + i * (beatDur / 4);
+      const dur = beatDur / 4 * 0.8;
+      mg.gain.setValueAtTime(0, start);
+      mg.gain.linearRampToValueAtTime(0.04, start + 0.05);
+      mg.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      m.connect(mg); mg.connect(musicGain);
+      m.start(start); m.stop(start + dur + 0.05);
+    });
+
+    measure++;
+    setTimeout(playMeasure, beatDur * 1000);
+  }
+  playMeasure();
+}
+
+function stopMusic() {
+  if (!musicPlaying) return;
+  musicPlaying = false;
+  if (musicGain) {
+    musicGain.gain.linearRampToValueAtTime(0, musicCtx.currentTime + 0.5);
+  }
+}
+
+function toggleMusic() {
+  const btn = document.getElementById('musicBtn');
+  if (musicPlaying) {
+    stopMusic();
+    btn.textContent = '🎵';
+    btn.classList.remove('playing');
+    localStorage.setItem(MUSIC_KEY, 'off');
+  } else {
+    startMusic();
+    btn.textContent = '🔊';
+    btn.classList.add('playing');
+    localStorage.setItem(MUSIC_KEY, 'on');
+  }
+}
+
+// auto-resume music if was on
+function maybeAutoMusic() {
+  if (localStorage.getItem(MUSIC_KEY) === 'on') {
+    // need user gesture — wait for first click
+    const onFirst = () => {
+      startMusic();
+      document.getElementById('musicBtn').textContent = '🔊';
+      document.getElementById('musicBtn').classList.add('playing');
+      document.removeEventListener('click', onFirst);
+    };
+    document.addEventListener('click', onFirst, { once: true });
+  }
+}
+
+spawnParticles();
+maybeAutoMusic();
 
 // ==================== INIT ====================
 async function init() {
