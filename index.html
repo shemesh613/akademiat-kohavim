@@ -671,8 +671,9 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 <div class="footer-actions">
   <button class="btn btn-warning" onclick="openLeaderboard()">🏆 לוח שיא</button>
   <button class="btn" onclick="resetWeek()">🔄 איפוס שבועי</button>
-  <button class="btn btn-danger" onclick="exportData()">💾 גיבוי</button>
-  <button class="btn" onclick="importData()">📂 שחזור</button>
+  <button class="btn btn-danger" onclick="exportData()">💾 גיבוי לקובץ</button>
+  <button class="btn" onclick="importData()">📂 שחזור מקובץ</button>
+  <button class="btn" onclick="openBackupHistory()">📜 היסטוריה</button>
 </div>
 
 <div class="modal-bg" id="studentModal" onclick="if(event.target===this)closeModal()">
@@ -954,8 +955,37 @@ function createStudent(name, column) {
 }
 
 function save() {
-  localStorage.setItem('cps_state_v2', JSON.stringify(state));
+  const json = JSON.stringify(state);
+  localStorage.setItem('cps_state_v2', json);
+  // rotating local backup — keep last 20 timestamped snapshots
+  try {
+    const now = Date.now();
+    const lastBackup = parseInt(localStorage.getItem('cps_lastBackup') || '0');
+    // keep one backup per minute max (avoid spam)
+    if (now - lastBackup > 60000) {
+      const idx = parseInt(localStorage.getItem('cps_backupIdx') || '0');
+      const slot = (idx + 1) % 20;
+      localStorage.setItem('cps_backup_' + slot, JSON.stringify({ ts: now, state: json }));
+      localStorage.setItem('cps_backupIdx', String(slot));
+      localStorage.setItem('cps_lastBackup', String(now));
+    }
+  } catch(e) { console.warn('local backup failed', e); }
   queueCloudSave();
+}
+
+// expose backup info for restore UI
+function listLocalBackups() {
+  const out = [];
+  for (let i = 0; i < 20; i++) {
+    const raw = localStorage.getItem('cps_backup_' + i);
+    if (!raw) continue;
+    try {
+      const b = JSON.parse(raw);
+      out.push({ slot: i, ts: b.ts, state: b.state, size: raw.length });
+    } catch(e) {}
+  }
+  out.sort((a, b) => b.ts - a.ts);
+  return out;
 }
 function getActiveClass() { return state.classes.find(c => c.id === state.activeClassId); }
 function getRank(p) {
@@ -2632,6 +2662,68 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(url);
 }
+function openBackupHistory() {
+  const backups = listLocalBackups();
+  const m = document.getElementById('modalContent');
+  m.innerHTML = `
+    <div class="modal-hero" style="padding-bottom:10px">
+      <div style="font-size:60px">📜</div>
+      <div style="flex:1">
+        <div class="modal-title">היסטוריית גיבויים מקומית</div>
+        <div class="modal-sub">${backups.length} מתוך 20 snapshots שמורים בדפדפן הזה</div>
+      </div>
+      <button class="btn" onclick="closeModal()">✕</button>
+    </div>
+    <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);padding:12px;border-radius:10px;margin-bottom:14px;font-size:0.9em">
+      ✅ <b>הנתונים שלך מוגנים ב-3 שכבות:</b><br>
+      1. localStorage (הדפדפן הזה)<br>
+      2. Firebase Realtime DB (כל המכשירים מסונכרנים)<br>
+      3. גיבויים מתוארכים מקומיים (20 אחרונים, רוטציה אוטומטית כל דקה)
+    </div>
+    ${backups.length === 0 ? '<div style="text-align:center;padding:30px;color:var(--text-dim)">עדיין אין snapshots — יווצרו אוטומטית כששתה משנה דברים</div>' : ''}
+    <div>
+      ${backups.map(b => {
+        const d = new Date(b.ts);
+        const dateStr = d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        let summary = '';
+        try {
+          const st = JSON.parse(b.state);
+          const totalStudents = st.classes?.reduce((sum, c) => sum + (c.students?.length || 0), 0) || 0;
+          const totalPoints = st.classes?.reduce((s, c) => s + (c.students?.reduce((p, st) => p + (st.points || 0), 0) || 0), 0) || 0;
+          const totalOwned = st.classes?.reduce((s, c) => s + (c.students?.reduce((o, st) => o + (st.owned?.length || 0), 0) || 0), 0) || 0;
+          const pending = st.pending?.length || 0;
+          summary = `${totalStudents} תלמידים · ${totalPoints} נק׳ · ${totalOwned} פריטים · ${pending} ממתינים`;
+        } catch(e) { summary = '(שגיאה בקריאה)'; }
+        return `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:12px;margin-bottom:8px">
+            <div style="font-size:1.8em">📅</div>
+            <div style="flex:1">
+              <div style="font-weight:900">${dateStr}</div>
+              <div style="font-size:0.85em;color:var(--text-dim)">${summary} · ${(b.size/1024).toFixed(1)} KB</div>
+            </div>
+            <button class="btn btn-warning" onclick="restoreLocalBackup(${b.slot})">↩ שחזר</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  document.getElementById('studentModal').classList.add('show');
+}
+
+function restoreLocalBackup(slot) {
+  const raw = localStorage.getItem('cps_backup_' + slot);
+  if (!raw) return;
+  if (!confirm('לשחזר את הגיבוי הזה? המצב הנוכחי יוחלף!')) return;
+  try {
+    const b = JSON.parse(raw);
+    state = JSON.parse(b.state);
+    save();
+    renderAll();
+    closeModal();
+    alert('✅ הגיבוי שוחזר בהצלחה');
+  } catch(e) { alert('❌ שגיאה: ' + e.message); }
+}
+
 function importData() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'application/json';
