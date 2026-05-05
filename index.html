@@ -1093,14 +1093,29 @@ async function preloadAllModels(progressCb) {
 }
 
 // Lazy-load character GLB only when a student actually has it equipped
+const loadingChars = {};
 function ensureCharLoaded(character) {
   if (character.type !== 'glb') return;
   if (modelCache[character.model]) return;
-  loadModel(character.model, 8000).then(() => {
+  if (loadingChars[character.model]) return;
+  loadingChars[character.model] = true;
+  loadModel(character.model, 30000).then((m) => {
+    delete loadingChars[character.model];
     clearAvatarCache();
+    // force re-render of all shop previews
+    document.querySelectorAll('canvas[data-shop], canvas[data-stshop]').forEach(c => c.dataset.rendered = '');
     if (typeof renderAll === 'function') renderAll();
+    // also refresh open modal
+    if (currentShopStudentSid) {
+      const s = state.classes.flatMap(c => c.students).find(st => st.id === currentShopStudentSid);
+      if (s) {
+        if (APP_MODE === 'student') setStudentTab(studentTab);
+        else openStudent(s.id);
+      }
+    }
   });
 }
+let currentShopStudentSid = null;
 
 // === PROCEDURAL PET BUILDERS ===
 const M = (color, opts = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, ...opts });
@@ -2484,6 +2499,7 @@ function openStudent(id) {
   if (APP_MODE === 'student') return; // never show teacher modal in home mode
   const s = getActiveClass().students.find(s => s.id === id);
   if (!s) return;
+  currentShopStudentSid = id;
   const rank = getRank(s.points);
   const m = document.getElementById('modalContent');
   m.innerHTML = `
@@ -2536,6 +2552,7 @@ function setModalTab(t, sid) { modalTab = t; openStudent(sid); }
 function closeModal() {
   document.getElementById('studentModal').classList.remove('show');
   if (modalAnimId) { cancelAnimationFrame(modalAnimId); modalAnimId = null; }
+  if (APP_MODE !== 'student') currentShopStudentSid = null;
 }
 
 function renderModalBody(s) {
@@ -2620,9 +2637,31 @@ function setupLazyShopRender(s) {
 }
 function renderShopPreview(canvas, s) {
   if (canvas.dataset.rendered === '1') return;
-  canvas.dataset.rendered = '1';
   const slot = canvas.dataset.slot;
   const itemId = canvas.dataset.item;
+  // Special handling for premium GLB characters that aren't loaded yet
+  if (slot === 'character') {
+    const char = findItem(itemId);
+    if (char && char.type === 'glb' && !modelCache[char.model]) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const grd = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
+      grd.addColorStop(0, 'rgba(0,245,255,0.3)');
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00f5ff';
+      ctx.font = `900 ${canvas.width/9}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⏳', canvas.width/2, canvas.height/2 - canvas.width/10);
+      ctx.fillStyle = '#fff';
+      ctx.font = `${canvas.width/12}px sans-serif`;
+      ctx.fillText('טוען דמות...', canvas.width/2, canvas.height/2 + canvas.width/8);
+      ensureCharLoaded(char);
+      return; // don't mark rendered — will re-attempt when loaded
+    }
+  }
+  canvas.dataset.rendered = '1';
   const eq = { ...s.equipped, [slot]: itemId };
   renderToCanvas(canvas, eq);
 }
@@ -3129,6 +3168,7 @@ function renderStudentPicker() {
 
 function enterStudentMode(sid) {
   studentSelectedId = sid;
+  currentShopStudentSid = sid;
   claimDailyBonus(sid);
   renderStudentProfile();
 }
