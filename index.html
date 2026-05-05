@@ -1022,30 +1022,17 @@ function findItem(id) {
 }
 
 // ==================== 3D RENDERER ====================
-let webglAvailable = true;
-const sharedRenderer = (() => {
-  try {
-    const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    r.outputEncoding = THREE.sRGBEncoding;
-    // Listen for context loss
-    r.domElement.addEventListener('webglcontextlost', (e) => {
-      e.preventDefault();
-      console.warn('WebGL context lost — clearing cache, will recover');
-      clearAvatarCache();
-    });
-    r.domElement.addEventListener('webglcontextrestored', () => {
-      console.warn('WebGL context restored');
-      clearAvatarCache();
-      if (typeof renderAll === 'function') renderAll();
-    });
-    return r;
-  } catch(e) {
-    console.error('WebGL not available — falling back to 2D', e);
-    webglAvailable = false;
-    return null;
-  }
-})();
+const sharedRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+sharedRenderer.setPixelRatio(window.devicePixelRatio);
+sharedRenderer.outputEncoding = THREE.sRGBEncoding;
+sharedRenderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  clearAvatarCache();
+});
+sharedRenderer.domElement.addEventListener('webglcontextrestored', () => {
+  clearAvatarCache();
+  if (typeof renderAll === 'function') renderAll();
+});
 
 const modelCache = {};
 const gltfLoader = new THREE.GLTFLoader();
@@ -2235,32 +2222,9 @@ function avatarCacheKey(equipped, w) {
 }
 function clearAvatarCache() { avatarCache.clear(); }
 
-function draw2DFallback(canvas, equipped) {
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  const body = findItem(equipped.body) || SHOP.bodies[0];
-  ctx.clearRect(0, 0, w, h);
-  // bg gradient
-  const grd = ctx.createRadialGradient(w/2, h*0.3, 0, w/2, h*0.5, w/2);
-  grd.addColorStop(0, '#' + ((body.skin || 0xffd6b8).toString(16).padStart(6,'0')));
-  grd.addColorStop(1, '#1a1d3a');
-  ctx.fillStyle = grd;
-  ctx.beginPath(); ctx.arc(w/2, h/2, w*0.4, 0, Math.PI*2); ctx.fill();
-  // simple face
-  ctx.fillStyle = '#222';
-  ctx.beginPath(); ctx.arc(w*0.4, h*0.45, w*0.04, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(w*0.6, h*0.45, w*0.04, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(w/2, h*0.6, w*0.1, 0, Math.PI); ctx.lineWidth = w*0.02; ctx.strokeStyle = '#222'; ctx.stroke();
-}
-
 function renderToCanvas(canvas, equipped, rotation = 0) {
   const w = canvas.width || 144;
   const h = canvas.height || 144;
-  // Fallback if no WebGL
-  if (!webglAvailable || !sharedRenderer) {
-    draw2DFallback(canvas, equipped);
-    return;
-  }
   // Cache hit (only when not rotating)
   if (rotation === 0) {
     const key = avatarCacheKey(equipped, w);
@@ -2272,38 +2236,22 @@ function renderToCanvas(canvas, equipped, rotation = 0) {
       return;
     }
   }
-  // Full 3D render — wrapped in try/catch
-  let renderOk = false;
-  try {
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
-    camera.position.set(0, 0.2, 6.5);
-    camera.lookAt(0, 0.2, 0);
-    const charGroup = build3DCharacter(scene, equipped);
-    charGroup.rotation.y = rotation;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
+  camera.position.set(0, 0.2, 6.5);
+  camera.lookAt(0, 0.2, 0);
+  const charGroup = build3DCharacter(scene, equipped);
+  charGroup.rotation.y = rotation;
 
-    sharedRenderer.setSize(w, h, false);
-    sharedRenderer.setClearColor(0x000000, 0);
-    sharedRenderer.render(scene, camera);
+  sharedRenderer.setSize(w, h, false);
+  sharedRenderer.setClearColor(0x000000, 0);
+  sharedRenderer.render(scene, camera);
 
-    // Verify context isn't lost
-    const gl = sharedRenderer.getContext();
-    if (gl.isContextLost && gl.isContextLost()) {
-      throw new Error('WebGL context lost');
-    }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(sharedRenderer.domElement, 0, 0, w, h);
 
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(sharedRenderer.domElement, 0, 0, w, h);
-    renderOk = true;
-    // NO dispose — would break GLB models that share cached geometry across instances
-  } catch(e) {
-    console.warn('3D render failed, using 2D fallback', e);
-    draw2DFallback(canvas, equipped);
-  }
-
-  // Save to cache only if render succeeded
-  if (renderOk && rotation === 0) {
+  if (rotation === 0) {
     if (avatarCache.size >= AVATAR_CACHE_MAX) {
       const firstKey = avatarCache.keys().next().value;
       avatarCache.delete(firstKey);
