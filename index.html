@@ -791,6 +791,18 @@ const SHOP = {
     { id: 'aura-rainbow',  name: 'קשת',      price: 500, color: 0xff2e93 },
     { id: 'aura-holy',     name: 'קדושה',    price: 700, color: 0xffe600 },
   ],
+  characters: [
+    { id: 'char-default', name: 'בסיס',           price: 0,    type: 'procedural' },
+    { id: 'char-bot',     name: '🧒 ילד תלת-מימד', price: 500,  type: 'glb',
+      model: 'https://threejs.org/examples/models/gltf/Xbot.glb',
+      scale: 1.5, headY: 2.7, eyeY: 2.45, eyeZ: 0.18, petY: -0.6, charYOffset: -1.3 },
+    { id: 'char-robot',   name: '🤖 רובוט חמוד',  price: 800,  type: 'glb',
+      model: 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
+      scale: 0.45, headY: 2.6, eyeY: 2.35, eyeZ: 0.55, petY: -0.5, charYOffset: -1.3 },
+    { id: 'char-soldier', name: '🥋 לוחם',        price: 1500, type: 'glb',
+      model: 'https://threejs.org/examples/models/gltf/Soldier.glb',
+      scale: 1.6, headY: 2.6, eyeY: 2.4, eyeZ: 0.18, petY: -0.5, charYOffset: -1.3 },
+  ],
 };
 
 const MYSTERY_BOX_PRICE = 75;
@@ -917,10 +929,12 @@ if (!state.pending) state.pending = [];
 state.classes.forEach(c => {
   if (!c.students) c.students = [];
   c.students.forEach(s => {
-    if (!s.equipped) s.equipped = { body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' };
-    if (!s.owned) s.owned = ['body-default','hat-none','gl-none','pet-none','aura-none'];
+    if (!s.equipped) s.equipped = { character: 'char-default', body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' };
+    if (!s.owned) s.owned = ['char-default','body-default','hat-none','gl-none','pet-none','aura-none'];
     if (!s.equipped.aura) s.equipped.aura = 'aura-none';
+    if (!s.equipped.character) s.equipped.character = 'char-default';
     if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
+    if (!s.owned.includes('char-default')) s.owned.push('char-default');
   });
 });
 
@@ -949,8 +963,8 @@ function createStudent(name, column) {
     column: column ?? 0,
     points: 0,
     weeklyPoints: 0,
-    equipped: { body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' },
-    owned: ['body-default','hat-none','gl-none','pet-none','aura-none'],
+    equipped: { character: 'char-default', body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' },
+    owned: ['char-default','body-default','hat-none','gl-none','pet-none','aura-none'],
   };
 }
 
@@ -1045,11 +1059,12 @@ function cloneModel(url) {
 }
 
 async function preloadAllModels(progressCb) {
-  const urls = SHOP.pets.filter(p => p.model).map(p => p.model);
+  const petUrls = SHOP.pets.filter(p => p.model).map(p => p.model);
+  const charUrls = SHOP.characters.filter(c => c.type === 'glb').map(c => c.model);
+  const urls = [...petUrls, ...charUrls];
   let done = 0;
-  // load all in parallel with timeout, no blocking on failures
   await Promise.all(urls.map(async url => {
-    try { await loadModel(url, 6000); } catch(e) { console.warn('Failed', url, e); }
+    try { await loadModel(url, 8000); } catch(e) { console.warn('Failed', url, e); }
     done++;
     progressCb(done, urls.length, url);
   }));
@@ -1389,6 +1404,7 @@ function build3DCharacter(scene, equipped) {
   const hat = findItem(equipped.hat);
   const glasses = findItem(equipped.glasses);
   const pet = findItem(equipped.pet);
+  const character = findItem(equipped.character) || SHOP.characters[0];
 
   // pro-grade lighting setup
   scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1d3a, 0.5));
@@ -1402,13 +1418,73 @@ function build3DCharacter(scene, equipped) {
   const fill = new THREE.PointLight(0xff2e93, 0.55);
   fill.position.set(3, 0, 2);
   scene.add(fill);
-  // soft top accent
   const top = new THREE.PointLight(0xffe600, 0.4);
   top.position.set(0, 6, 1);
   scene.add(top);
 
   const charGroup = new THREE.Group();
   scene.add(charGroup);
+
+  // === IMPORTED GLB CHARACTER PATH ===
+  if (character.type === 'glb') {
+    const model = cloneModel(character.model);
+    if (model) {
+      model.scale.setScalar(character.scale || 1);
+      model.traverse(node => {
+        if (node.isMesh && node.material) {
+          if (node.material.color) {
+            node.material.color.setHex(body.shirt);
+            if (node.material.emissive && body.metallic) {
+              node.material.emissive.setHex(body.shirt);
+              node.material.emissiveIntensity = 0.2;
+            }
+          }
+        }
+      });
+      charGroup.add(model);
+      // hat
+      if (hat && hat.id !== 'hat-none') {
+        const hatRoot = new THREE.Group();
+        hatRoot.position.y = character.headY || 2.7;
+        addHat(hatRoot, hat.id);
+        charGroup.add(hatRoot);
+      }
+      // glasses
+      if (glasses && glasses.id !== 'gl-none') {
+        const glRoot = new THREE.Group();
+        glRoot.position.set(0, character.eyeY || 2.45, character.eyeZ || 0.2);
+        addGlasses(glRoot, glasses.id);
+        charGroup.add(glRoot);
+      }
+      // shift down
+      charGroup.position.y = character.charYOffset || -1.3;
+      // pet
+      if (pet && pet.id !== 'pet-none') {
+        if (pet.model) {
+          const petClone = cloneModel(pet.model);
+          if (petClone) {
+            petClone.scale.setScalar((pet.scale || 0.5) * 0.85);
+            petClone.position.set(1.5, (pet.y || 0) + (character.petY || -0.5), 0.3);
+            petClone.rotation.y = -0.6;
+            scene.add(petClone);
+          }
+        } else if (pet.procedural && PETS_BUILD[pet.id]) {
+          const petGroup = new THREE.Group();
+          PETS_BUILD[pet.id](petGroup);
+          petGroup.scale.setScalar(0.7);
+          petGroup.position.set(1.5, (character.petY || -0.4), 0.4);
+          petGroup.rotation.y = -0.5;
+          scene.add(petGroup);
+        }
+        charGroup.position.x = -0.4;
+      }
+      // aura
+      const aura = findItem(equipped.aura);
+      if (aura && aura.id !== 'aura-none') buildAura(scene, charGroup, aura);
+      return charGroup;
+    }
+    // fallback to procedural if model not yet loaded
+  }
 
   // === MATERIALS === (smoother plastic-like with low roughness)
   const skinMat = new THREE.MeshStandardMaterial({
@@ -2360,10 +2436,10 @@ function renderModalBody(s) {
       </div>
     `;
   } else if (modalTab === 'shop') {
-    body.innerHTML = ['bodies','hats','glasses','pets','auras'].map(cat => {
-      const slot = ({bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
+    body.innerHTML = ['characters','bodies','hats','glasses','pets','auras'].map(cat => {
+      const slot = ({characters:'character', bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
       return `
-        <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({bodies:'🎨 דמות',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
+        <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({characters:'👤 דמות (שדרוג)',bodies:'🎨 צבע',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
         <div class="shop-grid">
           ${SHOP[cat].map(item => renderShopItem(s, item, slot, cat)).join('')}
         </div>
@@ -2440,7 +2516,7 @@ function openMysteryBox(sid) {
   const s = getActiveClass().students.find(s => s.id === sid);
   if (s.points < MYSTERY_BOX_PRICE) return;
   s.points -= MYSTERY_BOX_PRICE;
-  const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)];
+  const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)]; // characters not in mystery box
   const item = allItems[Math.floor(Math.random() * allItems.length)];
   const isDuplicate = s.owned.includes(item.id);
   if (isDuplicate) s.points += MYSTERY_BOX_PRICE / 2;
@@ -3035,13 +3111,13 @@ function setStudentTab(t) {
     const previewOw = previewOwned(s);
     const previewEq = previewEquipped(s);
     const previewPts = previewPoints(s);
-    body.innerHTML = ['bodies','hats','glasses','pets','auras'].map(cat => {
-      const slot = ({bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
-      const total = SHOP[cat].length - 1; // exclude "none"
+    body.innerHTML = ['characters','bodies','hats','glasses','pets','auras'].map(cat => {
+      const slot = ({characters:'character', bodies:'body', hats:'hat', glasses:'glasses', pets:'pet', auras:'aura'})[cat];
+      const total = SHOP[cat].length - (cat === 'characters' ? 0 : 1); // include base char
       const ownedInCat = SHOP[cat].filter(i => !i.id.endsWith('-none') && previewOw.includes(i.id)).length;
       const pct = total > 0 ? (ownedInCat / total) * 100 : 0;
       return `
-        <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({bodies:'🎨 דמות',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
+        <h3 style="margin:14px 0 8px;color:var(--neon-cyan)">${({characters:'👤 דמות (שדרוג)',bodies:'🎨 צבע',hats:'🎩 כובעים',glasses:'👓 משקפיים',pets:'🐾 חיות מחמד',auras:'✨ אאורה'})[cat]}</h3>
         <div class="collection-bar">
           <span style="font-weight:900">${ownedInCat}/${total}</span>
           <div class="progress"><div class="fill" style="width:${pct}%"></div></div>
@@ -3152,7 +3228,7 @@ function studentOpenBox() {
   const found = findStudent(studentSelectedId);
   if (!found) return;
   if (previewPoints(found.student) < MYSTERY_BOX_PRICE) return;
-  const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)];
+  const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)]; // characters not in mystery box
   const item = allItems[Math.floor(Math.random() * allItems.length)];
   let slot = 'hat';
   if (SHOP.bodies.find(i => i.id === item.id)) slot = 'body';
