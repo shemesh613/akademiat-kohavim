@@ -1463,17 +1463,16 @@ function build3DCharacter(scene, equipped) {
     const model = cloneModel(character.model);
     if (model) {
       model.scale.setScalar(character.scale || 1);
-      model.traverse(node => {
-        if (node.isMesh && node.material) {
-          if (node.material.color) {
-            node.material.color.setHex(body.shirt);
-            if (node.material.emissive && body.metallic) {
-              node.material.emissive.setHex(body.shirt);
-              node.material.emissiveIntensity = 0.2;
-            }
+      // Keep original GLB materials — don't tint everything to one color.
+      // Optional accent: subtle emissive boost for "metallic" body types
+      if (body.metallic) {
+        model.traverse(node => {
+          if (node.isMesh && node.material && node.material.emissive) {
+            node.material.emissive.setHex(body.shirt);
+            node.material.emissiveIntensity = 0.15;
           }
-        }
-      });
+        });
+      }
       charGroup.add(model);
       // hat
       if (hat && hat.id !== 'hat-none') {
