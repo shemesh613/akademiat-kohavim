@@ -897,17 +897,19 @@ function queueCloudSave() {
 }
 function startCloudPoll() {
   setInterval(async () => {
+    if (document.hidden) return; // skip when tab not visible
     const remote = await cloudLoad();
-    if (!remote || !remote.classes) return; // ignore null/errors
+    if (!remote || !remote.classes) return;
     const hash = JSON.stringify(remote);
     if (hash === lastCloudHash) return;
     if (hash === JSON.stringify(state)) { lastCloudHash = hash; return; }
     state = remote;
     lastCloudHash = hash;
+    clearAvatarCache();
     localStorage.setItem('cps_state_v2', hash);
     if (APP_MODE === 'student') renderStudentApp();
     else renderAll();
-  }, 3000);
+  }, 5000); // 3s → 5s, less polling, smoother UX
 }
 
 // ==================== STATE ====================
@@ -969,6 +971,7 @@ function createStudent(name, column) {
 }
 
 function save() {
+  clearAvatarCache(); // invalidate so re-renders pick up changes
   const json = JSON.stringify(state);
   localStorage.setItem('cps_state_v2', json);
   // rotating local backup — keep last 20 timestamped snapshots
@@ -1509,14 +1512,13 @@ function build3DCharacter(scene, equipped) {
   });
   const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.3 });
 
-  // === HEAD === smoother (48 segments)
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 48, 48), skinMat);
+  // === HEAD ===
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), skinMat);
   head.position.y = 2.0;
   head.scale.set(1, 1.05, 0.96);
   charGroup.add(head);
 
-  // ears — higher-poly + better blending
-  const earGeo = new THREE.SphereGeometry(0.16, 24, 24);
+  const earGeo = new THREE.SphereGeometry(0.16, 16, 16);
   for (const x of [-0.83, 0.83]) {
     const ear = new THREE.Mesh(earGeo, skinMat);
     ear.position.set(x, 2.0, 0);
@@ -2181,9 +2183,29 @@ function addGlasses(group, id) {
   }
 }
 
+// === AVATAR RENDER CACHE — biggest perf win ===
+const avatarCache = new Map();
+const AVATAR_CACHE_MAX = 200;
+function avatarCacheKey(equipped, w) {
+  return w + ':' + equipped.character + '|' + equipped.body + '|' + equipped.hat + '|' + equipped.glasses + '|' + equipped.pet + '|' + equipped.aura;
+}
+function clearAvatarCache() { avatarCache.clear(); }
+
 function renderToCanvas(canvas, equipped, rotation = 0) {
   const w = canvas.width || 144;
   const h = canvas.height || 144;
+  // Cache hit (only when not rotating)
+  if (rotation === 0) {
+    const key = avatarCacheKey(equipped, w);
+    const cached = avatarCache.get(key);
+    if (cached) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(cached, 0, 0, w, h);
+      return;
+    }
+  }
+  // Full render
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
   camera.position.set(0, 0.2, 6.5);
@@ -2198,10 +2220,25 @@ function renderToCanvas(canvas, equipped, rotation = 0) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(sharedRenderer.domElement, 0, 0, w, h);
+
+  // Save to cache (as ImageBitmap copy)
+  if (rotation === 0) {
+    if (avatarCache.size >= AVATAR_CACHE_MAX) {
+      const firstKey = avatarCache.keys().next().value;
+      avatarCache.delete(firstKey);
+    }
+    const off = document.createElement('canvas');
+    off.width = w; off.height = h;
+    off.getContext('2d').drawImage(canvas, 0, 0);
+    avatarCache.set(avatarCacheKey(equipped, w), off);
+  }
 }
 
 function queueRender(canvas, equipped) {
-  requestAnimationFrame(() => renderToCanvas(canvas, equipped));
+  // Use requestIdleCallback when available — non-critical work
+  const fn = () => renderToCanvas(canvas, equipped);
+  if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 200 });
+  else requestAnimationFrame(fn);
 }
 
 // ==================== UI RENDER ====================
@@ -2405,16 +2442,20 @@ function openStudent(id) {
   renderModalBody(s);
   document.getElementById('studentModal').classList.add('show');
 
-  // animate the 3D avatar (rotation)
+  // animate the 3D avatar (throttled to 24fps for performance)
   const canvas = document.getElementById('modalAvatar3D');
-  if (modalAnimId) cancelAnimationFrame(modalAnimId);
+  if (modalAnimId) { cancelAnimationFrame(modalAnimId); clearTimeout(modalAnimId); }
   let rot = 0;
-  function animate() {
-    rot += 0.012;
-    renderToCanvas(canvas, s.equipped, rot);
+  let lastFrame = 0;
+  function animate(t) {
+    if (t - lastFrame > 41) { // ~24fps
+      rot += 0.025;
+      renderToCanvas(canvas, s.equipped, rot);
+      lastFrame = t;
+    }
     modalAnimId = requestAnimationFrame(animate);
   }
-  animate();
+  modalAnimId = requestAnimationFrame(animate);
 }
 
 function setModalTab(t, sid) { modalTab = t; openStudent(sid); }
@@ -2446,16 +2487,8 @@ function renderModalBody(s) {
       `;
     }).join('');
 
-    // render previews
-    requestAnimationFrame(() => {
-      document.querySelectorAll('canvas[data-shop]').forEach(c => {
-        const sid = c.dataset.shop;
-        const slot = c.dataset.slot;
-        const itemId = c.dataset.item;
-        const previewEquipped = { ...s.equipped, [slot]: itemId };
-        renderToCanvas(c, previewEquipped);
-      });
-    });
+    // Lazy render shop previews — only when scrolled into view
+    setupLazyShopRender(s);
   } else if (modalTab === 'box') {
     body.innerHTML = `
       <div class="box-section">
@@ -2492,6 +2525,32 @@ function renderShopItem(s, item, slot, cat) {
         : `<div class="shop-price">⭐ ${item.price}</div>`}
     </div>
   `;
+}
+
+function setupLazyShopRender(s) {
+  const canvases = document.querySelectorAll('canvas[data-shop], canvas[data-stshop]');
+  if (!('IntersectionObserver' in window)) {
+    // fallback: render all
+    canvases.forEach(c => renderShopPreview(c, s));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        renderShopPreview(e.target, s);
+        io.unobserve(e.target);
+      }
+    });
+  }, { rootMargin: '100px' });
+  canvases.forEach(c => io.observe(c));
+}
+function renderShopPreview(canvas, s) {
+  if (canvas.dataset.rendered === '1') return;
+  canvas.dataset.rendered = '1';
+  const slot = canvas.dataset.slot;
+  const itemId = canvas.dataset.item;
+  const eq = { ...s.equipped, [slot]: itemId };
+  renderToCanvas(canvas, eq);
 }
 
 function buyItem(sid, slot, itemId) {
@@ -3128,14 +3187,7 @@ function setStudentTab(t) {
         </div>
       `;
     }).join('');
-    requestAnimationFrame(() => {
-      document.querySelectorAll('canvas[data-stshop]').forEach(c => {
-        const slot = c.dataset.slot;
-        const itemId = c.dataset.item;
-        const eq = { ...previewEquipped(s), [slot]: itemId };
-        renderToCanvas(c, eq);
-      });
-    });
+    setupLazyShopRender(s);
   } else if (t === 'box') {
     const previewPts = previewPoints(s);
     body.innerHTML = `
@@ -3245,10 +3297,15 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal()
 function spawnParticles() {
   const layer = document.getElementById('particleLayer');
   if (!layer) return;
-  for (let i = 0; i < 25; i++) {
-    setTimeout(() => createParticle(layer), i * 800);
+  // Reduced from 25 → 12 active, slower spawn
+  for (let i = 0; i < 12; i++) {
+    setTimeout(() => createParticle(layer), i * 1200);
   }
-  setInterval(() => createParticle(layer), 1200);
+  setInterval(() => {
+    // pause particle spawn while user is inactive (saves CPU)
+    if (document.hidden) return;
+    createParticle(layer);
+  }, 2400);
 }
 function createParticle(layer) {
   const p = document.createElement('div');
