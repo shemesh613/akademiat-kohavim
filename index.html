@@ -793,16 +793,7 @@ const SHOP = {
     { id: 'aura-holy',     name: 'קדושה',    price: 700, color: 0xffe600 },
   ],
   characters: [
-    { id: 'char-default', name: 'בסיס',           price: 0,    type: 'procedural' },
-    { id: 'char-bot',     name: '🧒 ילד תלת-מימד', price: 500,  type: 'glb',
-      model: 'https://threejs.org/examples/models/gltf/Xbot.glb',
-      scale: 1.5, headY: 2.7, eyeY: 2.45, eyeZ: 0.18, petY: -0.6, charYOffset: -1.3 },
-    { id: 'char-robot',   name: '🤖 רובוט חמוד',  price: 800,  type: 'glb',
-      model: 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
-      scale: 0.45, headY: 2.6, eyeY: 2.35, eyeZ: 0.55, petY: -0.5, charYOffset: -1.3 },
-    { id: 'char-soldier', name: '🥋 לוחם',        price: 1500, type: 'glb',
-      model: 'https://threejs.org/examples/models/gltf/Soldier.glb',
-      scale: 1.6, headY: 2.6, eyeY: 2.4, eyeZ: 0.18, petY: -0.5, charYOffset: -1.3 },
+    { id: 'char-default', name: 'בסיס', price: 0, type: 'procedural' },
   ],
 };
 
@@ -936,6 +927,8 @@ state.classes.forEach(c => {
     if (!s.owned) s.owned = ['char-default','body-default','hat-none','gl-none','pet-none','aura-none'];
     if (!s.equipped.aura) s.equipped.aura = 'aura-none';
     if (!s.equipped.character) s.equipped.character = 'char-default';
+    // reset removed premium characters
+    if (['char-bot','char-robot','char-soldier'].includes(s.equipped.character)) s.equipped.character = 'char-default';
     if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
     if (!s.owned.includes('char-default')) s.owned.push('char-default');
   });
