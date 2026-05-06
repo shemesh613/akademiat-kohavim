@@ -2222,10 +2222,150 @@ function avatarCacheKey(equipped, w) {
 }
 function clearAvatarCache() { avatarCache.clear(); }
 
+// Rich 2D cartoon avatar — reliable on every device, no WebGL needed
+const HAT_EMOJI = { 'hat-cap':'🧢','hat-graduation':'🎓','hat-tophat':'🎩','hat-crown':'👑','hat-wizard':'🧙‍♂️','hat-helmet':'⛑️','hat-pirate':'🏴‍☠️','hat-halo':'😇','hat-horns':'😈','hat-antenna':'👽','hat-beanie':'🧣','hat-flower':'🌸','hat-cat-ears':'🐱','hat-viking':'⚔️','hat-samurai':'🥋' };
+const GL_EMOJI = { 'gl-cool':'😎','gl-3d':'🤓','gl-star':'🤩','gl-monocle':'🧐','gl-heart':'😍','gl-round':'👓','gl-pixel':'👾','gl-laser':'😎' };
+const PET_EMOJI = { 'pet-cat':'🐱','pet-dog':'🐶','pet-duck':'🦆','pet-bunny':'🐰','pet-flamingo':'🦩','pet-bear':'🐻','pet-parrot':'🦜','pet-bee':'🐝','pet-frog':'🐸','pet-stork':'🐦','pet-owl':'🦉','pet-penguin':'🐧','pet-fox':'🦊','pet-octopus':'🐙','pet-robot':'🤖','pet-horse':'🐴','pet-ghost':'👻','pet-dragon':'🐲' };
+
+function draw2DAvatar(canvas, equipped) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const body = findItem(equipped.body) || SHOP.bodies[0];
+  const hat = findItem(equipped.hat);
+  const glasses = findItem(equipped.glasses);
+  const pet = findItem(equipped.pet);
+  const aura = findItem(equipped.aura);
+  const character = findItem(equipped.character) || SHOP.characters[0];
+
+  ctx.clearRect(0, 0, w, h);
+  const hex = (c, def) => '#' + (c || def).toString(16).padStart(6, '0');
+  const skin = hex(body.skin, 0xffd6b8);
+  const shirt = hex(body.shirt, 0xff2e93);
+  const hair = hex(body.hair, 0x6b3410);
+  const pants = hex(body.pants, 0x1a1d3a);
+
+  // Aura (background ring)
+  if (aura && aura.id !== 'aura-none') {
+    const ac = hex(aura.color, 0xffe600);
+    const grd = ctx.createRadialGradient(w/2, h/2, w*0.35, w/2, h/2, w*0.5);
+    grd.addColorStop(0, 'transparent');
+    grd.addColorStop(0.7, ac + '88');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Pants
+  ctx.fillStyle = pants;
+  ctx.beginPath(); ctx.roundRect(w*0.34, h*0.78, w*0.32, h*0.22, w*0.05); ctx.fill();
+
+  // Shirt body
+  ctx.fillStyle = shirt;
+  ctx.beginPath();
+  ctx.moveTo(w*0.22, h*0.95);
+  ctx.lineTo(w*0.22, h*0.55);
+  ctx.quadraticCurveTo(w*0.5, h*0.42, w*0.78, h*0.55);
+  ctx.lineTo(w*0.78, h*0.95);
+  ctx.closePath();
+  ctx.fill();
+
+  // Arms (sleeve)
+  ctx.fillStyle = shirt;
+  ctx.beginPath(); ctx.ellipse(w*0.18, h*0.7, w*0.06, h*0.13, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(w*0.82, h*0.7, w*0.06, h*0.13, 0, 0, Math.PI*2); ctx.fill();
+  // Hands (skin)
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(w*0.16, h*0.83, w*0.05, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.84, h*0.83, w*0.05, 0, Math.PI*2); ctx.fill();
+
+  // Neck
+  ctx.fillStyle = skin;
+  ctx.fillRect(w*0.45, h*0.48, w*0.1, h*0.08);
+
+  // Head
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(w*0.5, h*0.32, w*0.21, 0, Math.PI*2); ctx.fill();
+  // Subtle face shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.06)';
+  ctx.beginPath(); ctx.arc(w*0.5, h*0.42, w*0.13, 0, Math.PI); ctx.fill();
+
+  // Hair
+  ctx.fillStyle = hair;
+  ctx.beginPath();
+  ctx.arc(w*0.5, h*0.32, w*0.22, Math.PI, Math.PI*2); ctx.fill();
+  // Bangs
+  ctx.beginPath();
+  ctx.ellipse(w*0.5, h*0.22, w*0.18, h*0.06, 0, 0.1, Math.PI - 0.1);
+  ctx.fill();
+
+  // Eyes — bright cartoon style
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(w*0.42, h*0.32, w*0.045, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.58, h*0.32, w*0.045, 0, Math.PI*2); ctx.fill();
+  // Pupils
+  ctx.fillStyle = '#181828';
+  ctx.beginPath(); ctx.arc(w*0.43, h*0.33, w*0.026, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.59, h*0.33, w*0.026, 0, Math.PI*2); ctx.fill();
+  // Sparkle
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(w*0.435, h*0.323, w*0.01, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.595, h*0.323, w*0.01, 0, Math.PI*2); ctx.fill();
+
+  // Cheeks
+  ctx.fillStyle = 'rgba(255,140,170,0.55)';
+  ctx.beginPath(); ctx.arc(w*0.37, h*0.38, w*0.025, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(w*0.63, h*0.38, w*0.025, 0, Math.PI*2); ctx.fill();
+
+  // Smile
+  ctx.strokeStyle = '#3a2418';
+  ctx.lineWidth = w * 0.018;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(w*0.5, h*0.38, w*0.045, 0.25, Math.PI - 0.25);
+  ctx.stroke();
+
+  // Glasses overlay (emoji)
+  if (glasses && glasses.id !== 'gl-none') {
+    const e = GL_EMOJI[glasses.id] || '👓';
+    ctx.font = `${w*0.18}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e, w*0.5, h*0.32);
+  }
+
+  // Hat overlay (emoji)
+  if (hat && hat.id !== 'hat-none') {
+    const e = HAT_EMOJI[hat.id] || '🎩';
+    ctx.font = `${w*0.32}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e, w*0.5, h*0.13);
+  }
+
+  // Pet (corner)
+  if (pet && pet.id !== 'pet-none') {
+    const e = PET_EMOJI[pet.id] || '🐾';
+    ctx.font = `${w*0.22}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e, w*0.85, h*0.82);
+  }
+
+  // Premium character badge
+  if (character.type === 'glb') {
+    ctx.fillStyle = 'rgba(255,215,0,0.9)';
+    ctx.beginPath(); ctx.arc(w*0.15, h*0.15, w*0.06, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = `bold ${w*0.07}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⭐', w*0.15, h*0.15);
+  }
+}
+
 function renderToCanvas(canvas, equipped, rotation = 0) {
   const w = canvas.width || 144;
   const h = canvas.height || 144;
-  // Cache hit (only when not rotating)
   if (rotation === 0) {
     const key = avatarCacheKey(equipped, w);
     const cached = avatarCache.get(key);
@@ -2236,21 +2376,7 @@ function renderToCanvas(canvas, equipped, rotation = 0) {
       return;
     }
   }
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
-  camera.position.set(0, 0.2, 6.5);
-  camera.lookAt(0, 0.2, 0);
-  const charGroup = build3DCharacter(scene, equipped);
-  charGroup.rotation.y = rotation;
-
-  sharedRenderer.setSize(w, h, false);
-  sharedRenderer.setClearColor(0x000000, 0);
-  sharedRenderer.render(scene, camera);
-
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(sharedRenderer.domElement, 0, 0, w, h);
-
+  draw2DAvatar(canvas, equipped);
   if (rotation === 0) {
     if (avatarCache.size >= AVATAR_CACHE_MAX) {
       const firstKey = avatarCache.keys().next().value;
