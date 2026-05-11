@@ -858,10 +858,13 @@ function getItemRarity(item) {
 const FIREBASE_DB = 'https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatabase.app';
 const FIREBASE_PATH = 'cps_v1';
 const URL_PARAMS = new URLSearchParams(window.location.search);
-const APP_MODE = URL_PARAMS.get('home') === '1' ? 'student' : 'teacher';
+// Teacher access requires a secret key in the URL.
+// All other URLs (including the bare URL students already have) become student mode.
+const TEACHER_KEY = 'shay2026nikud';
+const APP_MODE = URL_PARAMS.get('t') === TEACHER_KEY ? 'teacher' : 'student';
 if (URL_PARAMS.get('reset') === '1') {
   localStorage.removeItem('cps_state_v2');
-  const keep = APP_MODE === 'student' ? '?home=1' : '';
+  const keep = APP_MODE === 'teacher' ? '?t=' + TEACHER_KEY : '';
   window.location.replace(window.location.pathname + keep);
 }
 
