@@ -2491,7 +2491,7 @@ function openStudent(id) {
   modalAnimId = requestAnimationFrame(animate);
 }
 
-function setModalTab(t, sid) { modalTab = t; openStudent(sid); }
+function setModalTab(t, sid) { modalTab = t; openStudent(sid); if (t === 'stickers' && modalAnimId) { cancelAnimationFrame(modalAnimId); modalAnimId = null; } }
 function closeModal() {
   document.getElementById('studentModal').classList.remove('show');
   if (modalAnimId) { cancelAnimationFrame(modalAnimId); modalAnimId = null; }
@@ -3228,6 +3228,7 @@ function setStudentTab(t) {
   const tabId = t === 'shop' ? 'stTabShop' : t === 'box' ? 'stTabBox' : t === 'stickers' ? 'stTabStickers' : 'stTabAch';
   document.getElementById(tabId)?.classList.add('active');
 
+  if (t === 'stickers' && studentAnimId) { cancelAnimationFrame(studentAnimId); studentAnimId = null; }
   if (t === 'shop') {
     const previewOw = previewOwned(s);
     const previewEq = previewEquipped(s);
@@ -3856,7 +3857,8 @@ function swapDuplicatesForMissing(sid, theme, stickerId) {
 function showStickerPopup(pick, isSwap) {
   const meta = STICKER_THEME_META[pick.theme];
   const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);animation:fadeIn .3s';
+  div.className = 'sticker-popup-overlay';
+  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);animation:fadeIn .3s';
   div.innerHTML = `
     <div style="background:linear-gradient(135deg,#fff,#f8f9ff);border-radius:24px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 0 80px ${meta.color}80;border:3px solid ${meta.color};animation:revealBounce .8s">
       <div style="font-size:.85em;color:#666;margin-bottom:6px">${isSwap ? '🔄 החלפה!' : '🎉 מדבקה חדשה!'}</div>
@@ -3864,13 +3866,16 @@ function showStickerPopup(pick, isSwap) {
       <img src="${stickerImagePath(pick.theme, STICKERS[pick.theme].findIndex(x => x.id === pick.sticker.id))}" style="width:200px;height:200px;object-fit:cover;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.3);margin-bottom:12px"/>
       <div style="font-size:1.15em;font-weight:900;color:#1a1a2e;margin-bottom:4px">${pick.sticker.name}</div>
       <div style="font-size:.85em;color:#666;line-height:1.5">${pick.sticker.desc}</div>
-      <button onclick="this.closest('div[style*=\\'z-index:10000\\']').remove()" style="margin-top:14px;padding:10px 28px;background:linear-gradient(135deg,${meta.color},${meta.color}cc);color:#fff;border:none;border-radius:12px;font-weight:900;font-size:1em;cursor:pointer">✨ סבבה!</button>
+      <button onclick="closeStickerPopups()" style="margin-top:14px;padding:10px 28px;background:linear-gradient(135deg,${meta.color},${meta.color}cc);color:#fff;border:none;border-radius:12px;font-weight:900;font-size:1em;cursor:pointer">✨ סבבה!</button>
     </div>
   `;
   div.onclick = (e) => { if (e.target === div) div.remove(); };
   document.body.appendChild(div);
   if (typeof burstConfetti === 'function') burstConfetti(window.innerWidth/2, window.innerHeight/2, 40);
   if (typeof playSound === 'function') playSound('buy');
+}
+function closeStickerPopups() {
+  document.querySelectorAll('.sticker-popup-overlay').forEach(d => d.remove());
 }
 function rerenderStickerViews(sid) {
   // Re-render teacher modal if open on this student
@@ -3915,7 +3920,7 @@ function renderStickerAlbum(s, opts = {}) {
             const swapBtn = (has && count >= STICKER_SWAP_COST) ? `<button onclick="event.stopPropagation();swapDuplicatesForMissing('${sid}','${theme}','${st.id}')" style="position:absolute;bottom:3px;right:3px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;border-radius:8px;font-size:.65em;font-weight:900;padding:3px 6px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3)" title="החלף 3 כפולות במדבקה חדשה">🔄</button>` : '';
             if (has) {
               return `<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;${isComplete?'border-radius:0':''};cursor:pointer" onclick="showStickerDetail('${theme}','${st.id}','${sid}')">
-                <img src="${stickerImagePath(theme, idx)}" alt="${escapeHtml(st.name)}" style="width:100%;height:100%;object-fit:cover;display:block"/>
+                <img src="${stickerImagePath(theme, idx)}" alt="${escapeHtml(st.name)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block"/>
                 ${dupBadge}${swapBtn}
               </div>`;
             }
@@ -3965,19 +3970,20 @@ function showStickerDetail(theme, stickerId, sid) {
   const found = findStudent(sid);
   const count = found ? (found.student.stickers[theme][stickerId] || 0) : 1;
   const div = document.createElement('div');
-  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);animation:fadeIn .3s';
+  div.className = 'sticker-popup-overlay';
+  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);animation:fadeIn .3s';
   const swapBtn = count >= STICKER_SWAP_COST
-    ? `<button onclick="swapDuplicatesForMissing('${sid}','${theme}','${stickerId}');this.closest('div[style*=\\'z-index:10000\\']').remove()" style="margin-top:10px;padding:10px 22px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;border-radius:12px;font-weight:900;cursor:pointer">🔄 החלף 3 כפולות במדבקה חדשה</button>`
+    ? `<button onclick="closeStickerPopups();setTimeout(()=>swapDuplicatesForMissing('${sid}','${theme}','${stickerId}'),200)" style="margin-top:10px;padding:10px 22px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;border-radius:12px;font-weight:900;cursor:pointer">🔄 החלף 3 כפולות במדבקה חדשה</button>`
     : '';
   div.innerHTML = `
     <div style="background:linear-gradient(135deg,#fff,#f8f9ff);border-radius:24px;padding:24px;max-width:340px;width:90%;text-align:center;border:3px solid ${meta.color}">
       <div style="font-size:.85em;color:${meta.color};font-weight:700;margin-bottom:6px">${meta.emoji} ${meta.name}</div>
-      <img src="${stickerImagePath(theme, idx)}" style="width:220px;height:220px;object-fit:cover;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);margin-bottom:12px"/>
+      <img src="${stickerImagePath(theme, idx)}" loading="lazy" decoding="async" style="width:220px;height:220px;object-fit:cover;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);margin-bottom:12px"/>
       <div style="font-size:1.2em;font-weight:900;color:#1a1a2e;margin-bottom:4px">${st.name}</div>
       <div style="font-size:.88em;color:#555;line-height:1.6;margin-bottom:8px">${st.desc}</div>
       ${count > 1 ? `<div style="display:inline-block;background:rgba(124,58,237,0.15);color:#7c3aed;padding:4px 12px;border-radius:14px;font-size:.85em;font-weight:900">יש לך ×${count}</div>` : ''}
       ${swapBtn}
-      <button onclick="this.closest('div[style*=\\'z-index:10000\\']').remove()" style="display:block;margin:10px auto 0;padding:8px 22px;background:rgba(0,0,0,0.06);border:none;border-radius:10px;color:#555;font-weight:700;cursor:pointer">סגור</button>
+      <button onclick="closeStickerPopups()" style="display:block;margin:10px auto 0;padding:8px 22px;background:rgba(0,0,0,0.06);border:none;border-radius:10px;color:#555;font-weight:700;cursor:pointer">סגור</button>
     </div>
   `;
   div.onclick = (e) => { if (e.target === div) div.remove(); };
