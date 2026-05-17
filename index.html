@@ -964,6 +964,8 @@ function createStudent(name, column) {
     weeklyPoints: 0,
     equipped: { character: 'char-default', body: 'body-default', hat: 'hat-none', glasses: 'gl-none', pet: 'pet-none', aura: 'aura-none' },
     owned: ['char-default','body-default','hat-none','gl-none','pet-none','aura-none'],
+    stickers: {},
+    stickerProgress: 0,
   };
 }
 
@@ -2382,6 +2384,8 @@ function addPoints(studentId, amount, fromX, fromY) {
   const oldRank = getRank(s.points).current;
   s.points = Math.max(0, s.points + amount);
   s.weeklyPoints = (s.weeklyPoints || 0) + amount;
+  const stickerAwards = awardStickersForPoints(s, amount);
+  stickerAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1000 + i * 1800));
   const newRank = getRank(s.points).current;
   showPointPopup(amount, fromX, fromY);
   if (newRank.name !== oldRank.name && amount > 0) showRankUp(s, newRank);
@@ -2414,6 +2418,8 @@ function columnBonus(col) {
   cls.students.filter(s => s.column === col).forEach(s => {
     s.points = Math.max(0, s.points + amount);
     s.weeklyPoints = (s.weeklyPoints || 0) + amount;
+    const colAwards = awardStickersForPoints(s, amount);
+    colAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1200 + i * 1800));
     studentIds.push(s.id);
     const newAchs = checkAchievements(s);
     newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 800 + i * 1500));
@@ -2462,6 +2468,7 @@ function openStudent(id) {
       <button class="modal-tab ${modalTab==='points'?'active':''}" onclick="setModalTab('points','${s.id}')">⭐ ניקוד</button>
       <button class="modal-tab ${modalTab==='shop'?'active':''}" onclick="setModalTab('shop','${s.id}')">🛍️ חנות</button>
       <button class="modal-tab ${modalTab==='box'?'active':''}" onclick="setModalTab('box','${s.id}')">🎁 הפתעה</button>
+      <button class="modal-tab ${modalTab==='stickers'?'active':''}" onclick="setModalTab('stickers','${s.id}')">🧩 מדבקות</button>
     </div>
     <div id="modalBody"></div>
   `;
@@ -2516,6 +2523,8 @@ function renderModalBody(s) {
 
     // Lazy render shop previews — only when scrolled into view
     setupLazyShopRender(s);
+  } else if (modalTab === 'stickers') {
+    body.innerHTML = renderStickerAlbum(s, { isTeacher: true });
   } else if (modalTab === 'box') {
     body.innerHTML = `
       <div class="box-section">
@@ -3124,6 +3133,8 @@ function claimDailyBonus(sid) {
   const totalBonus = baseBonus + streakBonus;
   s.points += totalBonus;
   s.weeklyPoints = (s.weeklyPoints || 0) + totalBonus;
+  const dailyAwards = awardStickersForPoints(s, totalBonus);
+  dailyAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 2500 + i * 1800));
   const newAchs = checkAchievements(s);
   newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 1500 + i * 1500));
   save();
@@ -3185,6 +3196,7 @@ function renderStudentProfile() {
       <div class="modal-tabs" style="border:none;padding:0">
         <button class="modal-tab active" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
         <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
+        <button class="modal-tab" id="stTabStickers" onclick="setStudentTab('stickers')">🧩 מדבקות</button>
         <button class="modal-tab" id="stTabAch" onclick="setStudentTab('ach')">🏆 הישגים</button>
       </div>
       <div id="studentBody"></div>
@@ -3212,8 +3224,8 @@ function setStudentTab(t) {
   if (!found) return;
   const { student: s } = found;
   const body = document.getElementById('studentBody');
-  ['stTabShop','stTabBox','stTabAch'].forEach(id => document.getElementById(id)?.classList.remove('active'));
-  const tabId = t === 'shop' ? 'stTabShop' : t === 'box' ? 'stTabBox' : 'stTabAch';
+  ['stTabShop','stTabBox','stTabAch','stTabStickers'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  const tabId = t === 'shop' ? 'stTabShop' : t === 'box' ? 'stTabBox' : t === 'stickers' ? 'stTabStickers' : 'stTabAch';
   document.getElementById(tabId)?.classList.add('active');
 
   if (t === 'shop') {
@@ -3250,6 +3262,8 @@ function setStudentTab(t) {
         </button>
       </div>
     `;
+  } else if (t === 'stickers') {
+    body.innerHTML = renderStickerAlbum(s, { isTeacher: false });
   } else if (t === 'ach') {
     const earned = s.achievements || [];
     const total = ACHIEVEMENTS.length;
@@ -3706,6 +3720,290 @@ async function init() {
 }
 
 init();
+
+// ==================== STICKER ALBUM ====================
+const STICKER_THEMES = ['heroes','relaxation','military','gooddeeds'];
+const STICKER_THEME_META = {
+  heroes:     { name:'גיבורי ישראל',  color:'#d97706', emoji:'🎖️' },
+  relaxation: { name:'רגעי רוגע',      color:'#059669', emoji:'🌿' },
+  military:   { name:'צבא',            color:'#4b5563', emoji:'🪖' },
+  gooddeeds:  { name:'גמילות חסדים',   color:'#e11d48', emoji:'💝' }
+};
+const STICKERS = {
+  heroes: [
+    {id:'h1',name:'שמירה על הגבול',desc:'חיילים שומרים על הגבול ומגנים על המדינה.'},
+    {id:'h2',name:'חובשים מצילים',desc:'חובשי מד״א מטפלים בפצועים ומצילים חיים.'},
+    {id:'h3',name:'מתנדבים אורזים',desc:'מתנדבים אורזים חבילות מזון לנזקקים.'},
+    {id:'h4',name:'סרטים צהובים',desc:'ילדים קושרים סרטים צהובים על עצים — לזכר החטופים.'},
+    {id:'h5',name:'מורה עם תלמידים',desc:'מורה מלמדת ילדים בכיתה, ממשיכים ללמוד גם בזמן קשה.'},
+    {id:'h6',name:'כבאים מצילים',desc:'כבאים מצילים חתול תקוע על עץ.'},
+    {id:'h7',name:'מארחים מפונים',desc:'משפחות מארחות בביתן אנשים שפונו מבתיהם.'},
+    {id:'h8',name:'נרות זיכרון',desc:'אנשים מדליקים נרות זיכרון ועומדים בדומייה.'},
+    {id:'h9',name:'חיבוק על הגבעה',desc:'קבוצה מתחבקת על גבעה ירוקה בשקיעה — יחד ננצח.'}
+  ],
+  relaxation: [
+    {id:'r1',name:'מדיטציה ליד מפל',desc:'ילד יושב בשקט ליד מפל מים ונושם עמוק.'},
+    {id:'r2',name:'יוגה על ההר',desc:'אדם עושה יוגה על פסגת הר עם נוף מרהיב.'},
+    {id:'r3',name:'קריאה תחת עץ',desc:'ילדה קוראת ספר תחת עץ גדול ומוצל.'},
+    {id:'r4',name:'ציור בטבע',desc:'ילדים מציירים על כנים בשדה פרחים.'},
+    {id:'r5',name:'פיקניק שקט',desc:'משפחה נהנית מפיקניק שליו בפארק ירוק.'},
+    {id:'r6',name:'נגינה רגועה',desc:'ילד מנגן בגיטרה מנגינה רכה ושלווה.'},
+    {id:'r7',name:'גינון עם פרחים',desc:'ילד שותל פרחים בגינה עם חיוך.'},
+    {id:'r8',name:'שחייה באגם',desc:'ילדים שוחים באגם שקט עם ברווזים.'},
+    {id:'r9',name:'צפייה בכוכבים',desc:'ילדים שוכבים על שמיכה וצופים בכוכבים בלילה.'}
+  ],
+  military: [
+    {id:'m1',name:'אימון ביחד',desc:'חיילים מתאמנים יחד בכושר גופני.'},
+    {id:'m2',name:'תצפית מהגבעה',desc:'חיילת צופה באופק דרך משקפת.'},
+    {id:'m3',name:'שבת בבסיס',desc:'חיילים חוגגים שבת יחד בחדר האוכל.'},
+    {id:'m4',name:'מכתב מהבית',desc:'חייל קורא מכתב מהמשפחה עם חיוך.'},
+    {id:'m5',name:'טקס כומתות',desc:'חיילים מקבלים כומתות בטקס מרגש.'},
+    {id:'m6',name:'עזרה לקהילה',desc:'חיילים עוזרים לקשישים בקהילה.'},
+    {id:'m7',name:'סיור בנוף',desc:'סיור רגלי בנוף הרים יפהפה.'},
+    {id:'m8',name:'מדורה עם חברים',desc:'חיילים צוחקים סביב מדורה בלילה.'},
+    {id:'m9',name:'שתילת עצים',desc:'חיילים שותלים עצים ביום הזיכרון.'}
+  ],
+  gooddeeds: [
+    {id:'g1',name:'עזרה לקשיש',desc:'ילד עוזר לסבתא לשאת שקיות מהסופר.'},
+    {id:'g2',name:'חבילות לחיילים',desc:'ילדים אורזים חבילות אהבה לחיילים בגבול.'},
+    {id:'g3',name:'ביקור חולים',desc:'ילדים מביאים פרחים ושמחה לחולים בבית חולים.'},
+    {id:'g4',name:'תרומת בגדים',desc:'משפחה תורמת בגדים לילדים נזקקים.'},
+    {id:'g5',name:'עזרה בשיעורים',desc:'תלמידה גדולה עוזרת לקטנים בשיעורי בית.'},
+    {id:'g6',name:'ניקוי חוף',desc:'קבוצת ילדים מנקה חוף ים מזבל.'},
+    {id:'g7',name:'שתילה בפארק',desc:'ילדים שותלים עצים ופרחים בגינה ציבורית.'},
+    {id:'g8',name:'בישול לנזקקים',desc:'מתנדבים מבשלים ארוחות למשפחות נזקקות.'},
+    {id:'g9',name:'חיבוק קהילתי',desc:'כל השכונה מתחבקת באירוע קהילתי גדול.'}
+  ]
+};
+const STICKER_POINTS_PER_DROP = 50;   // 1 sticker per 50 points → ~9000 points for natural full album
+const STICKER_SWAP_COST = 3;          // 3 duplicates → 1 random missing
+
+function ensureStickerFields(s) {
+  if (!s.stickers) s.stickers = {};
+  if (typeof s.stickerProgress !== 'number') s.stickerProgress = 0;
+  STICKER_THEMES.forEach(t => { if (!s.stickers[t]) s.stickers[t] = {}; });
+}
+function stickerImagePath(theme, idx9) {
+  const row = Math.floor(idx9 / 3), col = idx9 % 3;
+  return `stickers/${theme}-${row}-${col}.jpg`;
+}
+function stickerFullImagePath(theme) { return `stickers/${theme}-full.jpg`; }
+function totalStickersOwned(s) {
+  ensureStickerFields(s);
+  let n = 0;
+  STICKER_THEMES.forEach(t => Object.values(s.stickers[t]).forEach(c => { if (c > 0) n++; }));
+  return n;
+}
+function totalStickersWithDups(s) {
+  ensureStickerFields(s);
+  let n = 0;
+  STICKER_THEMES.forEach(t => Object.values(s.stickers[t]).forEach(c => { n += c; }));
+  return n;
+}
+function pickRandomSticker(filter) {
+  const pool = [];
+  STICKER_THEMES.forEach(theme => {
+    STICKERS[theme].forEach((sticker, idx) => {
+      if (!filter || filter(theme, sticker, idx)) pool.push({ theme, sticker, idx });
+    });
+  });
+  if (!pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function awardRandomSticker(s, opts = {}) {
+  ensureStickerFields(s);
+  const preferMissing = opts.preferMissing !== false;
+  let pick;
+  if (preferMissing) {
+    pick = pickRandomSticker((t, st) => !s.stickers[t][st.id] || s.stickers[t][st.id] === 0);
+  }
+  if (!pick) pick = pickRandomSticker();
+  if (!pick) return null;
+  s.stickers[pick.theme][pick.sticker.id] = (s.stickers[pick.theme][pick.sticker.id] || 0) + 1;
+  return pick;
+}
+function awardStickersForPoints(s, amountAdded) {
+  ensureStickerFields(s);
+  if (amountAdded <= 0) return [];
+  const before = s.stickerProgress;
+  s.stickerProgress = before + amountAdded;
+  const dropsBefore = Math.floor(before / STICKER_POINTS_PER_DROP);
+  const dropsAfter  = Math.floor(s.stickerProgress / STICKER_POINTS_PER_DROP);
+  const drops = dropsAfter - dropsBefore;
+  const awards = [];
+  for (let i = 0; i < drops; i++) {
+    const a = awardRandomSticker(s, { preferMissing: false });
+    if (a) awards.push(a);
+  }
+  return awards;
+}
+function swapDuplicatesForMissing(sid, theme, stickerId) {
+  const found = findStudent(sid);
+  if (!found) return false;
+  const s = found.student;
+  ensureStickerFields(s);
+  const count = s.stickers[theme][stickerId] || 0;
+  if (count < STICKER_SWAP_COST) return false;
+  s.stickers[theme][stickerId] = count - STICKER_SWAP_COST;
+  const pick = awardRandomSticker(s, { preferMissing: true });
+  save();
+  if (pick) {
+    showStickerPopup(pick, true);
+  }
+  rerenderStickerViews(sid);
+  return true;
+}
+function showStickerPopup(pick, isSwap) {
+  const meta = STICKER_THEME_META[pick.theme];
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);animation:fadeIn .3s';
+  div.innerHTML = `
+    <div style="background:linear-gradient(135deg,#fff,#f8f9ff);border-radius:24px;padding:28px;max-width:340px;width:90%;text-align:center;box-shadow:0 0 80px ${meta.color}80;border:3px solid ${meta.color};animation:revealBounce .8s">
+      <div style="font-size:.85em;color:#666;margin-bottom:6px">${isSwap ? '🔄 החלפה!' : '🎉 מדבקה חדשה!'}</div>
+      <div style="font-size:1.4em;color:${meta.color};font-weight:900;margin-bottom:10px">${meta.emoji} ${meta.name}</div>
+      <img src="${stickerImagePath(pick.theme, STICKERS[pick.theme].findIndex(x => x.id === pick.sticker.id))}" style="width:200px;height:200px;object-fit:cover;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.3);margin-bottom:12px"/>
+      <div style="font-size:1.15em;font-weight:900;color:#1a1a2e;margin-bottom:4px">${pick.sticker.name}</div>
+      <div style="font-size:.85em;color:#666;line-height:1.5">${pick.sticker.desc}</div>
+      <button onclick="this.closest('div[style*=\\'z-index:10000\\']').remove()" style="margin-top:14px;padding:10px 28px;background:linear-gradient(135deg,${meta.color},${meta.color}cc);color:#fff;border:none;border-radius:12px;font-weight:900;font-size:1em;cursor:pointer">✨ סבבה!</button>
+    </div>
+  `;
+  div.onclick = (e) => { if (e.target === div) div.remove(); };
+  document.body.appendChild(div);
+  if (typeof burstConfetti === 'function') burstConfetti(window.innerWidth/2, window.innerHeight/2, 40);
+  if (typeof playSound === 'function') playSound('buy');
+}
+function rerenderStickerViews(sid) {
+  // Re-render teacher modal if open on this student
+  if (document.getElementById('studentModal').classList.contains('show') && currentShopStudentSid === sid) {
+    if (typeof modalTab !== 'undefined' && modalTab === 'stickers') openStudent(sid);
+  }
+  // Re-render student profile if active
+  if (typeof studentSelectedId !== 'undefined' && studentSelectedId === sid && typeof studentTab !== 'undefined' && studentTab === 'stickers') {
+    setStudentTab('stickers');
+  }
+}
+function renderStickerAlbum(s, opts = {}) {
+  ensureStickerFields(s);
+  const isTeacher = !!opts.isTeacher;
+  const sid = s.id;
+  const total = STICKER_THEMES.length * 9;
+  const owned = totalStickersOwned(s);
+  const dupsBySticker = [];
+  STICKER_THEMES.forEach(t => STICKERS[t].forEach(st => {
+    const c = s.stickers[t][st.id] || 0;
+    if (c >= STICKER_SWAP_COST) dupsBySticker.push({ theme:t, sticker:st, count:c });
+  }));
+  const pointsToNext = STICKER_POINTS_PER_DROP - (s.stickerProgress % STICKER_POINTS_PER_DROP);
+  const progressPct = ((s.stickerProgress % STICKER_POINTS_PER_DROP) / STICKER_POINTS_PER_DROP) * 100;
+
+  const albumsHtml = STICKER_THEMES.map(theme => {
+    const meta = STICKER_THEME_META[theme];
+    const list = STICKERS[theme];
+    const ownedHere = list.filter(st => (s.stickers[theme][st.id] || 0) > 0).length;
+    const isComplete = ownedHere === 9;
+    return `
+      <div class="sticker-album" style="background:rgba(255,255,255,0.04);border:2px solid ${meta.color}33;border-radius:16px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-weight:900;font-size:1.05em;color:${meta.color}">${meta.emoji} ${meta.name}</div>
+          <div style="font-size:.85em;color:var(--text-dim)"><b style="color:${meta.color}">${ownedHere}</b>/9</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;${isComplete?'padding:0;gap:0':''};border-radius:10px;overflow:hidden;${isComplete?`box-shadow:0 0 40px ${meta.color}66`:''}">
+          ${list.map((st, idx) => {
+            const count = s.stickers[theme][st.id] || 0;
+            const has = count > 0;
+            const dupBadge = count > 1 ? `<div style="position:absolute;top:3px;left:3px;background:#7c3aed;color:#fff;border-radius:50%;width:20px;height:20px;font-size:.7em;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3)">×${count}</div>` : '';
+            const swapBtn = (has && count >= STICKER_SWAP_COST) ? `<button onclick="event.stopPropagation();swapDuplicatesForMissing('${sid}','${theme}','${st.id}')" style="position:absolute;bottom:3px;right:3px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;border-radius:8px;font-size:.65em;font-weight:900;padding:3px 6px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3)" title="החלף 3 כפולות במדבקה חדשה">🔄</button>` : '';
+            if (has) {
+              return `<div style="position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;${isComplete?'border-radius:0':''};cursor:pointer" onclick="showStickerDetail('${theme}','${st.id}','${sid}')">
+                <img src="${stickerImagePath(theme, idx)}" alt="${escapeHtml(st.name)}" style="width:100%;height:100%;object-fit:cover;display:block"/>
+                ${dupBadge}${swapBtn}
+              </div>`;
+            }
+            return `<div style="position:relative;aspect-ratio:1;border:2px dashed ${meta.color}44;border-radius:8px;background:rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:center;color:${meta.color}66;font-size:1.6em;font-weight:900">?</div>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const swapHint = dupsBySticker.length > 0
+    ? `<div style="background:linear-gradient(135deg,rgba(251,191,36,0.15),rgba(245,158,11,0.08));border:1.5px solid rgba(251,191,36,0.4);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.88em;color:#d97706;font-weight:600">💡 יש לך כפולות! לחץ על 🔄 ליד מדבקה כדי להחליף 3 כפולות שלה במדבקה חדשה אקראית.</div>`
+    : '';
+
+  const teacherAdmin = isTeacher ? `
+    <div style="margin-top:14px;padding:12px;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.15);border-radius:12px">
+      <div style="font-size:.85em;color:var(--text-dim);margin-bottom:8px">🧑‍🏫 כלי מורה</div>
+      <button class="btn btn-warning" onclick="adminGiveSticker('${sid}')" style="font-size:.85em">🎁 תן מדבקה אקראית</button>
+      <button class="btn btn-danger" onclick="adminResetStickers('${sid}')" style="font-size:.85em;margin-right:6px">🗑️ אפס אלבום</button>
+    </div>` : '';
+
+  return `
+    <div style="padding:6px">
+      <div style="background:rgba(255,255,255,0.04);border-radius:14px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:900">🧩 התקדמות כללית</div>
+          <div style="font-size:.9em"><b style="color:var(--neon-yellow)">${owned}</b>/${total} מדבקות</div>
+        </div>
+        <div style="height:8px;background:rgba(0,0,0,0.2);border-radius:8px;overflow:hidden;margin-bottom:8px">
+          <div style="height:100%;width:${(owned/total)*100}%;background:linear-gradient(90deg,#00f5ff,#ff2e93);transition:width .6s"></div>
+        </div>
+        <div style="font-size:.82em;color:var(--text-dim)">עוד <b style="color:var(--neon-cyan)">${pointsToNext}</b> נקודות למדבקה הבאה</div>
+        <div style="height:5px;background:rgba(0,0,0,0.2);border-radius:5px;overflow:hidden;margin-top:4px">
+          <div style="height:100%;width:${progressPct}%;background:linear-gradient(90deg,#fbbf24,#f59e0b);transition:width .4s"></div>
+        </div>
+      </div>
+      ${swapHint}
+      ${albumsHtml}
+      ${teacherAdmin}
+    </div>
+  `;
+}
+function showStickerDetail(theme, stickerId, sid) {
+  const meta = STICKER_THEME_META[theme];
+  const idx = STICKERS[theme].findIndex(x => x.id === stickerId);
+  const st = STICKERS[theme][idx];
+  const found = findStudent(sid);
+  const count = found ? (found.student.stickers[theme][stickerId] || 0) : 1;
+  const div = document.createElement('div');
+  div.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);animation:fadeIn .3s';
+  const swapBtn = count >= STICKER_SWAP_COST
+    ? `<button onclick="swapDuplicatesForMissing('${sid}','${theme}','${stickerId}');this.closest('div[style*=\\'z-index:10000\\']').remove()" style="margin-top:10px;padding:10px 22px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;border:none;border-radius:12px;font-weight:900;cursor:pointer">🔄 החלף 3 כפולות במדבקה חדשה</button>`
+    : '';
+  div.innerHTML = `
+    <div style="background:linear-gradient(135deg,#fff,#f8f9ff);border-radius:24px;padding:24px;max-width:340px;width:90%;text-align:center;border:3px solid ${meta.color}">
+      <div style="font-size:.85em;color:${meta.color};font-weight:700;margin-bottom:6px">${meta.emoji} ${meta.name}</div>
+      <img src="${stickerImagePath(theme, idx)}" style="width:220px;height:220px;object-fit:cover;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.25);margin-bottom:12px"/>
+      <div style="font-size:1.2em;font-weight:900;color:#1a1a2e;margin-bottom:4px">${st.name}</div>
+      <div style="font-size:.88em;color:#555;line-height:1.6;margin-bottom:8px">${st.desc}</div>
+      ${count > 1 ? `<div style="display:inline-block;background:rgba(124,58,237,0.15);color:#7c3aed;padding:4px 12px;border-radius:14px;font-size:.85em;font-weight:900">יש לך ×${count}</div>` : ''}
+      ${swapBtn}
+      <button onclick="this.closest('div[style*=\\'z-index:10000\\']').remove()" style="display:block;margin:10px auto 0;padding:8px 22px;background:rgba(0,0,0,0.06);border:none;border-radius:10px;color:#555;font-weight:700;cursor:pointer">סגור</button>
+    </div>
+  `;
+  div.onclick = (e) => { if (e.target === div) div.remove(); };
+  document.body.appendChild(div);
+}
+function adminGiveSticker(sid) {
+  const found = findStudent(sid);
+  if (!found) return;
+  const pick = awardRandomSticker(found.student, { preferMissing: true });
+  save();
+  if (pick) showStickerPopup(pick, false);
+  rerenderStickerViews(sid);
+}
+function adminResetStickers(sid) {
+  if (!confirm('לאפס את כל אלבום המדבקות של תלמיד זה?')) return;
+  const found = findStudent(sid);
+  if (!found) return;
+  found.student.stickers = {};
+  found.student.stickerProgress = 0;
+  ensureStickerFields(found.student);
+  save();
+  rerenderStickerViews(sid);
+  if (currentShopStudentSid === sid && document.getElementById('studentModal').classList.contains('show')) openStudent(sid);
+  if (studentSelectedId === sid) setStudentTab('stickers');
+}
+
 </script>
 </body>
 </html>
