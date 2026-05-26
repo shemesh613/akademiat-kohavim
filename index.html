@@ -647,6 +647,109 @@ input[type=text] {
   outline: none;
 }
 input[type=text]:focus { border-color: var(--neon-cyan); }
+
+/* ==================== COMBO FIRE BADGE ==================== */
+.combo-badge {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  background: linear-gradient(135deg, #FFB000, #FF4400);
+  border-radius: 999px;
+  padding: 3px 10px 3px 7px;
+  font-size: 0.85em;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+  border: 2px solid rgba(255,255,255,0.45);
+  box-shadow: 0 0 16px rgba(255,100,0,0.75), inset 0 0 8px rgba(255,200,100,0.55);
+  z-index: 4;
+  animation: comboBounce 0.6s cubic-bezier(0.34,1.56,0.64,1), comboPulse 1.2s ease-in-out infinite 0.6s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.combo-badge.tier2 { background: linear-gradient(135deg, #FF6B00, #FF0066); box-shadow: 0 0 22px rgba(255,40,80,0.8); }
+.combo-badge.tier3 { background: linear-gradient(135deg, #FF0099, #9900FF); box-shadow: 0 0 26px rgba(220,40,200,0.85); }
+.combo-badge.tier4 {
+  background: linear-gradient(135deg, #FFD700, #FF00FF);
+  box-shadow: 0 0 30px rgba(255,200,0,0.95), 0 0 50px rgba(255,0,255,0.5);
+  animation: comboBounce 0.6s cubic-bezier(0.34,1.56,0.64,1), comboMythicPulse 0.8s ease-in-out infinite 0.6s;
+}
+.combo-badge .combo-flame {
+  font-size: 1.05em;
+  filter: drop-shadow(0 0 4px #FFE066);
+  animation: comboFlame 0.5s ease-in-out infinite alternate;
+}
+@keyframes comboBounce {
+  0% { transform: scale(0) rotate(-180deg); }
+  60% { transform: scale(1.4) rotate(20deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes comboPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(255,100,0,0.75); transform: scale(1); }
+  50% { box-shadow: 0 0 28px rgba(255,100,0,1); transform: scale(1.07); }
+}
+@keyframes comboMythicPulse {
+  0%, 100% { transform: scale(1) rotate(-2deg); filter: hue-rotate(0deg); }
+  50% { transform: scale(1.12) rotate(2deg); filter: hue-rotate(40deg); }
+}
+@keyframes comboFlame {
+  from { transform: scale(1) translateY(0); }
+  to { transform: scale(1.25) translateY(-1.5px); }
+}
+
+.student.on-fire {
+  border-color: rgba(255,140,0,0.65) !important;
+  box-shadow: 0 0 24px rgba(255,120,0,0.5), inset 0 0 16px rgba(255,100,0,0.1) !important;
+}
+.student.on-fire.tier2 { border-color: rgba(255,60,80,0.75) !important; box-shadow: 0 0 28px rgba(255,40,80,0.6), inset 0 0 18px rgba(255,40,80,0.13) !important; }
+.student.on-fire.tier3 { border-color: rgba(220,40,200,0.8) !important; box-shadow: 0 0 32px rgba(220,40,200,0.65), inset 0 0 20px rgba(220,40,200,0.15) !important; }
+.student.on-fire.tier4 { border-color: rgba(255,200,0,0.9) !important; box-shadow: 0 0 38px rgba(255,200,0,0.7), 0 0 60px rgba(255,0,255,0.4), inset 0 0 22px rgba(255,200,0,0.16) !important; }
+
+/* COMBO POPUP */
+.combo-popup {
+  position: fixed;
+  top: 30%; left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 9990;
+  pointer-events: none;
+  text-align: center;
+  animation: comboPopupShow 2.2s ease-out forwards;
+}
+@keyframes comboPopupShow {
+  0%   { transform: translate(-50%, -50%) scale(0) rotate(-30deg); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.4) rotate(8deg); opacity: 1; }
+  35%  { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+  80%  { transform: translate(-50%, -50%) scale(1) rotate(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1.2) translateY(-60px); opacity: 0; }
+}
+.combo-popup-title {
+  font-family: 'Rubik Mono One', sans-serif;
+  font-size: 4em;
+  background: linear-gradient(135deg, #FFE066, #FF6600, #FF0066);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 60px rgba(255,100,0,0.75);
+  margin-bottom: 8px;
+  line-height: 1.05;
+}
+.combo-popup-sub {
+  font-size: 1.5em;
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 0 0 20px rgba(255,200,0,0.7);
+  margin-bottom: 4px;
+}
+.combo-popup-mult {
+  font-size: 2.4em;
+  font-weight: 900;
+  color: #FFE066;
+  text-shadow: 0 0 25px #FFE066;
+  margin-top: 8px;
+}
 </style>
 </head>
 <body>
@@ -798,6 +901,22 @@ const SHOP = {
 };
 
 const MYSTERY_BOX_PRICE = 75;
+
+// ==================== COMBO / FIRE MODE ====================
+// Combo never modifies the teacher's input amount — it only ADDS a bonus on top.
+// Existing student data is not affected; combo is opt-in via two new fields.
+const COMBO_WINDOW_MS = 90000; // 90s between answers keeps the streak alive
+const COMBO_TIERS = [
+  { at: 3,  mult: 1.5, tier: 1, label: '🔥 שריפה!',          sub: 'שלוש ברצף!'    },
+  { at: 5,  mult: 2,   tier: 2, label: '🔥🔥 לוהט!',         sub: 'חמש ברצף!'     },
+  { at: 8,  mult: 2.5, tier: 3, label: '🔥🔥🔥 בלתי עציר!',  sub: 'שמונה ברצף!'   },
+  { at: 10, mult: 3,   tier: 4, label: '💥 על אש!!!',        sub: 'אגדה חיה!'     },
+];
+function getComboTier(c) {
+  let t = null;
+  for (const x of COMBO_TIERS) if (c >= x.at) t = x;
+  return t;
+}
 
 // ==================== ACHIEVEMENTS ====================
 const ACHIEVEMENTS = [
@@ -2313,10 +2432,18 @@ function renderClassroom() {
 
 function renderStudent(s) {
   const rank = getRank(s.points);
+  // Combo / fire mode badge (purely visual; recomputed each render so expiry is honored)
+  const combo = s.combo || 0;
+  const lastTime = s.lastComboTime || 0;
+  const comboActive = combo >= 3 && (Date.now() - lastTime) < COMBO_WINDOW_MS;
+  const tier = comboActive ? getComboTier(combo) : null;
+  const fireClass = tier ? `on-fire tier${tier.tier}` : '';
+  const fireBadge = tier ? `<div class="combo-badge tier${tier.tier}"><span class="combo-flame">🔥</span>${combo}</div>` : '';
   return `
-    <div class="student" draggable="true" data-id="${s.id}"
+    <div class="student ${fireClass}" draggable="true" data-id="${s.id}"
          ondragstart="dragStart(event, '${s.id}')"
          ondragend="this.classList.remove('dragging')">
+      ${fireBadge}
       <span class="drag-handle" title="גרור להעברה">⋮⋮</span>
       <canvas class="avatar-canvas" data-student="${s.id}" width="144" height="144"
               onclick="openStudent('${s.id}')"></canvas>
@@ -2382,14 +2509,38 @@ function addPoints(studentId, amount, fromX, fromY) {
   const s = getActiveClass().students.find(s => s.id === studentId);
   if (!s) return;
   const oldRank = getRank(s.points).current;
-  s.points = Math.max(0, s.points + amount);
-  s.weeklyPoints = (s.weeklyPoints || 0) + amount;
-  const stickerAwards = awardStickersForPoints(s, amount);
+
+  // ---- COMBO LOGIC (additive bonus only; original `amount` never modified) ----
+  let comboBonus = 0;
+  let newTierCrossed = null;
+  try {
+    const now = Date.now();
+    if (amount > 0) {
+      const prevCombo = s.combo || 0;
+      const lastTime = s.lastComboTime || 0;
+      const expired = (now - lastTime) > COMBO_WINDOW_MS;
+      const oldTier = getComboTier(prevCombo);
+      s.combo = expired ? 1 : (prevCombo + 1);
+      s.lastComboTime = now;
+      const newTier = getComboTier(s.combo);
+      if (newTier && (!oldTier || newTier.tier > oldTier.tier)) newTierCrossed = newTier;
+      if (newTier) comboBonus = Math.round(amount * (newTier.mult - 1));
+    } else if (amount < 0) {
+      // Negative points break the streak
+      s.combo = 0;
+      s.lastComboTime = 0;
+    }
+  } catch (e) { comboBonus = 0; }
+
+  s.points = Math.max(0, s.points + amount + comboBonus);
+  s.weeklyPoints = (s.weeklyPoints || 0) + amount + comboBonus;
+  const stickerAwards = awardStickersForPoints(s, amount + comboBonus);
   stickerAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1000 + i * 1800));
   const newRank = getRank(s.points).current;
-  showPointPopup(amount, fromX, fromY);
+  showPointPopup(amount, fromX, fromY, comboBonus);
+  if (newTierCrossed) setTimeout(() => showComboPopup(s, newTierCrossed), 350);
   if (newRank.name !== oldRank.name && amount > 0) showRankUp(s, newRank);
-  else playSound(amount > 0 ? 'point' : 'minus');
+  else playSound(amount > 0 ? (newTierCrossed ? 'combo' : 'point') : 'minus');
   // check achievements
   const newAchs = checkAchievements(s);
   newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 500 + i * 1500));
@@ -2705,7 +2856,7 @@ function deleteStudent(sid) {
 }
 
 // ==================== EFFECTS ====================
-function showPointPopup(amount, x, y) {
+function showPointPopup(amount, x, y, comboBonus) {
   const el = document.createElement('div');
   el.className = 'point-popup';
   el.textContent = (amount > 0 ? '+' : '') + amount;
@@ -2714,6 +2865,33 @@ function showPointPopup(amount, x, y) {
   el.style.color = amount > 0 ? '#00ff88' : '#ff4444';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1300);
+  if (comboBonus && comboBonus > 0) {
+    const bonus = document.createElement('div');
+    bonus.className = 'point-popup';
+    bonus.textContent = '+' + comboBonus + ' 🔥';
+    bonus.style.left = ((x || window.innerWidth/2) + 40) + 'px';
+    bonus.style.top  = ((y || window.innerHeight/2) + 50) + 'px';
+    bonus.style.color = '#FFB000';
+    bonus.style.fontSize = '2em';
+    bonus.style.textShadow = '0 0 14px #FF6600';
+    bonus.style.animationDelay = '0.15s';
+    document.body.appendChild(bonus);
+    setTimeout(() => bonus.remove(), 1500);
+  }
+}
+
+function showComboPopup(s, tier) {
+  const el = document.createElement('div');
+  el.className = 'combo-popup';
+  el.innerHTML = `
+    <div class="combo-popup-title">${tier.label}</div>
+    <div class="combo-popup-sub">${escapeHtml(s.name)} · ${tier.sub}</div>
+    <div class="combo-popup-mult">×${tier.mult} מכפיל!</div>
+  `;
+  document.body.appendChild(el);
+  burstConfetti(window.innerWidth/2, window.innerHeight/3, 50 + tier.tier * 18);
+  try { playSound('combo'); } catch(e) {}
+  setTimeout(() => el.remove(), 2400);
 }
 
 function showRankUp(s, rank) {
@@ -2773,6 +2951,7 @@ function playSound(type) {
       boxBurst: [[1047,0.05],[1319,0.05],[1568,0.15]],
       boxItem:  [[523,0.08],[659,0.08],[784,0.08],[1047,0.08],[1319,0.2]],
       daily:    [[523,0.1],[784,0.1],[1047,0.1],[1319,0.1],[1568,0.25]],  // fanfare
+      combo:    [[523,0.06],[659,0.06],[784,0.06],[1047,0.06],[1319,0.06],[1568,0.2]], // combo flame rise
     };
     const notes = tunes[type] || [[440,0.1]];
     for (const [freq, dur] of notes) {
