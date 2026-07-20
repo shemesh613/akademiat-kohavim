@@ -6,8 +6,12 @@
 <title>⚡ אקדמיית הכוכבים</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&family=Rubik+Mono+One&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<!-- Three.js מקומי — רשתות בתי ספר חוסמות CDN-ים לעיתים קרובות, ובלי THREE
+     כל האפליקציה קורסת (לא רק האי). ה-CDN נשאר כגיבוי אם הקובץ המקומי חסר. -->
+<script src="vendor/three.min.js"></script>
+<script>if(typeof THREE==='undefined')document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
+<script src="vendor/GLTFLoader.js"></script>
+<script>if(typeof THREE!=='undefined'&&!THREE.GLTFLoader)document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script>');</script>
 <style>
 :root {
   --bg-1: #0a0e27;
@@ -751,6 +755,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
   margin-top: 8px;
 }
 </style>
+<link rel="stylesheet" href="css/shop-plus.css">
 </head>
 <body>
 
@@ -773,6 +778,8 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 <div class="classroom" id="classroom"></div>
 
 <div class="footer-actions">
+  <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassIsland()">🏝️ האי של הכיתה</button>
+  <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassGame()">🎮 משחק הצהריים</button>
   <button class="btn btn-warning" onclick="openLeaderboard()">🏆 לוח שיא</button>
   <button class="btn" onclick="resetWeek()">🔄 איפוס שבועי</button>
   <button class="btn btn-danger" onclick="exportData()">💾 גיבוי לקובץ</button>
@@ -1548,7 +1555,7 @@ function buildHair(group, body) {
   }
 }
 
-function build3DCharacter(scene, equipped) {
+function build3DCharacter(scene, equipped, avT) {
   while (scene.children.length > 0) scene.remove(scene.children[0]);
 
   const body = findItem(equipped.body) || SHOP.bodies[0];
@@ -1572,6 +1579,10 @@ function build3DCharacter(scene, equipped) {
   const top = new THREE.PointLight(0xffe600, 0.4);
   top.position.set(0, 6, 1);
   scene.add(top);
+
+  if (window.AvatarPlus && typeof window.AvatarPlus.lights === 'function') {
+    try { window.AvatarPlus.lights(scene); } catch (e) { console.warn('AvatarPlus.lights failed', e); }
+  }
 
   const charGroup = new THREE.Group();
   scene.add(charGroup);
@@ -1632,6 +1643,12 @@ function build3DCharacter(scene, equipped) {
       // aura
       const aura = findItem(equipped.aura);
       if (aura && aura.id !== 'aura-none') buildAura(scene, charGroup, aura);
+      if (window.AvatarPlus) {
+        try {
+          if (typeof window.AvatarPlus.enhance === 'function') window.AvatarPlus.enhance(charGroup, equipped);
+          if (typeof window.AvatarPlus.idle === 'function') window.AvatarPlus.idle(charGroup, (typeof avT === 'number') ? avT : performance.now());
+        } catch (e) { console.warn('AvatarPlus hook failed', e); }
+      }
       return charGroup;
     }
     // fallback to procedural if model not yet loaded
@@ -1665,6 +1682,7 @@ function build3DCharacter(scene, equipped) {
   head.position.y = 2.0;
   head.scale.set(1, 1.05, 0.96);
   charGroup.add(head);
+  head.userData.ak = 'head';
 
   const earGeo = new THREE.SphereGeometry(0.16, 16, 16);
   for (const x of [-0.83, 0.83]) {
@@ -1672,6 +1690,7 @@ function build3DCharacter(scene, equipped) {
     ear.position.set(x, 2.0, 0);
     ear.scale.set(0.6, 1.2, 1);
     charGroup.add(ear);
+    ear.userData.ak = 'ear';
   }
 
   // hair
@@ -1686,16 +1705,20 @@ function build3DCharacter(scene, equipped) {
     eye.position.set(x, 2.05, 0.7);
     eye.scale.set(1, 1.15, 0.7);
     charGroup.add(eye);
+    eye.userData.ak = 'eye';
     const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 24), pupilMat);
     pupil.position.set(x, 2.05, 0.84);
     charGroup.add(pupil);
+    pupil.userData.ak = 'pupil';
     const sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), sparkleMat);
     sparkle.position.set(x + 0.04, 2.11, 0.93);
     charGroup.add(sparkle);
+    sparkle.userData.ak = 'sparkle';
     // small secondary highlight
     const sparkle2 = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), sparkleMat);
     sparkle2.position.set(x - 0.03, 2.0, 0.93);
     charGroup.add(sparkle2);
+    sparkle2.userData.ak = 'sparkle';
   }
 
   // eyebrows
@@ -1705,6 +1728,7 @@ function build3DCharacter(scene, equipped) {
     brow.position.set(x, 2.3, 0.78);
     brow.rotation.z = -Math.sign(x) * 0.15;
     charGroup.add(brow);
+    brow.userData.ak = 'brow';
   }
 
   // === MOUTH ===
@@ -1715,6 +1739,7 @@ function build3DCharacter(scene, equipped) {
   mouth.position.set(0, 1.65, 0.78);
   mouth.rotation.z = Math.PI;
   charGroup.add(mouth);
+  mouth.userData.ak = 'mouth';
 
   // cheeks
   const cheekMat = new THREE.MeshStandardMaterial({ color: 0xff7a92, transparent: true, opacity: 0.5 });
@@ -1722,6 +1747,7 @@ function build3DCharacter(scene, equipped) {
     const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), cheekMat);
     cheek.position.set(x, 1.78, 0.65);
     charGroup.add(cheek);
+    cheek.userData.ak = 'cheek';
   }
 
   // helper: capsule = cylinder with sphere ends (smooth no-seam joint)
@@ -1747,14 +1773,17 @@ function build3DCharacter(scene, equipped) {
   const torso = capsule(0.55, 0.5, 1.0, shirtMat, 32);
   torso.position.y = 0.75;
   charGroup.add(torso);
+  torso.userData.ak = 'torso';
   const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 32), shirtMat);
   shoulders.position.y = 1.25;
   shoulders.scale.set(1, 0.6, 1);
   charGroup.add(shoulders);
+  shoulders.userData.ak = 'shoulders';
   const hips = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), shirtMat);
   hips.position.y = 0.25;
   hips.scale.set(1, 0.55, 1);
   charGroup.add(hips);
+  hips.userData.ak = 'hips';
 
   // === ARMS === smooth capsule arms
   for (const x of [-0.78, 0.78]) {
@@ -1792,6 +1821,7 @@ function build3DCharacter(scene, equipped) {
     hatRoot.position.y = 2.85;
     addHat(hatRoot, hat.id);
     charGroup.add(hatRoot);
+    hatRoot.userData.ak = 'hat';
   }
   // === GLASSES === (eye level, in front of face)
   if (glasses && glasses.id !== 'gl-none') {
@@ -1799,6 +1829,7 @@ function build3DCharacter(scene, equipped) {
     glRoot.position.set(0, 2.05, 0.85);
     addGlasses(glRoot, glasses.id);
     charGroup.add(glRoot);
+    glRoot.userData.ak = 'glasses';
   }
 
   // center character vertically (it spans ~y=-0.95 to 3.5, mid ~1.3)
@@ -1830,6 +1861,13 @@ function build3DCharacter(scene, equipped) {
   const aura = findItem(equipped.aura);
   if (aura && aura.id !== 'aura-none') {
     buildAura(scene, charGroup, aura);
+  }
+
+  if (window.AvatarPlus) {
+    try {
+      if (typeof window.AvatarPlus.enhance === 'function') window.AvatarPlus.enhance(charGroup, equipped);
+      if (typeof window.AvatarPlus.idle === 'function') window.AvatarPlus.idle(charGroup, (typeof avT === 'number') ? avT : performance.now());
+    } catch (e) { console.warn('AvatarPlus hook failed', e); }
   }
 
   return charGroup;
@@ -2339,7 +2377,7 @@ function avatarCacheKey(equipped, w) {
 }
 function clearAvatarCache() { avatarCache.clear(); }
 
-function renderToCanvas(canvas, equipped, rotation = 0) {
+function renderToCanvas(canvas, equipped, rotation = 0, avT) {
   const w = canvas.width || 144;
   const h = canvas.height || 144;
   // Cache hit (only when not rotating)
@@ -2357,7 +2395,7 @@ function renderToCanvas(canvas, equipped, rotation = 0) {
   const camera = new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
   camera.position.set(0, 0.2, 6.5);
   camera.lookAt(0, 0.2, 0);
-  const charGroup = build3DCharacter(scene, equipped);
+  const charGroup = build3DCharacter(scene, equipped, avT);
   charGroup.rotation.y = rotation;
 
   sharedRenderer.setSize(w, h, false);
@@ -2534,6 +2572,30 @@ function addPoints(studentId, amount, fromX, fromY) {
 
   s.points = Math.max(0, s.points + amount + comboBonus);
   s.weeklyPoints = (s.weeklyPoints || 0) + amount + comboBonus;
+
+  // ---- האי הכיתתי: 10 נקודות תלמיד = אבן בניין אחת לכיתה (SPEC §3, החלטה 1) ----
+  // לא גורע מהתלמיד. שארית נשמרת כדי שאף נקודה לא תלך לאיבוד לאורך השנה.
+  try {
+    const gained = amount + comboBonus;
+    if (gained > 0) {
+      const k = getActiveClass();
+      if (window.AK) window.AK.ensureKlass(k);
+      if (k && k.island) {
+        k.island._rem = (k.island._rem || 0) + gained;
+        const stones = Math.floor(k.island._rem / 10);
+        if (stones > 0) {
+          k.island._rem -= stones * 10;
+          k.island.coins += stones;
+        }
+      }
+    }
+  } catch (e) {}
+
+  // ---- קופת הזמן היומית + הגרלת שחקן/ית היום (class-games.js) ----
+  if (window.ClassGames && typeof window.ClassGames.onPointsAdded === 'function') {
+    try { window.ClassGames.onPointsAdded(s, amount + comboBonus); } catch (e) {}
+  }
+
   const stickerAwards = awardStickersForPoints(s, amount + comboBonus);
   stickerAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1000 + i * 1800));
   const newRank = getRank(s.points).current;
@@ -2634,7 +2696,7 @@ function openStudent(id) {
   function animate(t) {
     if (t - lastFrame > 41) { // ~24fps
       rot += 0.025;
-      renderToCanvas(canvas, s.equipped, rot);
+      renderToCanvas(canvas, s.equipped, rot, t);
       lastFrame = t;
     }
     modalAnimId = requestAnimationFrame(animate);
@@ -3377,6 +3439,7 @@ function renderStudentProfile() {
         <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
         <button class="modal-tab" id="stTabStickers" onclick="setStudentTab('stickers')">🧩 מדבקות</button>
         <button class="modal-tab" id="stTabAch" onclick="setStudentTab('ach')">🏆 הישגים</button>
+        <button class="modal-tab" onclick="openClassIsland()">🏝️ האי שלנו</button>
       </div>
       <div id="studentBody"></div>
     </div>
@@ -3386,9 +3449,9 @@ function renderStudentProfile() {
   if (studentAnimId) cancelAnimationFrame(studentAnimId);
   let rotation = 0;
   const canvas = document.getElementById('studentBigAvatar');
-  function animate() {
+  function animate(t) {
     rotation += 0.012;
-    renderToCanvas(canvas, previewEq, rotation);
+    renderToCanvas(canvas, previewEq, rotation, t);
     studentAnimId = requestAnimationFrame(animate);
   }
   animate();
@@ -4190,5 +4253,29 @@ function adminResetStickers(sid) {
 }
 
 </script>
+
+<script>
+/* ===== נקודות כניסה לאי ולמשחק הכיתתי =====
+   שתי עטיפות דקות בלבד. אם מודול חסר — הודעה ידידותית, בלי קריסה. */
+function openClassIsland() {
+  if (window.Island && typeof window.Island.open === 'function') {
+    try { window.Island.open(); return; } catch (e) { console.error('Island.open failed', e); }
+  }
+  alert('האי עדיין נטען — נסו שוב בעוד רגע 🏝️');
+}
+function openClassGame() {
+  if (window.ClassGames && typeof window.ClassGames.open === 'function') {
+    try { window.ClassGames.open(); return; } catch (e) { console.error('ClassGames.open failed', e); }
+  }
+  alert('המשחק עדיין נטען — נסו שוב בעוד רגע 🎮');
+}
+</script>
+
+<!-- ===== מודולים חדשים: האי הכיתתי + משחקי הצהריים + שדרוג ויזואלי ===== -->
+<script src="js/ak-bridge.js"></script>
+<script src="js/island-content.js"></script>
+<script src="js/island-engine.js"></script>
+<script src="js/class-games.js"></script>
+<script src="js/avatar-plus.js"></script>
 </body>
 </html>
