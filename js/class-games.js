@@ -211,6 +211,9 @@ function injectStyle() {
       'text-shadow:0 0 40px rgba(255,255,255,0.15);max-width:92vw;}' +
     '.ak-cg-h2{font-size:6.2vh;font-weight:900;color:#ffe600;max-width:90vw;}' +
     '.ak-cg-body{font-size:6vh;font-weight:800;color:#fff;max-width:90vw;}' +
+    '.ak-cg-btn{margin-top:3vh;font-size:5vh;font-weight:900;color:#04121f;background:linear-gradient(135deg,#00ff88,#00e0ff);'+
+      'border:none;border-radius:999px;padding:1.6vh 5vw;cursor:pointer;box-shadow:0 8px 30px rgba(0,255,136,.45);}' +
+    '.ak-cg-btn:active{transform:scale(.96);}' +
     '.ak-cg-badge{display:inline-block;padding:1.2vh 3vw;border-radius:999px;font-size:6.2vh;font-weight:900;' +
       'background:linear-gradient(135deg,#00f5ff,#0088ff);color:#001018;box-shadow:0 0 30px rgba(0,245,255,0.5);}' +
     '.ak-cg-count{font-family:"Rubik Mono One",sans-serif;font-size:22vh;font-weight:900;color:#ffe600;' +
@@ -237,6 +240,8 @@ function injectStyle() {
     '.ak-cg-role{font-size:3.4vh;font-weight:800;color:#00f5ff;background:rgba(0,245,255,0.1);padding:0.8vh 2vw;border-radius:14px;max-width:88vw;}' +
     '.ak-cg-quadgrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1.4vh;width:100%;height:100%;padding:1.6vh;}' +
     '.ak-cg-quad{border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:6vh;font-weight:900;color:#fff;' +
+    '.ak-cg-quad.warm{transform:scale(1.03);filter:brightness(1.25);}' +
+    '.ak-cg-quad.live{transform:scale(1.07);filter:brightness(1.45);box-shadow:0 0 0 8px rgba(255,255,255,.85) inset;}' +
       'cursor:pointer;transition:transform .1s;user-select:none;text-shadow:0 2px 6px rgba(0,0,0,0.4);}' +
     '.ak-cg-quad:active{transform:scale(0.94);}' +
     '.ak-cg-quad.hit{animation:ak-cg-pulse .35s ease-out;}' +
@@ -314,7 +319,10 @@ function open(opts) {
   injectStyle();
   var g = ensureGamesState(klass);
   var gameId = (opts && opts.game) || pickGameForToday();
-  var duration = timeBank(klass);
+  var replay = !!(opts && opts.replay);
+  if (g.dailyDone && !replay) { renderAlreadyPlayed(klass, g); return; }
+  /* סבב נוסף באותו יום — זמן מקוצר קבוע, כדי שהקופה היומית תישאר משמעותית */
+  var duration = replay ? REPLAY_SECONDS : timeBank(klass);
   SESSION.running = true;
   SESSION.klass = klass;
   SESSION.game = gameId;
@@ -324,6 +332,25 @@ function open(opts) {
   getRoot();
   if (gameId === 'confetti') renderConfettiAnnounce();
   else renderAnnounce();
+}
+var REPLAY_SECONDS = 20; /* סבב רשות נוסף — קצר בכוונה */
+
+/* כבר שיחקנו היום: מציג מה הרווחנו, ומאפשר סבב נוסף קצר בלי לחלק זמן מחדש */
+function renderAlreadyPlayed(klass, g) {
+  var root = getRoot();
+  var last = (g.plays && g.plays.length) ? g.plays[g.plays.length - 1] : null;
+  var earned = last ? last.score : 0;
+  root.innerHTML =
+    '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
+    '<div class="ak-cg-wrap">' +
+      '<div class="ak-cg-h1">🎉 כבר שיחקנו היום!</div>' +
+      '<div class="ak-cg-h2">הרווחנו ' + earned + ' אבני בניין לאי</div>' +
+      '<div class="ak-cg-body">הקופה מתמלאת שוב מחר — כל נקודה היום נחסכת למשחק של מחר! ⏳</div>' +
+      '<button class="ak-cg-btn" id="ak-cg-replay">▶️ עוד סבב קצר (' + REPLAY_SECONDS + ' שניות)</button>' +
+    '</div>';
+  SESSION.running = false;
+  var btn = document.getElementById('ak-cg-replay');
+  if (btn) btn.onclick = function () { close(); open({ replay: true }); };
 }
 function close() {
   clearSession();
@@ -882,7 +909,7 @@ RUNNERS.colorrush = (function () {
     { name: 'אדום', hex: '#ff2e4d' }, { name: 'צהוב', hex: '#ffce00' },
     { name: 'ירוק', hex: '#2ee6a8' }, { name: 'כחול', hex: '#2e8bff' }
   ];
-  var stageEl, rounds, success, currentIdx, active, clickHandlers;
+  var stageEl, rounds, success, currentIdx, active, clickHandlers, teaserId;
   function render() {
     var html = '<div class="ak-cg-quadgrid">';
     var i;
@@ -906,27 +933,60 @@ RUNNERS.colorrush = (function () {
     q.classList.add('hit');
     if (idx === currentIdx) success++;
   }
+  /* קצב: סיבוב אחד כל ~2.6 שניות ומאיץ. קודם היו 2-5 סיבובים לכל המשחק,
+     כלומר עשר שניות של מסך סטטי בין הכרזה להכרזה — הכיתה פשוט חיכתה. */
+  function roundsFor(duration) { return clampInt(Math.round(duration / 2.6), 6, 22); }
+  function setIdle(on) {
+    var quads = stageEl.querySelectorAll('.ak-cg-quad');
+    for (var i = 0; i < quads.length; i++) quads[i].classList.toggle('idle', !!on);
+  }
+  /* בין סיבובים הריבועים "מתחממים" בתורות — המסך אף פעם לא קפוא */
+  function startTeaser() {
+    stopTeaser();
+    var quads = stageEl.querySelectorAll('.ak-cg-quad');
+    var k = 0;
+    teaserId = setInterval(function () {
+      for (var i = 0; i < quads.length; i++) quads[i].classList.toggle('warm', i === (k % quads.length));
+      k++;
+    }, 120);
+  }
+  function stopTeaser() {
+    if (teaserId) { clearInterval(teaserId); teaserId = null; }
+    var quads = stageEl ? stageEl.querySelectorAll('.ak-cg-quad') : [];
+    for (var i = 0; i < quads.length; i++) quads[i].classList.remove('warm');
+  }
   function nextRound(i, total, perRoundMs) {
     if (!active) return;
-    if (i >= total) return; /* נגמרו הסיבובים לפני שנגמר הזמן — מחכים לחגיגה של הטיימר החיצוני */
-    currentIdx = Math.floor(Math.random() * COLORS.length);
-    var target = document.createElement('div');
-    target.className = 'ak-cg-target';
-    target.style.background = COLORS[currentIdx].hex;
-    target.textContent = COLORS[currentIdx].name + '!';
-    stageEl.appendChild(target);
-    stageEl.classList.add('ak-cg-shake');
-    trackTimer(setTimeout(function () { stageEl.classList.remove('ak-cg-shake'); }, 400));
-    var windowMs = Math.max(500, 1600 - i * 180);
+    if (i >= total) { startTeaser(); return; }
+    startTeaser();
+    /* רגע ציפייה קצר, ואז ההכרזה */
+    var lead = Math.min(700, perRoundMs * 0.35);
     trackTimer(setTimeout(function () {
-      if (target.parentNode) target.parentNode.removeChild(target);
-      trackTimer(setTimeout(function () { nextRound(i + 1, total, perRoundMs); }, Math.max(80, perRoundMs - windowMs)));
-    }, Math.min(windowMs, perRoundMs)));
+      if (!active) return;
+      stopTeaser();
+      currentIdx = Math.floor(Math.random() * COLORS.length);
+      var target = document.createElement('div');
+      target.className = 'ak-cg-target';
+      target.style.background = COLORS[currentIdx].hex;
+      target.textContent = COLORS[currentIdx].name + '!';
+      stageEl.appendChild(target);
+      var quads = stageEl.querySelectorAll('.ak-cg-quad');
+      if (quads[currentIdx]) quads[currentIdx].classList.add('live');
+      stageEl.classList.add('ak-cg-shake');
+      trackTimer(setTimeout(function () { stageEl.classList.remove('ak-cg-shake'); }, 380));
+      /* חלון התגובה מתקצר ככל שמתקדמים — קושי עולה לקראת השיא */
+      var windowMs = Math.max(620, (perRoundMs - lead) * (1 - i / (total * 1.6)));
+      trackTimer(setTimeout(function () {
+        if (target.parentNode) target.parentNode.removeChild(target);
+        for (var q = 0; q < quads.length; q++) quads[q].classList.remove('live');
+        nextRound(i + 1, total, perRoundMs);
+      }, windowMs));
+    }, lead));
   }
   function start(ctx) {
     stageEl = ctx.stage;
     success = 0; active = true;
-    rounds = clampInt(2 + (ctx.duration - 20) * (3 / 40), 2, 5);
+    rounds = roundsFor(ctx.duration);
     var perRoundMs = (ctx.duration * 1000) / rounds;
     render();
     nextRound(0, rounds, perRoundMs);
@@ -937,6 +997,7 @@ RUNNERS.colorrush = (function () {
   }
   function cleanup() {
     active = false;
+    stopTeaser();
     if (clickHandlers) {
       var i;
       for (i = 0; i < clickHandlers.length; i++) {

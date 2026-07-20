@@ -139,7 +139,7 @@ var ISL = {
   regionTier: {},        /* id -> 'locked' | 'lod' | 'full' */
   regionDirty: {},       /* id -> true אם צריך רה-בילד */
   activeId: 'beach',
-  cam: { yaw: 0.6, pitch: 0.62, radius: 32, cx: 0, cz: 0, tx: 0, tz: 0 },
+  cam: { yaw: 0.6, pitch: 0.55, radius: 23, cx: 0, cz: 0, tx: 0, tz: 0 },
   raycaster: new THREE.Raycaster(),
   buildPlane: null,
   highlightTile: null,
@@ -895,19 +895,19 @@ function ensureHudCss() {
     + '.ak-isl-progress-label{color:#fff;font-size:28px;font-weight:700;text-align:center;margin-bottom:6px;text-shadow:0 2px 6px rgba(0,0,0,.6);}'
     + '.ak-isl-progress-bar{height:26px;border-radius:14px;background:rgba(10,14,24,0.55);border:2px solid rgba(255,255,255,.4);overflow:hidden;}'
     + '.ak-isl-progress-fill{height:100%;background:linear-gradient(90deg,#ffd54a,#ff9a3c);border-radius:14px;transition:width .6s ease;}'
-    + '.ak-isl-shop{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:10px;background:rgba(15,20,35,0.72);border:2px solid rgba(255,255,255,.3);border-radius:24px;padding:12px 16px;pointer-events:auto;max-width:92vw;overflow-x:auto;}'
-    + '.ak-isl-item{flex:0 0 auto;min-width:108px;max-width:150px;text-align:center;color:#fff;background:rgba(255,255,255,0.08);border-radius:16px;padding:8px 12px;cursor:pointer;border:3px solid transparent;font-size:28px;}'
-    + '.ak-isl-item .em{font-size:34px;display:block;}'
-    + '.ak-isl-item .nm{font-size:22px;font-weight:700;margin-top:2px;line-height:1.15;white-space:normal;overflow-wrap:anywhere;}'
-    + '.ak-isl-item .cs{font-size:22px;color:#ffe08a;font-weight:800;margin-top:3px;white-space:nowrap;}'
+    + '.ak-isl-shop{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(15,20,35,0.72);border:2px solid rgba(255,255,255,.3);border-radius:18px;padding:7px 10px;pointer-events:auto;max-width:96vw;overflow-x:auto;}'
+    + '.ak-isl-item{flex:0 0 auto;width:96px;text-align:center;color:#fff;background:rgba(255,255,255,0.08);border-radius:12px;padding:5px 6px;cursor:pointer;border:2px solid transparent;font-size:22px;}'
+    + '.ak-isl-item .em{font-size:26px;display:block;line-height:1.1;}'
+    + '.ak-isl-item .nm{font-size:15px;font-weight:700;margin-top:1px;line-height:1.1;height:2.2em;overflow:hidden;}'
+    + '.ak-isl-item .cs{font-size:17px;color:#ffe08a;font-weight:800;margin-top:1px;white-space:nowrap;}'
     + '.ak-isl-item.sel{border-color:#ffd54a;background:rgba(255,213,74,0.22);}'
     + '.ak-isl-item.cant{opacity:.45;}'
     + '.ak-isl-item.del{background:rgba(255,90,90,.18);}'
-    + '.ak-isl-hint{position:absolute;bottom:290px;left:50%;transform:translateX(-50%);color:#fff;font-size:30px;font-weight:800;text-shadow:0 3px 10px rgba(0,0,0,.7);background:rgba(15,20,35,.55);padding:10px 26px;border-radius:18px;pointer-events:none;}'
+    + '.ak-isl-hint{position:absolute;bottom:190px;left:50%;transform:translateX(-50%);color:#fff;font-size:30px;font-weight:800;text-shadow:0 3px 10px rgba(0,0,0,.7);background:rgba(15,20,35,.55);padding:10px 26px;border-radius:18px;pointer-events:none;}'
     + '.ak-isl-ambientflag{position:absolute;top:18px;left:24px;font-size:28px;color:#fff;background:rgba(255,213,74,.85);color:#3a2c00;font-weight:900;padding:8px 18px;border-radius:16px;display:none;}'
     + '.ak-isl-ambientflag.on{display:block;}'
-    + '.ak-isl-plots{position:absolute;bottom:210px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(15,20,35,0.6);border:2px solid rgba(255,255,255,.25);border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}'
-    + '.ak-isl-plot-chip{white-space:nowrap;font-size:22px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);border-radius:14px;padding:6px 16px;cursor:pointer;border:3px solid transparent;}'
+    + '.ak-isl-plots{position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(15,20,35,0.6);border:2px solid rgba(255,255,255,.25);border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}'
+    + '.ak-isl-plot-chip{white-space:nowrap;font-size:18px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);border-radius:12px;padding:4px 12px;cursor:pointer;border:2px solid transparent;}'
     + '.ak-isl-plot-chip.sel{border-color:#7dffa8;background:rgba(125,255,168,0.25);}';
   var style = document.createElement('style');
   style.id = HUD_CSS_ID;
