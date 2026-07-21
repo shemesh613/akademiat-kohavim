@@ -433,23 +433,52 @@ function syncVillagerRoster() {
   assignHomes();
 }
 
-/* בחירת עד MAX_FULL_VILLAGERS תלמידים לפירוט מלא — הקרובים ביותר למצלמה, בין אלו
- * שהאזור-בית שלהם כרגע ב-'full' tier. שאר התלמידים מקבלים impostor זול (Sprite). */
+/* "קאסט שקט" — במקום 24 תושבים בערימה, רואים רק את תושבי האזור הפעיל, ועד
+ * CAST_MAX בו-זמנית. כשיש יותר — חלון מתחלף כל CAST_ROTATE_SEC שניות, כך שכל
+ * ילד/ה מקבלים זמן-מסך במהלך שיעור (24 תלמידים ÷ 6 ≈ סבב מלא בכ-5 דקות).
+ * מתוך הנראים: עד MAX_FULL_VILLAGERS בפירוט מלא, השאר מיני-דמות זולה. */
+var CAST_MAX = 6;
+var CAST_ROTATE_SEC = 75;
 function updateLod() {
   var cp = camPos();
-  var candidates = [];
+  var activeId = LIFE.ISL ? LIFE.ISL.activeId : null;
+  var residents = [];
   for (var i = 0; i < LIFE.villagers.length; i++) {
     var v = LIFE.villagers[i];
-    if (!v.homeRegion) { v.wrapper.visible = false; continue; }
-    var dx = v.pos.x - cp.x, dz = v.pos.z - cp.z, dy = 0 - cp.y;
-    v.distSq = dx * dx + dz * dz + dy * dy * 0.2;
-    candidates.push(v);
+    var out = !v.homeRegion || (activeId && v.homeRegion !== activeId);
+    if (out) {
+      v.wrapper.visible = false;
+      if (v.petWrap) v.petWrap.visible = false;
+      continue;
+    }
+    residents.push(v);
   }
-  candidates.sort(function (a, b) { return a.distSq - b.distSq; });
-  for (var k = 0; k < candidates.length; k++) {
+  var visible = residents;
+  if (residents.length > CAST_MAX) {
+    residents.sort(function (a, b) { return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); });
+    var now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+    var start = Math.floor(now / CAST_ROTATE_SEC) % residents.length;
+    visible = [];
+    for (var w = 0; w < CAST_MAX; w++) visible.push(residents[(start + w) % residents.length]);
+    for (var h = 0; h < residents.length; h++) {
+      var vr = residents[h];
+      if (visible.indexOf(vr) < 0) {
+        vr.wrapper.visible = false;
+        if (vr.petWrap) vr.petWrap.visible = false;
+      }
+    }
+  }
+  for (var c2 = 0; c2 < visible.length; c2++) {
+    var vc = visible[c2];
+    var dx = vc.pos.x - cp.x, dz = vc.pos.z - cp.z, dy = 0 - cp.y;
+    vc.distSq = dx * dx + dz * dz + dy * dy * 0.2;
+  }
+  visible.sort(function (a, b) { return a.distSq - b.distSq; });
+  for (var k = 0; k < visible.length; k++) {
     var want = k < MAX_FULL_VILLAGERS ? 'full' : 'impostor';
-    var v2 = candidates[k];
+    var v2 = visible[k];
     v2.wrapper.visible = true;
+    if (v2.petWrap) v2.petWrap.visible = true;
     if (v2.lod !== want) setVillagerLod(v2, want);
   }
 }

@@ -1199,7 +1199,7 @@ function setupInput(canvas) {
   canvas.addEventListener('touchstart', function (e) { var t = e.touches[0]; pd(t.clientX, t.clientY); }, { passive: true });
   canvas.addEventListener('touchmove', function (e) { var t = e.touches[0]; pm(t.clientX, t.clientY); }, { passive: true });
   canvas.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; pu(t.clientX, t.clientY); }, { passive: true });
-  canvas.addEventListener('wheel', function (e) { ISL.cam.radius = clamp(ISL.cam.radius + e.deltaY * 0.012, 12, 70); pauseAmbient(); }, { passive: true });
+  canvas.addEventListener('wheel', function (e) { ISL.cam.radius = clamp(ISL.cam.radius + e.deltaY * 0.012, 4.5, 70); pauseAmbient(); }, { passive: true });
 }
 function pauseAmbient() { if (ISL.ambient) ISL.ambientPauseUntil = performance.now() / 1000 + 20; }
 function pickPoint(x, y) {
