@@ -1578,19 +1578,19 @@ function build3DCharacter(scene, equipped, avT) {
   const pet = findItem(equipped.pet);
   const character = findItem(equipped.character) || SHOP.characters[0];
 
-  // pro-grade lighting setup
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1d3a, 0.5));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-  dir.position.set(2, 5, 4);
+  // תאורת סטודיו "יום שמשי" — key חם, rim תכלת, fill שמנת. תואם לשפה הבהירה + ACES
+  scene.add(new THREE.HemisphereLight(0xfff8ec, 0x8a7a68, 0.6));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.32));
+  const dir = new THREE.DirectionalLight(0xfff2d8, 1.15);
+  dir.position.set(2.5, 5, 4);
   scene.add(dir);
-  const rim = new THREE.PointLight(0x00f5ff, 0.8);
+  const rim = new THREE.PointLight(0x9ec9ff, 0.75);
   rim.position.set(-3, 3, -2);
   scene.add(rim);
-  const fill = new THREE.PointLight(0xff2e93, 0.55);
-  fill.position.set(3, 0, 2);
+  const fill = new THREE.PointLight(0xffdca8, 0.5);
+  fill.position.set(3, 0.5, 2);
   scene.add(fill);
-  const top = new THREE.PointLight(0xffe600, 0.4);
+  const top = new THREE.PointLight(0xffffff, 0.35);
   top.position.set(0, 6, 1);
   scene.add(top);
 

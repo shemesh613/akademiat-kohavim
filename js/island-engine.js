@@ -308,23 +308,56 @@ function regionLocalHeight(idx, lx, lz) {
 /* ===================================================================================
  * 7. עולם משותף — ים מונפש, שמיים גרדיאנט, עננים, ציפורים, מחזור יום/לילה
  * =================================================================================== */
+function glowSprite(size, inner, outer) {
+  /* ספרייט זוהר radial-gradient — לשמש, הילה וכו'. בלי טקסטורות חיצוניות */
+  var cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  var c2 = cv.getContext('2d');
+  var gr = c2.createRadialGradient(64, 64, 2, 64, 64, 64);
+  gr.addColorStop(0, inner);
+  gr.addColorStop(1, outer);
+  c2.fillStyle = gr; c2.fillRect(0, 0, 128, 128);
+  var tx = new THREE.CanvasTexture(cv);
+  tx.minFilter = THREE.LinearFilter;
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tx, transparent: true, depthWrite: false, fog: false,
+    blending: THREE.AdditiveBlending
+  }));
+  sp.scale.set(size, size, 1);
+  return sp;
+}
 function buildSky() {
-  /* כיפת שמיים גרדיאנט פשוטה (BackSide sphere עם צבעי קודקוד) */
-  var geo = new THREE.SphereGeometry(220, 20, 14);
+  /* כיפת שמיים תלת-שכבתית: אופק שמנת חם → תכלת אמצע → כחול עמוק בזנית,
+   * + דיסקת שמש זוהרת עם הילה — נקודת-עיגון ויזואלית לכיוון האור והצללים */
+  var g = new THREE.Group();
+  var geo = new THREE.SphereGeometry(220, 24, 16);
   var colors = [];
-  var top = new THREE.Color(0x2a6fd8), bottom = new THREE.Color(0xdcefff);
+  var zen = new THREE.Color(0x2468d8), mid = new THREE.Color(0x6fb4f4), hor = new THREE.Color(0xe6f4ff), warm = new THREE.Color(0xfff0d2);
   var pos = geo.attributes.position;
   for (var i = 0; i < pos.count; i++) {
     var y = pos.getY(i) / 220;
     var t = clamp((y + 1) / 2, 0, 1);
-    var c = bottom.clone().lerp(top, Math.pow(t, 0.7));
+    var c;
+    if (t <= 0.5) c = hor.clone();
+    else if (t < 0.56) c = hor.clone().lerp(warm, Math.sin(((t - 0.5) / 0.06) * Math.PI) * 0.5); /* פס-אופק חם דק */
+    else if (t < 0.68) c = hor.clone().lerp(mid, (t - 0.56) / 0.12);
+    else c = mid.clone().lerp(zen, Math.pow((t - 0.68) / 0.32, 0.85));
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   var m = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false });
   var dome = new THREE.Mesh(geo, m);
-  ISL.sky = dome;
-  return dome;
+  dome.renderOrder = -10;
+  g.add(dome);
+  /* השמש — באותו כיוון כמו ה-DirectionalLight (20,34,14) מנורמל * 185 */
+  var sunDir = new THREE.Vector3(20, 34, 14).normalize().multiplyScalar(185);
+  var halo = glowSprite(95, 'rgba(255,242,196,0.5)', 'rgba(255,242,196,0)');
+  halo.position.copy(sunDir); halo.renderOrder = -9;
+  g.add(halo);
+  var disc = glowSprite(30, 'rgba(255,252,240,1)', 'rgba(255,234,170,0)');
+  disc.position.copy(sunDir); disc.renderOrder = -8;
+  g.add(disc);
+  ISL.sky = g;
+  return g;
 }
 function buildSea() {
   /* seg הוגבר מ-44 ל-56 (גלים חלקים יותר) + צבעי-קודקוד לעומק (רדוד/בהיר ליד
@@ -333,7 +366,7 @@ function buildSea() {
   var size = (RING_R0 + REGION_DEFS.length * RING_STEP) * 2 + 60;
   var geo = new THREE.PlaneGeometry(size, size, seg, seg);
   geo.rotateX(-Math.PI / 2);
-  var shallow = new THREE.Color(0x8fe0f5), deep = new THREE.Color(0x0c3f78);
+  var shallow = new THREE.Color(0x5fcdec), deep = new THREE.Color(0x0b4a8f);
   var centers = [];
   for (var ci = 0; ci < REGION_DEFS.length; ci++) centers.push(regionCenter(ci));
   var colors = [];
@@ -346,12 +379,12 @@ function buildSea() {
       var dd = Math.sqrt(dxp * dxp + dzp * dzp);
       if (dd < minD) minD = dd;
     }
-    var depthT = clamp((minD - 8) / 34, 0, 1);
+    var depthT = clamp((minD - 7) / 26, 0, 1);
     var c = shallow.clone().lerp(deep, depthT);
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  var m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, transparent: true, opacity: 0.92 });
+  var m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 240, specular: new THREE.Color(0x8fb4d8), transparent: true, opacity: 0.93 });
   var mesh = new THREE.Mesh(geo, m);
   mesh.position.y = -0.35;
   mesh.receiveShadow = true;
@@ -369,7 +402,7 @@ function updateSea(t) {
   var baseCol = ISL.seaBaseColor;
   for (var i = 0; i < p.count; i++) {
     var x = p.getX(i), z = p.getZ(i);
-    var wave = Math.sin(x * 0.12 + t * 1.1) * 0.22 + Math.sin(z * 0.09 - t * 0.8) * 0.18;
+    var wave = Math.sin(x * 0.12 + t * 1.1) * 0.22 + Math.sin(z * 0.09 - t * 0.8) * 0.18 + Math.sin((x + z) * 0.05 + t * 0.55) * 0.1;
     p.setY(i, ISL.seaBaseY[i] + wave);
     if (cAttr && baseCol) {
       /* נצנוץ-שמש זול: פס בהירות נעה שמאירה נקודות פזורות על פני הים */
@@ -383,37 +416,68 @@ function updateSea(t) {
   }
   p.needsUpdate = true;
   if (cAttr) cAttr.needsUpdate = true;
+  /* נורמלים מתעדכנים כל פריים שני — בלעדיהם הברק הספקולרי קפוא והים נראה כמו פלסטיק */
+  ISL.seaFrame = (ISL.seaFrame | 0) + 1;
+  if (ISL.seaFrame % 2 === 0) ISL.seaGeo.computeVertexNormals();
 }
 function buildClouds(scene) {
+  /* עננים "פחזניים" מאשכולות כדורים — סגנון פיקסאר, לא קופסאות */
   ISL.clouds = [];
   var span = RING_R0 + REGION_DEFS.length * RING_STEP + 30;
+  var puffGeo = new THREE.SphereGeometry(1, 9, 7);
+  var mTop = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  var mBot = new THREE.MeshLambertMaterial({ color: 0xdde9f8 });
   for (var i = 0; i < 10; i++) {
     var g = new THREE.Group();
-    var mC = mat(0xffffff);
-    var b1 = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1, 1.8), mC); g.add(b1);
-    var b2 = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 1.4), mC); b2.position.set(1.8, 0.3, 0.2); g.add(b2);
-    var b3 = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 1.4), mC); b3.position.set(-1.8, 0.2, -0.2); g.add(b3);
+    var n = 4 + Math.floor(Math.random() * 3);
+    var w = 2.2 + Math.random() * 1.6;
+    for (var j = 0; j < n; j++) {
+      var fr = n <= 1 ? 0.5 : j / (n - 1);
+      var px = (fr - 0.5) * w * 2;
+      var edge = Math.abs(fr - 0.5) * 2; /* 0 באמצע, 1 בקצוות */
+      var s = (1.15 - edge * 0.55) * (0.9 + Math.random() * 0.5);
+      var puff = new THREE.Mesh(puffGeo, mTop);
+      puff.position.set(px, (1 - edge) * 0.45 + (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.9);
+      puff.scale.set(s * 1.25, s * 0.78, s);
+      g.add(puff);
+    }
+    /* "בטן" שטוחה מעט כהה מתחת — נותנת לענן נפח ומשקל */
+    var belly = new THREE.Mesh(puffGeo, mBot);
+    belly.position.set(0, -0.35, 0);
+    belly.scale.set(w * 0.95, 0.42, 1.15);
+    g.add(belly);
     g.children.forEach(function (c) { c.castShadow = false; c.receiveShadow = false; });
     g.position.set((Math.random() - 0.5) * span * 2, 26 + Math.random() * 10, (Math.random() - 0.5) * span * 2);
     g.userData.speed = 0.4 + Math.random() * 0.5;
+    g.userData.baseY = g.position.y;
+    g.userData.phase = Math.random() * Math.PI * 2;
     scene.add(g); ISL.clouds.push(g);
   }
 }
 function updateClouds(dt) {
   var span = RING_R0 + REGION_DEFS.length * RING_STEP + 30;
+  var te = ISL.clock.elapsed;
   ISL.clouds.forEach(function (c) {
     c.position.x += c.userData.speed * dt;
     if (c.position.x > span) c.position.x = -span;
+    c.position.y = c.userData.baseY + Math.sin(te * 0.25 + c.userData.phase) * 0.5;
   });
 }
 function buildBirds(scene) {
   ISL.birds = [];
   for (var i = 0; i < 6; i++) {
     var g = new THREE.Group();
-    var wm = mat(0x2a2a2a);
-    var w1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 0.14), wm); w1.position.x = -0.22; g.add(w1);
-    var w2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 0.14), wm); w2.position.x = 0.22; g.add(w2);
-    g.children.forEach(function (c) { c.castShadow = false; });
+    var wm = mat(0xf4f7fb); /* שחף — כנפיים בהירות עם קצה כהה */
+    var body = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), wm);
+    body.scale.set(2.1, 1, 1); g.add(body);
+    var beak = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 5), mat(0xffb020));
+    beak.rotation.x = Math.PI / 2; beak.position.set(0, 0.02, 0.2); g.add(beak);
+    var w1 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.16), wm); w1.position.x = -0.28; g.add(w1);
+    var w2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.16), wm); w2.position.x = 0.28; g.add(w2);
+    var tip1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.032, 0.16), mat(0x3a4250)); tip1.position.x = -0.28; w1.add(tip1);
+    var tip2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.032, 0.16), mat(0x3a4250)); tip2.position.x = 0.28; w2.add(tip2);
+    g.traverse(function (c) { c.castShadow = false; });
+    g.userData.w1 = w1; g.userData.w2 = w2;
     g.userData.radius = 10 + Math.random() * 14;
     g.userData.speed = 0.25 + Math.random() * 0.3;
     g.userData.a0 = Math.random() * Math.PI * 2;
@@ -429,9 +493,35 @@ function updateBirds(t) {
     b.position.set(c.x + Math.cos(a) * b.userData.radius, b.userData.h + Math.sin(t * 2 + b.userData.a0) * 0.6, c.z + Math.sin(a) * b.userData.radius);
     b.rotation.y = -a + Math.PI / 2;
     var flap = Math.sin(t * 14 + b.userData.a0) * 0.6;
-    if (b.children[0]) b.children[0].rotation.z = flap;
-    if (b.children[1]) b.children[1].rotation.z = -flap;
+    if (b.userData.w1) b.userData.w1.rotation.z = flap;
+    if (b.userData.w2) b.userData.w2.rotation.z = -flap;
   });
+}
+function buildPollen(scene) {
+  /* "אבקת אור" זהובה מרחפת סביב האזור הפעיל — עומק אטמוספרי בזיל הזול */
+  var COUNT = 70;
+  var positions = new Float32Array(COUNT * 3);
+  for (var i = 0; i < COUNT; i++) {
+    var a = Math.random() * Math.PI * 2;
+    var r = 2 + Math.random() * 15;
+    positions[i * 3] = Math.cos(a) * r;
+    positions[i * 3 + 1] = 0.4 + Math.random() * 7;
+    positions[i * 3 + 2] = Math.sin(a) * r;
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  var pm = new THREE.PointsMaterial({
+    color: 0xffe9a8, size: 0.13, transparent: true, opacity: 0.65,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  });
+  var pts = new THREE.Points(geo, pm);
+  scene.add(pts);
+  ISL.pollen = pts;
+}
+function updatePollen(t) {
+  if (!ISL.pollen) return;
+  ISL.pollen.position.set(ISL.cam.cx, Math.sin(t * 0.5) * 0.35, ISL.cam.cz);
+  ISL.pollen.rotation.y = t * 0.045;
 }
 /* מחזור יום/לילה איטי — מקזז אור/שמיים/ים לאורך מחזור של כ-6 דקות ambient בלבד;
  * במצב רגיל (לא ambient) נשמר על "יום" קבוע ובהיר כדי לא להטריד שיעור פעיל. */
@@ -444,8 +534,8 @@ function updateDayNight(t, scene) {
   /* גם במחזור היממה של מצב אמביינט לא יורדים מתחת ל-0.55 — "לילה" מלא
      על מקרן נראה כמו מסך שחור, לא כמו אווירה. */
   day = clamp(day, 0.55, 1);
-  if (ISL.sun) ISL.sun.intensity = 0.35 + day * 0.75;
-  if (ISL.hemi) ISL.hemi.intensity = 0.25 + day * 0.45;
+  if (ISL.sun) ISL.sun.intensity = 0.38 + day * 0.78;
+  if (ISL.hemi) ISL.hemi.intensity = 0.27 + day * 0.46;
   var fogCol = regionDef(ISL.activeId) ? regionDef(ISL.activeId).theme.fog : 0xbfe8ff;
   var nightTint = 0x0c1533;
   var fc = new THREE.Color(fogCol).lerp(new THREE.Color(nightTint), 1 - day);
@@ -864,14 +954,26 @@ function updateCamera(dt) {
   if (ISL.ambient) {
     ISL.cam.yaw += dt * 0.06;
   }
-  var yaw = ISL.cam.yaw, pitch = ISL.cam.pitch, r = ISL.cam.radius;
+  /* נשימת-מצלמה עדינה — תחושת "יד חיה" גם כשאף אחד לא נוגע */
+  var te = ISL.clock.elapsed;
+  var swayYaw = Math.sin(te * 0.16) * 0.016;
+  var swayY = Math.sin(te * 0.42) * 0.1;
+  var yaw = ISL.cam.yaw + swayYaw, pitch = ISL.cam.pitch, r = ISL.cam.radius;
   var cx = ISL.cam.cx, cz = ISL.cam.cz;
   ISL.camera.position.set(
     cx + Math.sin(yaw) * Math.cos(pitch) * r,
-    Math.sin(pitch) * r + 2,
+    Math.sin(pitch) * r + 2 + swayY,
     cz + Math.cos(yaw) * Math.cos(pitch) * r
   );
   ISL.camera.lookAt(cx, 1, cz);
+  /* השמש (ומצלמת הצל שלה) עוקבת אחרי מרכז האזור הפעיל — בלי זה
+     אזורים חיצוניים בטבעת נשארים בלי צללים בכלל */
+  if (ISL.sun) {
+    ISL.sun.position.set(cx + 20, 34, cz + 14);
+    ISL.sun.target.position.set(cx, 0, cz);
+  }
+  /* כיפת השמיים + השמש הוויזואלית נגררות עם המצלמה — שמיים "אינסופיים" */
+  if (ISL.sky) ISL.sky.position.set(cx, 0, cz);
 }
 function updateAmbientTour(dt, now) {
   if (!ISL.ambient) return;
@@ -1223,6 +1325,12 @@ function buildHud(container) {
     '<div class="ak-isl-regions" data-role="regions"></div>' +
     '<div class="ak-isl-plots" data-role="plots"></div>' +
     '<div class="ak-isl-shop" data-role="shop"></div>';
+  /* ויניטה קולנועית עדינה — ממקדת את העין למרכז, בלי לגעת בקריאות ה-HUD */
+  var vin = document.createElement('div');
+  vin.className = 'ak-isl-vignette';
+  vin.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:1;' +
+    'background:radial-gradient(ellipse 130% 105% at 50% 42%, transparent 62%, rgba(16,36,72,0.20) 100%);';
+  container.appendChild(vin);
   container.appendChild(hud);
   ISL.hud = {
     root: hud,
@@ -1361,24 +1469,29 @@ function initScene(container) {
   ISL.canvas = canvas;
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  /* בלי tone-mapping ובלי sRGB output — צבעי החומרים בכל הקבצים הם hex-ים של sRGB
+     שמכוילים לסגנון מצויר רווי; ACES/sRGB כפול שוטפים את הסצנה לחלבי (נבדק) */
   ISL.renderer = renderer;
   var scene = new THREE.Scene();
   var farEdge = RING_R0 + REGION_DEFS.length * RING_STEP + 40;
-  scene.fog = new THREE.Fog(0xbfe8ff, farEdge * 0.35, farEdge * 1.05);
+  /* ערפל דחוי — התחלה קרובה מדי צובעת את כל הים במרחק־ביניים בחלבי ומוחקת רוויה */
+  scene.fog = new THREE.Fog(0xc8e6fa, farEdge * 0.6, farEdge * 1.45);
   ISL.scene = scene;
   scene.add(buildSky());
   var camera = new THREE.PerspectiveCamera(50, 1, 0.1, farEdge * 2.2);
   ISL.camera = camera;
   ISL.hemi = new THREE.HemisphereLight(0xffffff, 0x2a5a3a, 0.5); scene.add(ISL.hemi);
-  var sun = new THREE.DirectionalLight(0xfff2d0, 0.95);
+  var sun = new THREE.DirectionalLight(0xfff2d0, 1.25);
   sun.position.set(20, 34, 14); sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.camera.left = -28; sun.shadow.camera.right = 28; sun.shadow.camera.top = 28; sun.shadow.camera.bottom = -28;
-  sun.shadow.camera.far = 90;
-  scene.add(sun); ISL.sun = sun;
+  sun.shadow.camera.far = 120;
+  sun.shadow.bias = -0.0005;
+  scene.add(sun); scene.add(sun.target); ISL.sun = sun;
   var sea = buildSea(); scene.add(sea); ISL.sea = sea;
   buildClouds(scene);
   buildBirds(scene);
+  buildPollen(scene);
   ISL.groundPlaneMesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ visible: false }));
   ISL.groundPlaneMesh.rotation.x = -Math.PI / 2; ISL.groundPlaneMesh.position.y = 0.1;
   scene.add(ISL.groundPlaneMesh);
@@ -1427,6 +1540,7 @@ function stepFrame() {
   updateSea(t);
   updateClouds(dt);
   updateBirds(t);
+  updatePollen(t);
   updateDayNight(t, ISL.scene);
   updateAnims(dt);
 
