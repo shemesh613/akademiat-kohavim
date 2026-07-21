@@ -1480,7 +1480,7 @@ function tickReactive(t, dt) {
   if (isl.regions.length > LIFE.lastCounts.regions) {
     triggerGather(isl.regions[isl.regions.length - 1], true);
     LIFE.lastCounts.regions = isl.regions.length;
-    akConfetti(window.innerWidth / 2, window.innerHeight / 3, 70);
+    akConfetti(window.innerWidth / 2, window.innerHeight / 3, 40);
   }
 }
 function triggerGather(regionId, big) {

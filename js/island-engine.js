@@ -686,8 +686,10 @@ function buildTerrainMesh(idx, def) {
       var col = (k <= 5) ? groundColor : (k <= 7) ? accentColor
               : (k === 8) ? rockColor : (k === 9) ? rockBright
               : (k === 10) ? rockColor : (k === 11) ? rockDark : deepColor;
-      /* גיוון-צבע דטרמיניסטי (mottling) — שובר את מראה ה"פלסטיק החלק" של משטח אחיד */
-      var mott = (k < rings - 2) ? (rnd() - 0.5) * 0.07 : 0;
+      /* גיוון-צבע דטרמיניסטי (mottling) — עדין! מרכז האזור כמעט אחיד (העין צריכה
+         מקום לנוח — עקרון הניקיון של מריו/LEGO), הטקסטורה רק בטבעת החיצונית */
+      var mottAmp = (k <= 5) ? 0.018 : 0.04;
+      var mott = (k < rings - 2) ? (rnd() - 0.5) * mottAmp : 0;
       colArr.push(clamp(col.r + mott, 0, 1), clamp(col.g + mott * 1.15, 0, 1), clamp(col.b + mott * 0.85, 0, 1));
     }
   }
@@ -784,15 +786,16 @@ function buildRegionBase(idx, detailed) {
   return g;
 }
 function biomeDecoMesh(idx, def, rnd) {
-  var geo, color, count = 46, scaleFn;
+  /* צפיפות מצומצמת (~40% פחות) — עומס פרטים קטן = מראה נקי, לא "רעש" */
+  var geo, color, count = 28, scaleFn;
   if (def.id === 'forest' || def.id === 'village' || def.id === 'farm') {
-    geo = new THREE.BoxGeometry(0.14, 0.32, 0.14); color = 0x2f6a30; scaleFn = function () { return 0.7 + rnd() * 0.7; };
+    geo = new THREE.BoxGeometry(0.14, 0.32, 0.14); color = new THREE.Color(def.theme.accent).multiplyScalar(0.7).getHex(); scaleFn = function () { return 0.7 + rnd() * 0.7; };
   } else if (def.id === 'mountain' || def.id === 'sky') {
     geo = new THREE.OctahedronGeometry(0.16, 0); color = 0xffffff; scaleFn = function () { return 0.8 + rnd() * 0.6; };
   } else if (def.id === 'desert' || def.id === 'beach') {
-    geo = new THREE.DodecahedronGeometry(0.14, 0); color = 0xc79447; scaleFn = function () { return 0.7 + rnd() * 0.5; }; count = 26;
+    geo = new THREE.DodecahedronGeometry(0.14, 0); color = 0xc79447; scaleFn = function () { return 0.7 + rnd() * 0.5; }; count = 16;
   } else if (def.id === 'volcano') {
-    geo = new THREE.DodecahedronGeometry(0.16, 0); color = 0x2b241f; scaleFn = function () { return 0.8 + rnd() * 0.7; }; count = 30;
+    geo = new THREE.DodecahedronGeometry(0.16, 0); color = 0x2b241f; scaleFn = function () { return 0.8 + rnd() * 0.7; }; count = 18;
   } else return null;
   var m = new THREE.MeshLambertMaterial({ color: color });
   var im = new THREE.InstancedMesh(geo, m, count);
@@ -824,9 +827,11 @@ function duneFloraMesh(idx, def) {
   /* --- עשב: קונוסים קטנים בשני גוונים --- */
   var grassGeo = new THREE.ConeGeometry(0.07, 0.3, 5);
   grassGeo.translate(0, 0.15, 0);
-  var greens = dry ? [0xb8a15c, 0x9b8a4e] : [0x3f9a48, 0x2f7a38];
+  /* גוונים נגזרים מצבע האזור עצמו — סולם צבעים אחוד, לא ירוק רביעי */
+  var accCol = new THREE.Color(def.theme.accent);
+  var greens = dry ? [0xb8a15c, 0x9b8a4e] : [accCol.getHex(), accCol.clone().multiplyScalar(0.76).getHex()];
   for (var gi = 0; gi < 2; gi++) {
-    var gCount = dry ? 12 : 22;
+    var gCount = dry ? 8 : 13;
     var gim = new THREE.InstancedMesh(grassGeo, new THREE.MeshLambertMaterial({ color: greens[gi] }), gCount);
     gim.castShadow = true; gim.receiveShadow = true;
     var dummy = new THREE.Object3D();
@@ -846,13 +851,13 @@ function duneFloraMesh(idx, def) {
   }
   /* --- פרחים: גבעול + ראש צבעוני (שני InstancedMesh עם אותן מטריצות) --- */
   if (!dry) {
-    var fCount = 14;
+    var fCount = 7;
     var stemGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.22, 4);
     stemGeo.translate(0, 0.11, 0);
     var headGeo = new THREE.SphereGeometry(0.055, 8, 6);
     headGeo.translate(0, 0.24, 0);
     var petal = [0xff5d5d, 0xffb800, 0xffffff, 0xff8fc0][idx % 4];
-    var sim = new THREE.InstancedMesh(stemGeo, new THREE.MeshLambertMaterial({ color: 0x2f7a38 }), fCount);
+    var sim = new THREE.InstancedMesh(stemGeo, new THREE.MeshLambertMaterial({ color: accCol.clone().multiplyScalar(0.76).getHex() }), fCount);
     var him = new THREE.InstancedMesh(headGeo, new THREE.MeshLambertMaterial({ color: petal }), fCount);
     him.castShadow = true;
     var d2 = new THREE.Object3D();
@@ -931,7 +936,7 @@ function placeholderMesh(itemId, regionId) {
   var cone = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.4, 6), mat(col));
   cone.position.y = 0.7; cone.castShadow = true; g.add(cone);
   var cat = catalogItem(regionId, itemId);
-  var lbl = makeLabel(cat ? cat.em || '❔' : '❔', { worldHeight: 0.5, fontSize: 44, bg: 'rgba(0,0,0,0.35)' });
+  var lbl = makeLabel(cat ? cat.em || '❔' : '❔', { worldHeight: 0.38, fontSize: 40, bg: 'rgba(0,0,0,0.18)' });
   lbl.position.y = 1.2; g.add(lbl);
   return g;
 }

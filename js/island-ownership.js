@@ -444,7 +444,7 @@
 
   function celebrateReveal(regionId, info) {
     akSound('rankup');
-    akConfetti(window.innerWidth / 2, window.innerHeight / 3, 120);
+    akConfetti(window.innerWidth / 2, window.innerHeight / 3, 55);
     akToast('🎉 האי גדל! נבנה: ' + info.em + ' ' + info.n + '!');
     try { if (window.Island && typeof window.Island.focusRegion === 'function') window.Island.focusRegion(regionId); } catch (e) {}
   }
@@ -561,7 +561,7 @@
       ? '.ak-isl-item.del{display:none !important;}' /* מחיקה חסומה תמיד, גם במצב פיתוח */
       : '.ak-isl-shop{display:none !important;}.ak-isl-plots{display:none !important;}.ak-isl-item.del{display:none !important;}';
     return block
-      + '.ak-own-teaser{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:rgba(255,250,238,0.95);border:3px solid #a9713f;border-radius:20px;padding:10px 28px;font-size:30px;font-weight:900;color:#3d2a17;direction:rtl;z-index:6;pointer-events:none;box-shadow:0 6px 18px rgba(60,40,20,.28);display:none;font-family:Heebo,Arial,sans-serif;}'
+      + '.ak-own-teaser{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:rgba(255,250,238,0.92);border:2px solid #a9713f;border-radius:16px;padding:7px 20px;font-size:22px;font-weight:900;color:#3d2a17;direction:rtl;z-index:6;pointer-events:none;box-shadow:0 4px 12px rgba(60,40,20,.22);display:none;font-family:Heebo,Arial,sans-serif;}'
       + '.ak-own-teaser.on{display:block;}'
       + '.ak-own-teaser.up{bottom:150px;}'
       + '.ak-own-panel{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);max-width:96vw;background:rgba(255,250,238,0.96);border:3px solid #a9713f;border-radius:20px;padding:10px 16px;direction:rtl;z-index:7;pointer-events:auto;display:none;align-items:center;gap:12px;box-shadow:0 6px 18px rgba(60,40,20,.28);font-family:Heebo,Arial,sans-serif;overflow-x:auto;}'
@@ -604,6 +604,9 @@
     }
     var t = teaser(null);
     var on = !t.done && t.pct >= TEASER_AT;
+    /* שקט על המסך: כשהאוצר כבר מלא (ready) הבאנר לא יושב קבוע — מופיע בפולס קצר
+       של 6 שניות מתוך כל 30, ממש לפני שהבנאי האוטומטי חושף. באנר תמידי = רעש. */
+    if (on && t.ready) on = ((Date.now() / 1000) % 30) < 6;
     var isStudentPanel = panelEl && panelEl.className.indexOf(' on') >= 0;
     var cls = 'ak-own-teaser' + (on ? ' on' : '') + (isStudentPanel ? ' up' : '');
     if (teaserEl.className !== cls) teaserEl.className = cls;
