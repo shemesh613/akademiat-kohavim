@@ -1694,7 +1694,12 @@ function build3DCharacter(scene, equipped, avT) {
   }
 
   // hair
+  const _hairFrom = charGroup.children.length;
   buildHair(charGroup, body);
+  /* השיער נבנה כאוסף meshes ישירות על charGroup ולא היה מתויג — לכן AvatarPlus.enhance
+     לא העביר אותו ל-headGroup, הראש גדל פי 1.16 ובלע אותו והדמויות יצאו קירחות.
+     מתייגים כאן את כל מה ש-buildHair בדיוק הוסיף. */
+  for (let _i = _hairFrom; _i < charGroup.children.length; _i++) charGroup.children[_i].userData.ak = 'hair';
 
   // === EYES === high-poly + glossy
   const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.1 });
@@ -4275,6 +4280,7 @@ function openClassGame() {
 <script src="js/ak-bridge.js"></script>
 <script src="js/island-content.js"></script>
 <script src="js/island-engine.js"></script>
+<script src="js/island-life.js"></script>
 <script src="js/class-games.js"></script>
 <script src="js/avatar-plus.js"></script>
 </body>

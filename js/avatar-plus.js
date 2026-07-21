@@ -92,7 +92,7 @@
     // ---- 1) Chibi head/body proportions -----------------------------
     // Reparent every head-region part into one pivot group at the head's
     // center so it can move/scale as a single believable unit.
-    const HEAD_TAGS = ['head', 'ear', 'eye', 'pupil', 'sparkle', 'brow', 'mouth', 'cheek', 'hat', 'glasses'];
+    const HEAD_TAGS = ['head', 'ear', 'eye', 'pupil', 'sparkle', 'brow', 'mouth', 'cheek', 'hat', 'glasses', 'hair'];
     let headGroup = group.userData._akHeadGroup;
     if (!headGroup) {
       headGroup = new THREE.Group();

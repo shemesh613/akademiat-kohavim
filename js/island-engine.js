@@ -1033,6 +1033,7 @@ function updateHud(now) {
  * 15. אתחול סצנה, שינוי גודל, לולאת רינדור ראשית
  * =================================================================================== */
 function initScene(container) {
+  if (window.IslandLife && typeof window.IslandLife.detach === 'function') window.IslandLife.detach();
   ISL.container = container;
   var canvas = document.createElement('canvas');
   canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.display = 'block';
@@ -1068,6 +1069,8 @@ function initScene(container) {
   buildHud(container);
   setupResize(container);
   resizeNow();
+  window.__ISL = ISL; /* לאבחון/בדיקות בלבד — לא ממשק ציבורי */
+  if (window.IslandLife && typeof window.IslandLife.attach === 'function') window.IslandLife.attach(ISL);
 }
 function setupResize(container) {
   if (ISL.resizeObs) { try { ISL.resizeObs.disconnect(); } catch (e) {} }
@@ -1126,6 +1129,7 @@ function stepFrame() {
   }
 
   updateHud(t);
+  if (window.IslandLife && typeof window.IslandLife.tick === 'function') window.IslandLife.tick(t, dt);
   ISL.renderer.render(ISL.scene, ISL.camera);
 }
 function loop() {
