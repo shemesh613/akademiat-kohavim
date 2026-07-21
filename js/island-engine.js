@@ -497,6 +497,58 @@ function updateBirds(t) {
     if (b.userData.w2) b.userData.w2.rotation.z = -flap;
   });
 }
+/* גובה הגל בנקודה — אותה נוסחה בדיוק כמו updateSea, כדי שהסירות ישבו על המים באמת */
+function seaWaveAt(x, z, t) {
+  return Math.sin(x * 0.12 + t * 1.1) * 0.22 + Math.sin(z * 0.09 - t * 0.8) * 0.18 + Math.sin((x + z) * 0.05 + t * 0.55) * 0.1;
+}
+function buildBoats(scene) {
+  /* מפרשיות קטנות שמפליגות לאט סביב הארכיפלג — עולם שחי גם כשלא נוגעים בו */
+  ISL.boats = [];
+  var hullMat = new THREE.MeshLambertMaterial({ color: 0x9a6a3f });
+  var hullMat2 = new THREE.MeshLambertMaterial({ color: 0x7d5430 });
+  var mastMat = new THREE.MeshLambertMaterial({ color: 0x6b4a28 });
+  var sailShape = new THREE.Shape();
+  sailShape.moveTo(0, 0); sailShape.lineTo(0, 1.15); sailShape.lineTo(0.72, 0.08); sailShape.lineTo(0, 0);
+  var sailGeo = new THREE.ShapeGeometry(sailShape);
+  var sailColors = [0xffffff, 0xff5d5d, 0x2ea8ff];
+  var defs = [
+    { radius: RING_R0 * 0.55, speed: 0.055, phase: 0.4 },
+    { radius: RING_R0 + 2.5 * RING_STEP, speed: -0.038, phase: 2.6 },
+    { radius: RING_R0 + 5.5 * RING_STEP, speed: 0.03, phase: 4.4 }
+  ];
+  defs.forEach(function (bd, i) {
+    var g = new THREE.Group();
+    var hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.3, 0.6), hullMat);
+    hull.castShadow = true; g.add(hull);
+    var bow = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.55, 4), hullMat2);
+    bow.rotation.z = -Math.PI / 2; bow.rotation.y = Math.PI / 4;
+    bow.scale.set(1, 1, 0.72); bow.position.set(1.0, 0, 0); g.add(bow);
+    var stern = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.42, 0.62), hullMat2);
+    stern.position.set(-0.72, 0.05, 0); g.add(stern);
+    var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.5, 6), mastMat);
+    mast.position.set(0.1, 0.85, 0); g.add(mast);
+    var sail = new THREE.Mesh(sailGeo, new THREE.MeshLambertMaterial({ color: sailColors[i % sailColors.length], side: THREE.DoubleSide }));
+    sail.position.set(0.14, 0.28, 0); g.add(sail);
+    var flag = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.02), new THREE.MeshLambertMaterial({ color: 0xffb800 }));
+    flag.position.set(0.2, 1.62, 0); g.add(flag);
+    g.userData = { radius: bd.radius, speed: bd.speed, phase: bd.phase };
+    scene.add(g); ISL.boats.push(g);
+  });
+}
+function updateBoats(t) {
+  if (!ISL.boats) return;
+  ISL.boats.forEach(function (bg) {
+    var u = bg.userData;
+    var a = u.phase + t * u.speed;
+    var x = Math.cos(a) * u.radius, z = Math.sin(a) * u.radius;
+    var w = seaWaveAt(x, z, t);
+    bg.position.set(x, -0.35 + w * 0.85 + 0.18, z);
+    /* חרטום לכיוון ההפלגה + טלטול גלים עדין */
+    bg.rotation.y = -a - (u.speed > 0 ? Math.PI / 2 : -Math.PI / 2);
+    bg.rotation.z = Math.sin(t * 1.25 + u.phase * 3) * 0.055;
+    bg.rotation.x = Math.sin(t * 0.9 + u.phase * 5) * 0.045;
+  });
+}
 function buildPollen(scene) {
   /* "אבקת אור" זהובה מרחפת סביב האזור הפעיל — עומק אטמוספרי בזיל הזול */
   var COUNT = 70;
@@ -576,7 +628,7 @@ function buildRegionLocked(idx) {
   return g;
 }
 /* טבעות המש (רדיוס לפי k, יכול להיות תלוי-זווית ברדיוסים החיצוניים — קו-חוף אורגני) */
-var TERRAIN_SEG = 18, TERRAIN_RINGS = 11;
+var TERRAIN_SEG = 28, TERRAIN_RINGS = 11; /* 28 סגמנטים — קו חוף חלק, עדיין זול (308 קודקודים) */
 function terrainRingRadius(k, a, idx) {
   var duneEnd = DUNE_R0 + DUNE_W;
   switch (k) {
@@ -613,7 +665,9 @@ function buildTerrainMesh(idx, def) {
       if (k > 0 && k < rings - 1) h += (rnd() - 0.5) * 0.05; /* חספוס עדין, לא על הגבול החיצוני */
       posArr.push(lx, h, lz);
       var col = (k <= 5) ? groundColor : (k <= 7) ? accentColor : (k === 8) ? rockColor : deepColor;
-      colArr.push(col.r, col.g, col.b);
+      /* גיוון-צבע דטרמיניסטי (mottling) — שובר את מראה ה"פלסטיק החלק" של משטח אחיד */
+      var mott = (k < rings - 2) ? (rnd() - 0.5) * 0.07 : 0;
+      colArr.push(clamp(col.r + mott, 0, 1), clamp(col.g + mott * 1.15, 0, 1), clamp(col.b + mott * 0.85, 0, 1));
     }
   }
   function vi(kk, ss) { return kk * seg + (((ss % seg) + seg) % seg); }
@@ -698,6 +752,8 @@ function buildRegionBase(idx, detailed) {
     var rnd = seedRand(idx * 977 + 13);
     var deco = biomeDecoMesh(idx, def, rnd);
     if (deco) g.add(deco);
+    var flora = duneFloraMesh(idx, def);
+    if (flora) g.add(flora);
     var foam = buildCoastFoam(idx, def);
     if (foam) g.add(foam);
     var islet = buildIslet(idx, def);
@@ -734,6 +790,68 @@ function biomeDecoMesh(idx, def, rnd) {
   }
   im.instanceMatrix.needsUpdate = true;
   return im;
+}
+/* צמחייה על טבעת הדיונות — אשכולות עשב + פרחים צבעוניים. יושבים מחוץ לרשת הבנייה
+ * (רדיוס DUNE_R0 ומעלה) ולכן לעולם לא מתנגשים במבנים. דטרמיניסטי per-region. */
+function duneFloraMesh(idx, def) {
+  var kind = def.id;
+  if (kind === 'volcano' || kind === 'mountain' || kind === 'sky') return null;
+  var dry = (kind === 'desert');
+  var g = new THREE.Group();
+  var rnd = seedRand(idx * 1543 + 29);
+  var duneEnd = DUNE_R0 + DUNE_W;
+  /* --- עשב: קונוסים קטנים בשני גוונים --- */
+  var grassGeo = new THREE.ConeGeometry(0.07, 0.3, 5);
+  grassGeo.translate(0, 0.15, 0);
+  var greens = dry ? [0xb8a15c, 0x9b8a4e] : [0x3f9a48, 0x2f7a38];
+  for (var gi = 0; gi < 2; gi++) {
+    var gCount = dry ? 12 : 22;
+    var gim = new THREE.InstancedMesh(grassGeo, new THREE.MeshLambertMaterial({ color: greens[gi] }), gCount);
+    gim.castShadow = true; gim.receiveShadow = true;
+    var dummy = new THREE.Object3D();
+    for (var i = 0; i < gCount; i++) {
+      var a = rnd() * TWO_PI;
+      var r = DUNE_R0 - 0.3 + rnd() * (DUNE_W + 1.6);
+      var x = Math.cos(a) * r, z = Math.sin(a) * r;
+      dummy.position.set(x, regionLocalHeight(idx, x, z) + 0.02, z);
+      var s = 0.7 + rnd() * 0.9;
+      dummy.scale.set(s, s * (0.8 + rnd() * 0.6), s);
+      dummy.rotation.set((rnd() - 0.5) * 0.25, rnd() * TWO_PI, (rnd() - 0.5) * 0.25);
+      dummy.updateMatrix();
+      gim.setMatrixAt(i, dummy.matrix);
+    }
+    gim.instanceMatrix.needsUpdate = true;
+    g.add(gim);
+  }
+  /* --- פרחים: גבעול + ראש צבעוני (שני InstancedMesh עם אותן מטריצות) --- */
+  if (!dry) {
+    var fCount = 14;
+    var stemGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.22, 4);
+    stemGeo.translate(0, 0.11, 0);
+    var headGeo = new THREE.SphereGeometry(0.055, 8, 6);
+    headGeo.translate(0, 0.24, 0);
+    var petal = [0xff5d5d, 0xffb800, 0xffffff, 0xff8fc0][idx % 4];
+    var sim = new THREE.InstancedMesh(stemGeo, new THREE.MeshLambertMaterial({ color: 0x2f7a38 }), fCount);
+    var him = new THREE.InstancedMesh(headGeo, new THREE.MeshLambertMaterial({ color: petal }), fCount);
+    him.castShadow = true;
+    var d2 = new THREE.Object3D();
+    for (var f = 0; f < fCount; f++) {
+      var fa = rnd() * TWO_PI;
+      var fr = DUNE_R0 + rnd() * (DUNE_W + 1.2);
+      var fx = Math.cos(fa) * fr, fz = Math.sin(fa) * fr;
+      d2.position.set(fx, regionLocalHeight(idx, fx, fz) + 0.02, fz);
+      var fs = 0.8 + rnd() * 0.7;
+      d2.scale.set(fs, fs, fs);
+      d2.rotation.set((rnd() - 0.5) * 0.2, 0, (rnd() - 0.5) * 0.2);
+      d2.updateMatrix();
+      sim.setMatrixAt(f, d2.matrix);
+      him.setMatrixAt(f, d2.matrix);
+    }
+    sim.instanceMatrix.needsUpdate = true;
+    him.instanceMatrix.needsUpdate = true;
+    g.add(sim); g.add(him);
+  }
+  return g;
 }
 function buildRegionItems(idx, isl) {
   var def = REGION_DEFS[idx];
@@ -1491,6 +1609,7 @@ function initScene(container) {
   var sea = buildSea(); scene.add(sea); ISL.sea = sea;
   buildClouds(scene);
   buildBirds(scene);
+  buildBoats(scene);
   buildPollen(scene);
   ISL.groundPlaneMesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ visible: false }));
   ISL.groundPlaneMesh.rotation.x = -Math.PI / 2; ISL.groundPlaneMesh.position.y = 0.1;
@@ -1540,6 +1659,7 @@ function stepFrame() {
   updateSea(t);
   updateClouds(dt);
   updateBirds(t);
+  updateBoats(t);
   updatePollen(t);
   updateDayNight(t, ISL.scene);
   updateAnims(dt);

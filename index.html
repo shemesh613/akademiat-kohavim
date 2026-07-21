@@ -1715,30 +1715,47 @@ function build3DCharacter(scene, equipped, avT) {
      מתייגים כאן את כל מה ש-buildHair בדיוק הוסיף. */
   for (let _i = _hairFrom; _i < charGroup.children.length; _i++) charGroup.children[_i].userData.ak = 'hair';
 
-  // === EYES === high-poly + glossy
+  // === EYES === עיניים גדולות בסגנון פיקסאר: לובן + קשתית צבעונית + אישון + 2 נצנוצים
   const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.1 });
+  const IRIS_COLORS = [0x4a76d8, 0x6b4423, 0x3e8e4f, 0x7b5cc4, 0x2e8b9a, 0x9a6a2f];
+  const irisMat = new THREE.MeshStandardMaterial({
+    color: IRIS_COLORS[(((body.skin || 0) >> 8) + ((body.hair || 0) >> 4)) % IRIS_COLORS.length],
+    roughness: 0.2, metalness: 0.15,
+  });
   const pupilMat = new THREE.MeshStandardMaterial({ color: 0x0a0a1a, roughness: 0.1, metalness: 0.3 });
   const sparkleMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.4 });
   for (const x of [-0.3, 0.3]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 32, 32), eyeWhiteMat);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.21, 32, 32), eyeWhiteMat);
     eye.position.set(x, 2.05, 0.7);
-    eye.scale.set(1, 1.15, 0.7);
+    eye.scale.set(1, 1.22, 0.7);
     charGroup.add(eye);
     eye.userData.ak = 'eye';
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.1, 24, 24), pupilMat);
-    pupil.position.set(x, 2.05, 0.84);
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.155, 24, 24), irisMat);
+    iris.position.set(x, 2.05, 0.79);
+    iris.scale.set(1, 1, 0.55);
+    charGroup.add(iris);
+    iris.userData.ak = 'pupil'; // ממצמץ יחד עם האישון
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.09, 24, 24), pupilMat);
+    pupil.position.set(x, 2.05, 0.88);
     charGroup.add(pupil);
     pupil.userData.ak = 'pupil';
     const sparkle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 12), sparkleMat);
-    sparkle.position.set(x + 0.04, 2.11, 0.93);
+    sparkle.position.set(x + 0.05, 2.12, 0.94);
     charGroup.add(sparkle);
     sparkle.userData.ak = 'sparkle';
     // small secondary highlight
     const sparkle2 = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), sparkleMat);
-    sparkle2.position.set(x - 0.03, 2.0, 0.93);
+    sparkle2.position.set(x - 0.04, 1.99, 0.94);
     charGroup.add(sparkle2);
     sparkle2.userData.ak = 'sparkle';
   }
+
+  // === NOSE === אף כפתור קטן — מוסיף המון אופי
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), skinMat);
+  nose.position.set(0, 1.9, 0.85);
+  nose.scale.set(1, 0.78, 0.7);
+  charGroup.add(nose);
+  nose.userData.ak = 'head';
 
   // eyebrows
   const browMat = new THREE.MeshStandardMaterial({ color: body.hair, roughness: 0.6 });
@@ -1752,8 +1769,8 @@ function build3DCharacter(scene, equipped, avT) {
 
   // === MOUTH ===
   const mouth = new THREE.Mesh(
-    new THREE.TorusGeometry(0.15, 0.04, 8, 16, Math.PI),
-    new THREE.MeshStandardMaterial({ color: 0x882233 })
+    new THREE.TorusGeometry(0.16, 0.045, 8, 16, Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0xc94f63 })
   );
   mouth.position.set(0, 1.65, 0.78);
   mouth.rotation.z = Math.PI;
