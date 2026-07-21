@@ -17,14 +17,15 @@
    0) Local tokens (fall back gracefully if the root vars aren't found)
 --------------------------------------------------------------------- */
 :root {
-  --akp-common: #9aa3c7;
-  --akp-rare: #00f5ff;
-  --akp-epic: #b829ff;
-  --akp-mythic: #ffd700;
-  --akp-ok: #00ff88;
-  --akp-danger: #ff5577;
-  --akp-card-bg: linear-gradient(155deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
-  --akp-card-bg-hover: linear-gradient(155deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05));
+  /* מיושר ל-5 צבעי היסוד של המוצר — במקום פלטה כפולה ונפרדת */
+  --akp-common: #7d879f;
+  --akp-rare: #2ea8ff;
+  --akp-epic: #8b5cf6;
+  --akp-mythic: #ffb800;
+  --akp-ok: #34c759;
+  --akp-danger: #ff5d5d;
+  --akp-card-bg: #ffffff;
+  --akp-card-bg-hover: #f2f7ff;
 }
 
 /* ---------------------------------------------------------------------

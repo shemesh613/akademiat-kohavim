@@ -14,23 +14,27 @@
 <script>if(typeof THREE!=='undefined'&&!THREE.GLTFLoader)document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script>');</script>
 <style>
 :root {
-  --bg-1: #0a0e27;
-  --neon-pink: #ff2e93;
-  --neon-cyan: #00f5ff;
-  --neon-yellow: #ffe600;
-  --neon-green: #00ff88;
-  --neon-purple: #b829ff;
-  --neon-orange: #ff8c00;
-  --card: rgba(255,255,255,0.06);
-  --card-hover: rgba(255,255,255,0.12);
-  --text: #ffffff;
-  --text-dim: #a0a8c8;
+  --bg-1: #eaf6ff;
+  /* 5 צבעי אנרגיה — רוויים אך לא זוהרים. שמות ה---neon-* נשמרו בכוונה
+     כדי שכל הרכיבים הקיימים יתעדכנו בלי לגעת בהם אחד-אחד. */
+  --neon-pink:   #ff5d5d;   /* coral */
+  --neon-cyan:   #2ea8ff;   /* sky   */
+  --neon-yellow: #ffb800;   /* gold  */
+  --neon-green:  #34c759;   /* leaf  */
+  --neon-purple: #8b5cf6;   /* grape */
+  --neon-orange: #ff8f1f;
+  --card: #ffffff;
+  --card-hover: #f2f7ff;
+  --text: #1c2340;
+  --text-dim: #5b6688;
+  --wood: #a9713f;          /* מסגרות "שלט עץ" — אותה שפה כמו באי */
+  --cream: #fffaee;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; background-color: #050714; }
+html, body { height: 100%; background-color: #eaf6ff; }
 body {
   font-family: 'Heebo', sans-serif;
-  background: #050714 radial-gradient(ellipse at top, #1a1d3a 0%, #0a0e27 60%, #050714 100%);
+  background: linear-gradient(180deg, #eaf6ff 0%, #d3ecff 60%, #c7e6ff 100%);
   color: var(--text);
   overflow-x: hidden;
   min-height: 100vh;
@@ -40,14 +44,14 @@ body::before {
   content: '';
   position: fixed; inset: 0;
   background-image:
-    radial-gradient(2px 2px at 20% 30%, white, transparent),
-    radial-gradient(1px 1px at 60% 70%, white, transparent),
-    radial-gradient(2px 2px at 80% 10%, white, transparent),
-    radial-gradient(1px 1px at 30% 80%, white, transparent),
-    radial-gradient(2px 2px at 90% 60%, white, transparent),
-    radial-gradient(1px 1px at 50% 50%, white, transparent);
-  background-size: 250px 250px;
-  opacity: 0.5;
+    radial-gradient(60px 26px at 20% 30%, #ffffff, transparent),
+    radial-gradient(44px 20px at 60% 70%, #ffffff, transparent),
+    radial-gradient(70px 30px at 80% 10%, #ffffff, transparent),
+    radial-gradient(40px 18px at 30% 80%, #ffffff, transparent),
+    radial-gradient(56px 24px at 90% 60%, #ffffff, transparent),
+    radial-gradient(48px 22px at 50% 50%, #ffffff, transparent);
+  background-size: 420px 420px;
+  opacity: 0.75;
   pointer-events: none;
   animation: starsMove 120s linear infinite;
   z-index: 0;
@@ -108,9 +112,8 @@ button:active { transform: scale(0.95); }
 }
 
 header {
-  background: linear-gradient(90deg, rgba(255,46,147,0.15), rgba(0,245,255,0.15));
-  backdrop-filter: blur(10px);
-  border-bottom: 2px solid rgba(0,245,255,0.3);
+  background: var(--cream);
+  border-bottom: 3px solid var(--wood);
   padding: 14px 24px;
   display: flex;
   align-items: center;
@@ -123,12 +126,12 @@ header {
 .logo {
   font-family: 'Rubik Mono One', sans-serif;
   font-size: 1.5em;
-  background: linear-gradient(90deg, #ff2e93, #b829ff, #00f5ff, #00ff88, #ffe600, #ff8c00, #ff2e93);
+  background: linear-gradient(90deg, #d6263f, #6d28d9, #0a6fc2, #17803d, #b06a00, #c2500a, #d6263f);
   background-size: 400% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  text-shadow: 0 0 30px rgba(255,46,147,0.5);
+  text-shadow: none;
   animation: gradFlow 8s linear infinite;
 }
 @keyframes gradFlow {
@@ -138,10 +141,10 @@ header {
 .tab {
   padding: 8px 14px;
   background: var(--card);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 2px solid var(--wood);
   border-radius: 12px;
   cursor: pointer;
-  color: var(--text-dim);
+  color: var(--text);
   font-weight: 700;
   transition: all 0.2s;
   font-family: inherit;
@@ -193,7 +196,7 @@ header {
   background: rgba(255,255,255,0.04);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 2px solid rgba(169,113,63,0.45);
   border-radius: 16px;
   padding: 12px;
   min-height: 200px;
@@ -238,15 +241,15 @@ header {
 .col-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 .student {
-  background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03));
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  background: #ffffff;
+  
+  -webkit-
   border-radius: 14px;
   padding: 10px;
   margin-bottom: 10px;
   cursor: grab;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 2px solid var(--wood);
   position: relative;
   display: flex;
   align-items: center;
@@ -471,9 +474,9 @@ header {
 }
 .shop-item {
   background: rgba(255,255,255,0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 2px solid rgba(255,255,255,0.08);
+  
+  -webkit-
+  border: 2px solid rgba(169,113,63,0.45);
   border-radius: 14px;
   padding: 10px 8px;
   text-align: center;
@@ -563,7 +566,7 @@ header {
   justify-content: center;
   z-index: 9999;
   background: rgba(0,0,0,0.85);
-  backdrop-filter: blur(10px);
+  
 }
 .rank-up-overlay.show { display: flex; }
 .rank-up-content { text-align: center; animation: rankUpZoom 0.6s ease-out; }
