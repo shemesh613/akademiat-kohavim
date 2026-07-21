@@ -1691,6 +1691,30 @@ function build3DCharacter(scene, equipped, avT) {
   });
   const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.2, metalness: 0.3 });
 
+  // === CHUNKY PROPORTIONS (RESEARCH_VISUAL_PRO.md פער C) ===
+  // רגליים קצרות ב-~15%: מכווצים כלפי-פנים סביב ציר-ירך קבוע (LEG_PIVOT_Y) כדי
+  // שירך-הרגל לא "יזוז" מנקודת החיבור לירכיים. שאר הגוף (וה-charGroup כולו) יורד
+  // בהתאם כדי שהנעל תישאר בדיוק על אותה רצפה שהיתה קודם (ראו legShorten למטה).
+  const LEG_SCALE = 0.85;
+  const LEG_PIVOT_Y = 0.2; // גובה חיבור הירך המקורי (thigh top, לא זז)
+  const legY = (y) => LEG_PIVOT_Y + (y - LEG_PIVOT_Y) * LEG_SCALE;
+  const SHOE_Y_ORIG = -0.78, SHOE_R = 0.18, SHOE_YSCALE = 0.5;
+  const shoeBottomOrig = SHOE_Y_ORIG - SHOE_R * SHOE_YSCALE;      // -0.87 (רצפה מקורית)
+  const shoeYNew = legY(SHOE_Y_ORIG);
+  const shoeBottomNew = shoeYNew - SHOE_R * SHOE_YSCALE;          // רצפה חדשה (local, לפני charGroup offset)
+  const legShorten = shoeBottomNew - shoeBottomOrig;              // כמה "עלתה" הרצפה המקומית (חיובי)
+
+  // === פוזה א-סימטרית דטרמיניסטית — הטיה זעירה (2-4°) נגזרת מצבעי-הגוף + מזהי הפריטים
+  // המצוידים (לא Math.random), כך שאותה דמות תמיד תקבל את אותה הטיה, אבל תלמידים
+  // שונים (אפילו עם אותו body ברירת-מחדל, לפני התאמה אישית בחנות) לא יתלכדו לאותה תנוחה
+  // בזכות תרומת ה-id של הכובע/משקפיים/דמות/חיית-המחמד המצוידים.
+  const strHash = (s) => { let h = 0; if (s) for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+  const poseHashRaw = (((body.skin || 0) * 131 + (body.hair || 0) * 17 + (body.shirt || 0) * 7 + (body.pants || 0) * 3
+    + strHash(equipped.hat) * 5 + strHash(equipped.glasses) * 11 + strHash(equipped.character) * 13 + strHash(equipped.pet) * 19) >>> 0);
+  const poseHash = (poseHashRaw % 1000) / 1000;
+  const poseTiltZ = (poseHash - 0.5) * 2 * (Math.PI / 180) * 3.2; // ±~3.2°
+  const poseTiltX = (((poseHashRaw >>> 3) % 1000) / 1000 - 0.5) * (Math.PI / 180) * 2.0; // ±~1° קידמה/אחורה, עצמאי מה-Z
+
   // === HEAD ===
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), skinMat);
   head.position.y = 2.0;
@@ -1805,49 +1829,66 @@ function build3DCharacter(scene, equipped, avT) {
   neck.position.y = 1.4;
   charGroup.add(neck);
 
-  // === TORSO === smooth jelly-bean
-  const torso = capsule(0.55, 0.5, 1.0, shirtMat, 32);
+  // === TORSO === pear silhouette: taper is wider at the BOTTOM (belly/hips) than
+  // at the top (shoulders/neck) — the opposite of the old top-heavy capsule.
+  const torso = capsule(0.5, 0.6, 1.0, shirtMat, 32);
   torso.position.y = 0.75;
   charGroup.add(torso);
   torso.userData.ak = 'torso';
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 32), shirtMat);
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.58, 32, 32), shirtMat);
   shoulders.position.y = 1.25;
   shoulders.scale.set(1, 0.6, 1);
   charGroup.add(shoulders);
   shoulders.userData.ak = 'shoulders';
-  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), shirtMat);
-  hips.position.y = 0.25;
-  hips.scale.set(1, 0.55, 1);
+  const hips = new THREE.Mesh(new THREE.SphereGeometry(0.6, 32, 32), shirtMat);
+  hips.position.y = 0.22;
+  hips.scale.set(1, 0.56, 1);
   charGroup.add(hips);
   hips.userData.ak = 'hips';
 
-  // === ARMS === smooth capsule arms
+  // === ARMS === shoulder-pivot + elbow-pivot hierarchy (Group, no extra geometry cost)
+  // so the forearm can hinge with a real natural bend instead of a static tilted capsule.
+  // A rounded skin-colored "mitten" hand caps every arm.
   for (const x of [-0.78, 0.78]) {
-    const upperArm = capsule(0.16, 0.14, 0.55, shirtMat, 24);
-    upperArm.position.set(x, 1.0, 0);
-    upperArm.rotation.z = -Math.sign(x) * 0.2;
-    charGroup.add(upperArm);
-    const forearm = capsule(0.14, 0.12, 0.45, skinMat, 24);
-    forearm.position.set(x + Math.sign(x) * 0.15, 0.5, 0);
-    forearm.rotation.z = -Math.sign(x) * 0.1;
-    charGroup.add(forearm);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.17, 24, 24), skinMat);
-    hand.position.set(x + Math.sign(x) * 0.2, 0.25, 0);
-    charGroup.add(hand);
+    const s = Math.sign(x);
+    const shoulderPivot = new THREE.Group();
+    shoulderPivot.position.set(x, 1.18, 0);
+    shoulderPivot.rotation.z = -s * 0.16; // relaxed outward hang from the shoulder
+    charGroup.add(shoulderPivot);
+
+    const upperArm = capsule(0.16, 0.14, 0.5, shirtMat, 24);
+    upperArm.position.y = -0.25; // hangs down from the shoulder pivot (top of capsule = pivot)
+    shoulderPivot.add(upperArm);
+
+    const elbowPivot = new THREE.Group();
+    elbowPivot.position.y = -0.5; // at the bottom of the upper arm
+    elbowPivot.rotation.x = 0.17; // ~10° natural forward elbow bend (was 0 — stiff wooden-doll arms)
+    shoulderPivot.add(elbowPivot);
+
+    const forearm = capsule(0.14, 0.13, 0.42, skinMat, 24);
+    forearm.position.y = -0.21;
+    elbowPivot.add(forearm);
+
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 20), skinMat);
+    hand.position.y = -0.46;
+    hand.scale.set(1, 0.9, 1.05); // slightly flattened mitten-glove, not a perfect ball
+    elbowPivot.add(hand);
+    hand.userData.ak = 'hand';
   }
 
-  // === LEGS === smooth capsule legs
+  // === LEGS === smooth capsule legs, shortened ~15% around a fixed hip pivot (LEG_PIVOT_Y)
+  // — see legY()/legShorten above. Feet keep their footprint; only the leg column compacts.
   for (const x of [-0.22, 0.22]) {
-    const thigh = capsule(0.18, 0.16, 0.5, pantsMat, 24);
-    thigh.position.set(x, -0.05, 0);
+    const thigh = capsule(0.18, 0.16, 0.5 * LEG_SCALE, pantsMat, 24);
+    thigh.position.set(x, legY(-0.05), 0);
     charGroup.add(thigh);
-    const calf = capsule(0.16, 0.14, 0.45, pantsMat, 24);
-    calf.position.set(x, -0.5, 0);
+    const calf = capsule(0.16, 0.14, 0.45 * LEG_SCALE, pantsMat, 24);
+    calf.position.set(x, legY(-0.5), 0);
     charGroup.add(calf);
     // smoother shoe — stretched ovoid
-    const shoe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), shoesMat);
-    shoe.position.set(x, -0.78, 0.1);
-    shoe.scale.set(1, 0.5, 1.5);
+    const shoe = new THREE.Mesh(new THREE.SphereGeometry(SHOE_R, 24, 24), shoesMat);
+    shoe.position.set(x, legY(SHOE_Y_ORIG), 0.1);
+    shoe.scale.set(1, SHOE_YSCALE, 1.5);
     charGroup.add(shoe);
   }
 
@@ -1868,8 +1909,19 @@ function build3DCharacter(scene, equipped, avT) {
     glRoot.userData.ak = 'glasses';
   }
 
-  // center character vertically (it spans ~y=-0.95 to 3.5, mid ~1.3)
-  charGroup.position.y = -1.3;
+  // center character vertically (it spans ~y=-0.95 to 3.5, mid ~1.3).
+  // legShorten (>=0) pushes the whole group down by exactly the amount the legs
+  // got compacted, so the shoes still land on the same floor line as before.
+  charGroup.position.y = -1.3 - legShorten;
+
+  // deterministic tiny asymmetric lean (no Math.random — same character = same pose
+  // every rebuild) so the whole classroom doesn't stand in identical parade-rest.
+  charGroup.rotation.z = poseTiltZ;
+  charGroup.rotation.x = poseTiltX;
+
+  // cross-file contract for avatar-plus.js: local-space Y of the shoe soles,
+  // used to keep the fake contact-shadow blob glued to the (now shorter) legs.
+  charGroup.userData.akFootY = shoeBottomNew;
 
   // === PET ===
   if (pet && pet.id !== 'pet-none') {

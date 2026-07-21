@@ -197,7 +197,7 @@ function activeIslState() { var k = activeClass(); return k ? ensureLifeState(k)
 /* ===================================================================================
  * 5. תושבים — 24 התלמידים כדמויות תלת-מימדיות אמיתיות (build3DCharacter הקיים)
  * =================================================================================== */
-var MAX_FULL_VILLAGERS = 6;      /* LOD: כמה דמויות מלאות בו-זמנית (6-8 לפי המשימה — 6 לבטיחות ביצועים) */
+var MAX_FULL_VILLAGERS = 8;      /* LOD: כמה דמויות מלאות בו-זמנית (הועלה 6->8 לפי המשימה) */
 var VILLAGER_SCALE = 0.36;   /* קטנטנות — 0.58 היה גדול מדי ביחס למבנים ולאי */
 var _tempCharScene = null;
 function tempCharScene() { if (!_tempCharScene) _tempCharScene = new THREE.Scene(); return _tempCharScene; }
@@ -295,18 +295,64 @@ function disposeObj(o) {
   });
 }
 
+/* ===================================================================================
+ * 5א. מיני-דמות אימפוסטור — קפסולת-גוף (צינור+שתי כיפות) + ראש + כיפת-שיער, במקום
+ *     עיגול-תג-על-מקל הישן. גיאומטריה משותפת (נבנית פעם אחת) + קאש חומרים גלובלי
+ *     לפי צבע (לא יוצרים Material חדש לכל תלמיד אם הצבע חוזר) — תקציב ~30-40 משולשים.
+ * =================================================================================== */
+var IMP_CAP_R = 0.15;                                                        /* רדיוס הקפסולה */
+var IMP_CYL_H = 0.30;                                                        /* גובה הצינור הישר באמצע */
+var IMP_CYL_GEO = new THREE.CylinderGeometry(IMP_CAP_R, IMP_CAP_R, IMP_CYL_H, 6, 1, true);
+var IMP_CAP_GEO = new THREE.SphereGeometry(IMP_CAP_R, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2); /* חצי-כדור עליון; הופך לתחתית ע"י rotation.x=PI */
+var IMP_HEAD_GEO = new THREE.SphereGeometry(0.17, 8, 6);                     /* ראש — כדור מלא, משותף */
+var IMP_HAIR_GEO = new THREE.SphereGeometry(0.15, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2); /* כיפת-שיער — חצי-כדור נפרד */
+var _impMatCache = {}; /* Map גלובלי: צבע-hex -> MeshLambertMaterial, קאש לפי צבע (סעיף 3 עקרון #2) */
+function impMat(colorHex) {
+  var key = 'c' + colorHex;
+  if (!_impMatCache[key]) _impMatCache[key] = new THREE.MeshLambertMaterial({ color: colorHex });
+  return _impMatCache[key];
+}
+/* פלטת ברירת-מחדל עליזה — לתלמיד/ה בלי צבע חולצה מצויד, נבחר דטרמיניסטית לפי hash של השם */
+var IMP_DEFAULT_PALETTE = [0xff6b6b, 0xffa94d, 0xffd43b, 0x69db7c, 0x4dabf7, 0x9775fa, 0xff8fab, 0x63e6be];
+function defaultImpColor(seedStr) { return IMP_DEFAULT_PALETTE[Math.floor(hash01(seedStr) * IMP_DEFAULT_PALETTE.length) % IMP_DEFAULT_PALETTE.length]; }
+/* צל-מגע משותף — דיסקה כהה שקופה מתחת לכל תושב (גיאומטריה+חומר יחידים, לא נוצרים מחדש) */
+var CONTACT_SHADOW_GEO = new THREE.CircleGeometry(0.34, 12);
+CONTACT_SHADOW_GEO.rotateX(-Math.PI / 2); /* שוכב שטוח על XZ, פונה למעלה */
+var CONTACT_SHADOW_MAT = new THREE.MeshBasicMaterial({ color: 0x140f08, transparent: true, opacity: 0.25, depthWrite: false });
+function makeContactShadow() {
+  var m = new THREE.Mesh(CONTACT_SHADOW_GEO, CONTACT_SHADOW_MAT);
+  m.position.y = 0.02; m.renderOrder = -1;
+  return m;
+}
+
 function makeImpostor(student) {
   var g = new THREE.Group();
-  var color = 0x66ccff;
-  try { var bodyItem = window.findItem && window.findItem(student.equipped && student.equipped.body); if (bodyItem && bodyItem.shirt != null) color = bodyItem.shirt; } catch (e) {}
-  var body = cyl(0.13, 0.16, 0.55, color, 0, 0.55, 0, 6); body.castShadow = true; g.add(body);
-  var head = sph(0.18, 0xffd9a8, 0, 1.0, 0, 8); g.add(head);
-  /* שיער גם ב-LOD הזול: בלעדיו הדמויות הרחוקות נראו ככתמים קירחים לצד המלאות */
-  var hairCol = 0x6b3410;
-  try { var bi = window.findItem && window.findItem(student.equipped && student.equipped.body); if (bi && bi.hair != null) hairCol = bi.hair; } catch (e) {}
-  var hair = sph(0.185, hairCol, 0, 1.05, 0, 8); hair.scale.set(1, 0.62, 1); g.add(hair);
-  var badge = badgeSprite((student.name || '?').charAt(0), color);
-  badge.position.y = 1.42; g.add(badge);
+  var color = 0x66ccff, skinColor = 0xffd9a8, hairCol = 0x6b3410, hasShirt = false;
+  try {
+    var bodyItem = window.findItem && window.findItem(student.equipped && student.equipped.body);
+    if (bodyItem) {
+      if (bodyItem.shirt != null) { color = bodyItem.shirt; hasShirt = true; }
+      if (bodyItem.skin != null) skinColor = bodyItem.skin;
+      if (bodyItem.hair != null) hairCol = bodyItem.hair;
+    }
+  } catch (e) {}
+  if (!hasShirt) color = defaultImpColor(student.name || student.id || 'x'); /* אין צבע מצויד — פלטת ברירת-מחדל */
+  var bodyM = impMat(color), skinM = impMat(skinColor), hairM = impMat(hairCol);
+
+  /* קפסולה מדומה: צינור ישר + שתי כיפות חצי-כדור (התחתונה — אותה גיאומטריה הפוכה) */
+  var cylY = IMP_CAP_R + IMP_CYL_H / 2;
+  var body = new THREE.Mesh(IMP_CYL_GEO, bodyM); body.position.y = cylY; body.castShadow = true; g.add(body);
+  var capBottom = new THREE.Mesh(IMP_CAP_GEO, bodyM); capBottom.position.y = IMP_CAP_R; capBottom.rotation.x = Math.PI; g.add(capBottom);
+  var capTop = new THREE.Mesh(IMP_CAP_GEO, bodyM); capTop.position.y = cylY + IMP_CYL_H / 2; g.add(capTop);
+
+  /* ראש בצבע עור, יושב ישר על קודקוד הקפסולה */
+  var headY = cylY + IMP_CYL_H / 2 + 0.17;
+  var head = new THREE.Mesh(IMP_HEAD_GEO, skinM); head.position.y = headY; head.castShadow = true; g.add(head);
+
+  /* כיפת-שיער — חצי-כדור נפרד, מעט גדול ושטוח, בלעדיו הדמויות הרחוקות נראו קירחות */
+  var hair = new THREE.Mesh(IMP_HAIR_GEO, hairM);
+  hair.position.y = headY + 0.03; hair.scale.set(1.12, 0.8, 1.12); g.add(hair);
+
   g.userData.impostor = true; g.userData.headMesh = head; g.userData.bodyColor = color;
   return g;
 }
@@ -324,6 +370,7 @@ function makeVillager(student, idx) {
   };
   v.wrapper = new THREE.Group();
   v.wrapper.visible = false;
+  v.shadow = makeContactShadow(); v.wrapper.add(v.shadow); /* צל-מגע — קבוע לאורך חיי התושב, לא תלוי ב-LOD */
   return v;
 }
 
@@ -531,6 +578,8 @@ function applyVillagerTransform(v, t) {
     if (v.state === 'walk' || v.state === 'gohome') bob = Math.abs(Math.sin(t * 6 + v.jumpPhase)) * 0.05;
     else bob = Math.sin(t * 1.6 + v.jumpPhase) * 0.02;
     if (v.state === 'wave' && v.rig) { var arm = v.rig.children[0]; if (arm) arm.rotation.z = Math.sin(t * 10) * 0.3; }
+    /* אנימציה זולה לאימפוסטור: טלטול הליכה קל בעת תנועה בלבד (בלי לולאת tick נפרדת) */
+    if (v.impostor) v.impostor.rotation.z = (v.state === 'walk' || v.state === 'gohome') ? Math.sin(t * 8 + v.jumpPhase) * 0.12 : 0;
   }
   if (v.happy && !LIFE.reducedMotion) bob += Math.abs(Math.sin(t * 9 + v.jumpPhase)) * 0.12;
   v.wrapper.position.y = bob;

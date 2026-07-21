@@ -153,6 +153,7 @@ var ISL = {
   hud: null,
   lastAutoUnlockCheck: 0,
   lastHudUpdate: 0,
+  signFrame: 0,          /* מונה-פריימים זול לעדכון דעיכת שלטי-שם כל פריים שני */
   ambientTimer: 0, ambientPauseUntil: 0, ambientNextSwap: 0,
   contentPoll: null
 };
@@ -628,9 +629,16 @@ function buildRegionLocked(idx) {
   return g;
 }
 /* טבעות המש (רדיוס לפי k, יכול להיות תלוי-זווית ברדיוסים החיצוניים — קו-חוף אורגני) */
-var TERRAIN_SEG = 28, TERRAIN_RINGS = 11; /* 28 סגמנטים — קו חוף חלק, עדיין זול (308 קודקודים) */
+var TERRAIN_SEG = 28, TERRAIN_RINGS = 13; /* 28 סגמנטים — קו חוף חלק, עדיין זול (364 קודקודים) */
+/* חצאית-צוק (פער A ב-RESEARCH_VISUAL_PRO): בין קו-החוף (k=9) למדף התת-ימי המוסתר (k=12)
+ * הוספנו 2 טבעות-ביניים מדורגות (k=10,11) — undercut קל של הרדיוס פנימה + גובה יורד
+ * במדרגות, כדי שהצד ייראה כמו צוק-סלע מקצועי ולא קיר כהה שטוח. */
+var CLIFF_UNDERCUT_1 = 0.05, CLIFF_UNDERCUT_2 = 0.10;   /* % נסיגת-רדיוס פנימה, מצטבר, לכל טבעת-מדף */
+var CLIFF_SHORE_H = -0.08;                              /* גובה קו-החוף לפני terrace() — זהה לקבוע המקביל ב-regionLocalHeight */
+var CLIFF_DROP_1 = 0.4, CLIFF_DROP_2 = 0.4, CLIFF_DROP_3 = 0.35; /* מדרגות-צוק כלפי מטה, עד מתחת לשפל הגלים */
 function terrainRingRadius(k, a, idx) {
   var duneEnd = DUNE_R0 + DUNE_W;
+  var shoreD = regionShoreDist(idx, a);
   switch (k) {
     case 0: return 0;
     case 1: return 1.4;
@@ -640,9 +648,11 @@ function terrainRingRadius(k, a, idx) {
     case 5: return DUNE_R0;
     case 6: return DUNE_R0 + DUNE_W * 0.5;
     case 7: return duneEnd;
-    case 8: return lerp(duneEnd, regionShoreDist(idx, a), 0.5);
-    case 9: return regionShoreDist(idx, a);
-    case 10: return regionShoreDist(idx, a) + SHELF_W;
+    case 8: return lerp(duneEnd, shoreD, 0.5);
+    case 9: return shoreD;                              /* קו-החוף עצמו — קצה עליון של הצוק */
+    case 10: return shoreD * (1 - CLIFF_UNDERCUT_1);     /* מדף-צוק עליון — undercut קל */
+    case 11: return shoreD * (1 - CLIFF_UNDERCUT_2);     /* מדף-צוק תחתון — undercut נוסף, צמוד למים */
+    case 12: return shoreD + SHELF_W;                    /* מדף תת-ימי מוסתר מתחת לים */
   }
   return 0;
 }
@@ -653,6 +663,10 @@ function buildTerrainMesh(idx, def) {
   var groundColor = new THREE.Color(def.theme.ground);
   var accentColor = new THREE.Color(def.theme.accent);
   var rockColor = accentColor.clone().multiplyScalar(0.62);
+  /* שכבות-סלע לחצאית-הצוק: עליונה מובהרת (שיא הצוק, קרוב ליבשה) → אמצעית → תחתונה
+   * כהה (פס-מגע צמוד למים) — value-structure כהה-למטה/בהיר-למעלה נותן נפח מיידי */
+  var rockBright = rockColor.clone().lerp(new THREE.Color(0xffffff), 0.32);
+  var rockDark = rockColor.clone().multiplyScalar(0.5);
   var deepColor = new THREE.Color(0x1c3550);
   var rnd = seedRand(idx * 331 + 71);
   var posArr = [], colArr = [];
@@ -661,10 +675,17 @@ function buildTerrainMesh(idx, def) {
       var a = (s / seg) * TWO_PI;
       var rad = terrainRingRadius(k, a, idx);
       var lx = Math.cos(a) * rad, lz = Math.sin(a) * rad;
-      var h = (k === 0) ? regionLocalHeight(idx, 0, 0) : regionLocalHeight(idx, lx, lz);
+      var h;
+      if (k === 0) h = regionLocalHeight(idx, 0, 0);
+      else if (k === 10) h = terrace(CLIFF_SHORE_H - CLIFF_DROP_1);
+      else if (k === 11) h = terrace(CLIFF_SHORE_H - CLIFF_DROP_1 - CLIFF_DROP_2);
+      else if (k === 12) h = terrace(CLIFF_SHORE_H - CLIFF_DROP_1 - CLIFF_DROP_2 - CLIFF_DROP_3);
+      else h = regionLocalHeight(idx, lx, lz);
       if (k > 0 && k < rings - 1) h += (rnd() - 0.5) * 0.05; /* חספוס עדין, לא על הגבול החיצוני */
       posArr.push(lx, h, lz);
-      var col = (k <= 5) ? groundColor : (k <= 7) ? accentColor : (k === 8) ? rockColor : deepColor;
+      var col = (k <= 5) ? groundColor : (k <= 7) ? accentColor
+              : (k === 8) ? rockColor : (k === 9) ? rockBright
+              : (k === 10) ? rockColor : (k === 11) ? rockDark : deepColor;
       /* גיוון-צבע דטרמיניסטי (mottling) — שובר את מראה ה"פלסטיק החלק" של משטח אחיד */
       var mott = (k < rings - 2) ? (rnd() - 0.5) * 0.07 : 0;
       colArr.push(clamp(col.r + mott, 0, 1), clamp(col.g + mott * 1.15, 0, 1), clamp(col.b + mott * 0.85, 0, 1));
@@ -853,6 +874,26 @@ function duneFloraMesh(idx, def) {
   }
   return g;
 }
+/* צל-מגע (contact shadow) — דיסקה שחורה שקופה צמודה לקרקע מתחת לכל מבנה. גיאומטריה
+ * משותפת (זולה) בין כל הדיסקאות, חומר עצמאי לכל דיסקה כדי שלא ייווצר תלות-שחרור
+ * חוצה-אזורים ב-disposeGroup. userData.noRaycast מסמן לדלג עליה בבחירת/הסרת פריטים
+ * (ראו onTap) — היא לא אמורה להיות "ניתנת ללחיצה" בעצמה. פער A ב-RESEARCH_VISUAL_PRO:
+ * בלי עיגון-קרקע העין קוראת "מרחף" = זול; זה סימן ההיכר מספר 1 של רנדור מקצועי. */
+var _contactShadowGeo = null;
+function contactShadowGeometry() {
+  if (!_contactShadowGeo) _contactShadowGeo = new THREE.CircleGeometry(0.55, 8); /* 8 סגמנטים — זול גם כשמצטבר על עשרות פריטים */
+  return _contactShadowGeo;
+}
+function makeContactShadow() {
+  var geo = contactShadowGeometry();
+  var m = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
+  var disc = new THREE.Mesh(geo, m);
+  disc.rotation.x = -Math.PI / 2;
+  disc.castShadow = false; disc.receiveShadow = false;
+  disc.userData.sharedGeo = true;  /* הגיאומטריה משותפת — לא לשחרר ב-disposeGroup */
+  disc.userData.noRaycast = true;  /* לדלג עליה בריי-קאסטינג של בחירת/הסרת פריטים */
+  return disc;
+}
 function buildRegionItems(idx, isl) {
   var def = REGION_DEFS[idx];
   var c = regionCenter(idx);
@@ -869,13 +910,17 @@ function buildRegionItems(idx, isl) {
      * הגובה נדגם מתוך regionLocalHeight כדי שהמבנה ישב על הקרקע המקומית (גבעה/דיונה/
      * שטוח) ולעולם לא ירחף/ישקע — זה בדיוק חוזה groundHeightAt החשוף למטה. */
     var lx = (it.x - HALF) * TILE, lz = (it.z - HALF) * TILE;
-    var ly = regionLocalHeight(idx, lx, lz) + 0.1;
+    var groundY = regionLocalHeight(idx, lx, lz);
+    var ly = groundY + 0.1;
     node.position.set(c.x + lx, ly, c.z + lz);
     node.rotation.y = it.rot || 0;
     node.userData.tile = it.x + '_' + it.z;
     node.userData.itemId = it.id;
     node.userData.regionKey = def.id;
     grp.add(node);
+    var shadow = makeContactShadow();
+    shadow.position.set(c.x + lx, groundY + 0.02, c.z + lz);
+    grp.add(shadow);
   });
   return grp;
 }
@@ -922,6 +967,7 @@ function buildPersonalPlots(idx, isl) {
     pg.add(bridge);
     var sign = makeLabel('🌟 ' + (st.name || 'תלמיד/ה'), { worldHeight: 0.7, fontSize: 34, bg: 'rgba(255,250,238,0.94)', color: '#3d2a17' });
     sign.position.set(0, 1.5, 0);
+    sign.userData.isPlotSign = true; /* מסומן לדעיכה-לפי-מרחק, ראו updatePlotSignLOD */
     pg.add(sign);
     /* פריטים אישיים שהתלמיד/ה הציבו בחלקה (0..2 מקומי) */
     var pItems = studentPlotItems(isl, st.id);
@@ -1066,6 +1112,28 @@ function focusRegionInternal(id, snap) {
   refreshRegions();
   updateHudRegionName();
 }
+/* דעיכת שלטי-שם לפי מרחק (פער B ב-RESEARCH_VISUAL_PRO): ~24 שלטי-חלקה לבנים גדולים
+ * סביב האי הם רעש ויזואלי אדיר. שלט קרוב — מלא; מעבר ל-FADE_START דוהה (opacity) וכווץ
+ * (scale) עד ~55%, לעולם לא מוסתר לגמרי כדי שהמורה עדיין יראה מי שייך לאיזו חלקה.
+ * נקרא רק כל פריים שני (stepFrame) ולא יוצר אף אובייקט — רק traverse + עדכון שדות קיימים. */
+var SIGN_FADE_START = 18, SIGN_FADE_RANGE = 12, SIGN_OPACITY_FLOOR = 0.4, SIGN_SCALE_FLOOR = 0.55;
+function updatePlotSignLOD() {
+  var group = ISL.regionGroups[ISL.activeId];
+  if (!group || !ISL.camera) return;
+  var camPos = ISL.camera.position;
+  group.traverse(function (o) {
+    if (!o.userData || !o.userData.isPlotSign) return;
+    if (!o.userData.baseScale) o.userData.baseScale = o.scale.clone();
+    if (!o.userData.wp) o.userData.wp = new THREE.Vector3();
+    o.getWorldPosition(o.userData.wp);
+    var d = o.userData.wp.distanceTo(camPos);
+    var k = clamp((d - SIGN_FADE_START) / SIGN_FADE_RANGE, 0, 1);
+    var base = o.userData.baseScale;
+    var sMul = lerp(1, SIGN_SCALE_FLOOR, k);
+    o.scale.set(base.x * sMul, base.y * sMul, base.z);
+    if (o.material) o.material.opacity = lerp(1, SIGN_OPACITY_FLOOR, k);
+  });
+}
 function updateCamera(dt) {
   ISL.cam.cx = lerp(ISL.cam.cx, ISL.cam.tx, clamp(dt * 1.6, 0, 1));
   ISL.cam.cz = lerp(ISL.cam.cz, ISL.cam.tz, clamp(dt * 1.6, 0, 1));
@@ -1203,6 +1271,7 @@ function onTap(x, y) {
     var hits = ray.intersectObjects(group.children, true);
     for (var i = 0; i < hits.length; i++) {
       var o = hits[i].object;
+      if (o.userData && o.userData.noRaycast) continue; /* צל-מגע וכד' — לא ניתן לבחירה בעצמו */
       while (o && !(o.userData && o.userData.tile) && o.parent) o = o.parent;
       if (o && o.userData && o.userData.tile) {
         var parts = o.userData.tile.split('_');
@@ -1663,6 +1732,8 @@ function stepFrame() {
   updatePollen(t);
   updateDayNight(t, ISL.scene);
   updateAnims(dt);
+  ISL.signFrame = (ISL.signFrame | 0) + 1;
+  if (ISL.signFrame % 2 === 0) updatePlotSignLOD();
 
   /* אנימציית "userData.animate" — חוזה עם BUILDERS של סוכן B */
   for (var id in ISL.regionGroups) {

@@ -118,12 +118,15 @@
 
     // Slightly compact the torso for a chibi silhouette (cheap: absolute
     // scale set on objects whose base scale is already known/fixed).
+    // Hips/belly get a touch more x/z width than the shoulders — combined with
+    // the pear-taper baked into the torso capsule geometry itself (index.html),
+    // this reads as a soft "pear" silhouette instead of a straight tube.
     const torso = tagOne(map, 'torso');
     if (torso) torso.scale.set(1.04, 0.9, 1.04);
     const shoulders = tagOne(map, 'shoulders');
     if (shoulders) shoulders.scale.set(1.05, 0.62, 1.05);
     const hips = tagOne(map, 'hips');
-    if (hips) hips.scale.set(1.05, 0.58, 1.05);
+    if (hips) hips.scale.set(1.14, 0.58, 1.1);
 
     // ---- 2) A little "shine" for cheap plastic-toy gloss -------------
     if (!group.userData._akShineAdded) {
@@ -156,7 +159,11 @@
       shadow.rotation.x = -Math.PI / 2;
       // Procedural rig feet sit at a fixed local Y (see build3DCharacter's
       // shoe placement) — constant, so no expensive bbox computation needed.
-      shadow.position.set(0.05, -0.9, 0.15);
+      // build3DCharacter exposes the exact sole Y as group.userData.akFootY
+      // (cross-file contract — updates automatically if leg length ever changes
+      // again). -0.87 fallback matches the pre-chunky-legs geometry for safety.
+      const footY = (typeof group.userData.akFootY === 'number') ? group.userData.akFootY : -0.87;
+      shadow.position.set(0.05, footY - 0.03, 0.15);
       group.add(shadow);
       group.userData._akShadowAdded = true;
     }
