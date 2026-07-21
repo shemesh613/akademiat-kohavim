@@ -759,6 +759,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 }
 </style>
 <link rel="stylesheet" href="css/shop-plus.css">
+<link rel="stylesheet" href="css/theme.css">
 </head>
 <body>
 
@@ -999,13 +1000,20 @@ if (URL_PARAMS.get('reset') === '1') {
 
 let cloudPushTimer = null;
 let lastCloudHash = '';
+let cloudReady = false; // הפך true רק אחרי משיכה מוצלחת מהענן
 async function cloudLoad() {
   try {
     const res = await fetch(`${FIREBASE_DB}/${FIREBASE_PATH}.json?_=${Date.now()}`);
-    return await res.json();
-  } catch(e) { console.warn('cloud load failed', e); return null; }
+    if (!res.ok) return { __failed: true };
+    const data = await res.json();
+    return { __ok: true, data };
+  } catch(e) { console.warn('cloud load failed', e); return { __failed: true }; }
 }
 async function cloudSave(data) {
+  /* הגנת דריסה: אסור לכתוב לענן לפני שקראנו ממנו בהצלחה פעם אחת.
+     בלעדיה — דפדפן עם רשת איטית (טיימאאוט 4 שנ') היה מוחק את נתוני
+     הכיתה האמיתיים עם ה-state ההתחלתי הריק שלו. */
+  if (!cloudReady) { console.warn('cloudSave skipped — cloud not loaded yet'); return; }
   try {
     await fetch(`${FIREBASE_DB}/${FIREBASE_PATH}.json`, {
       method: 'PUT',
@@ -1022,7 +1030,10 @@ function queueCloudSave() {
 function startCloudPoll() {
   setInterval(async () => {
     if (document.hidden) return; // skip when tab not visible
-    const remote = await cloudLoad();
+    const wrapped = await cloudLoad();
+    if (!wrapped || !wrapped.__ok) return; /* כשל רשת — לא נוגעים בכלום */
+    cloudReady = true;
+    const remote = wrapped.data;
     if (!remote || !remote.classes) return;
     const hash = JSON.stringify(remote);
     if (hash === lastCloudHash) return;
@@ -2604,6 +2615,11 @@ function addPoints(studentId, amount, fromX, fromY) {
     try { window.ClassGames.onPointsAdded(s, amount + comboBonus); } catch (e) {}
   }
 
+  // ---- מטבע אישי לחלקה (island-ownership.js) — אותן נקודות, ערוץ מקביל ----
+  if (window.IslandOwnership && typeof window.IslandOwnership.onPointsAdded === 'function') {
+    try { window.IslandOwnership.onPointsAdded(s, amount + comboBonus); } catch (e) {}
+  }
+
   const stickerAwards = awardStickersForPoints(s, amount + comboBonus);
   stickerAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1000 + i * 1800));
   const newRank = getRank(s.points).current;
@@ -3945,10 +3961,11 @@ async function init() {
   text.textContent = '☁️ מסנכרן...';
   try {
     const cloudPromise = cloudLoad();
-    const timeout = new Promise(r => setTimeout(() => r(null), 4000));
+    const timeout = new Promise(r => setTimeout(() => r({ __timeout: true }), 8000));
     const cloud = await Promise.race([cloudPromise, timeout]);
-    if (cloud && cloud.classes) {
-      state = cloud;
+    if (cloud && cloud.__ok && cloud.data && cloud.data.classes) {
+      cloudReady = true;
+      state = cloud.data;
       if (!state.pending) state.pending = [];
       state.classes.forEach(c => c.students.forEach(s => {
         if (!s.equipped.aura) s.equipped.aura = 'aura-none';
@@ -3956,10 +3973,14 @@ async function init() {
       }));
       lastCloudHash = JSON.stringify(state);
       localStorage.setItem('cps_state_v2', lastCloudHash);
-    } else if (cloud && cloud.error) {
-      console.warn('Firebase access denied — running offline');
-    } else {
+    } else if (cloud && cloud.__ok && !cloud.data) {
+      /* הענן קיים ובאמת ריק (משיכה הצליחה, אין נתונים) — מותר לזרוע */
+      cloudReady = true;
       cloudSave(state);
+    } else {
+      /* טיימאאוט או כשל רשת — מצב לא-מקוון. לא כותבים לענן בכלל. */
+      console.warn('cloud unreachable — offline mode, cloud writes disabled');
+      text.textContent = '📴 מצב לא-מקוון';
     }
   } catch (e) { console.warn('cloud err', e); }
 
@@ -4284,6 +4305,8 @@ function openClassGame() {
 <script src="js/island-content.js"></script>
 <script src="js/island-engine.js"></script>
 <script src="js/island-life.js"></script>
+<script src="js/island-ownership.js"></script>
+<script>if (window.IslandOwnership) IslandOwnership.init();</script>
 <script src="js/class-games.js"></script>
 <script src="js/avatar-plus.js"></script>
 </body>

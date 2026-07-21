@@ -1,0 +1,546 @@
+/*
+ * theme.css — שפת העיצוב "יום שמש בכיתה" של אקדמיית הכוכבים.
+ * נטען אחרון (אחרי ה-<style> הפנימי ואחרי shop-plus.css) ולכן דורס בקסקדה רגילה.
+ *
+ * מקור אמת: RESEARCH_DESIGN.md —
+ *   5 צבעי אנרגיה + נייטרלים, סקאלת 8 גדלים, רדיוסים, צללי "צעצוע",
+ *   גבולות מלאים 2-3px (מקרן דהוי — RESEARCH.md §9.3), שפת "שלט העץ" של האי.
+ *
+ * עקרונות:
+ *   - מסך הכיתה = לוח מודעות חם: עמודות-שעם, כותרות-שלט עץ, כרטיסי-פתק לבנים.
+ *   - זוהר (glow) שמור לרגעי חגיגה בלבד (celebrating / mythic / tier4).
+ *   - כל טקסט קריטי ≥22px ובמשקל כבד. RTL מלא. prefers-reduced-motion מכובד.
+ *   - CSS בלבד — אפס שינויי מרקאפ; לא נוגעים בממדי canvas (רק box-shadow).
+ */
+
+/* =====================================================================
+   0) טוקנים — מקור אמת אחד
+===================================================================== */
+:root {
+  /* 5 צבעי אנרגיה */
+  --gold:  #ffb800;
+  --coral: #ff5d5d;
+  --sky:   #2ea8ff;
+  --leaf:  #34c759;
+  --grape: #8b5cf6;
+
+  /* גוונים כהים לצל-תחתון "לחיץ" של כל צבע (כפתורי צעצוע) */
+  --gold-deep:  #c98f00;
+  --coral-deep: #d13c3c;
+  --sky-deep:   #1877c2;
+  --leaf-deep:  #1f8f3d;
+  --grape-deep: #6a3fd1;
+
+  /* נייטרלים */
+  --bg-sky-top:    #eaf6ff;
+  --bg-sky-bottom: #d3ecff;
+  --surface:       #ffffff;
+  --surface-alt:   #f2f7ff;
+  --ink:           #1c2340;
+  --ink-dim:       #5b6688;
+
+  /* שפת "שלט העץ" של האי */
+  --wood:       #a9713f;
+  --wood-deep:  #7d4f24;
+  --wood-light: #c08a52;
+  --cream:      #fffaee;
+  --cream-deep: #f4e8c8;
+
+  /* טיפוגרפיה — Major Third */
+  --fs-xs:      14px;
+  --fs-sm:      18px;
+  --fs-md:      22px;   /* רצפת המקרן */
+  --fs-lg:      28px;
+  --fs-xl:      36px;
+  --fs-xxl:     46px;
+  --fs-display: 60px;
+  --fs-hero:    88px;
+
+  /* רדיוסים */
+  --r-chip:  10px;
+  --r-btn:   16px;
+  --r-card:  24px;
+  --r-modal: 32px;
+  --r-pill:  999px;
+
+  /* צללים רכים — שלוש רמות */
+  --shadow-sm: 0 2px 8px rgba(20,30,60,0.10);
+  --shadow-md: 0 8px 20px rgba(20,30,60,0.14);
+  --shadow-lg: 0 16px 40px rgba(20,30,60,0.18);
+}
+
+/* =====================================================================
+   1) רקע — שמיים עם עומק: גרדיאנט + גבעות ירוקות עדינות בתחתית
+===================================================================== */
+body {
+  background: linear-gradient(180deg, var(--bg-sky-top) 0%, var(--bg-sky-bottom) 62%, #c2e4ff 100%);
+  color: var(--ink);
+}
+/* body::before = העננים הקיימים; body::after = גבעות CSS בתחתית המסך */
+body::after {
+  content: '';
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: 24vh;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(130% 95% at 88% 128%, #b4e390 0 54%, transparent 55%),
+    radial-gradient(140% 100% at 10% 132%, #a2dc7c 0 57%, transparent 58%),
+    radial-gradient(230% 135% at 50% 158%, #8fd167 0 60%, transparent 61%);
+  opacity: 0.45;
+}
+
+/* חלקיקים מרחפים — צבעי היסוד ברכות, לא ניאון */
+.bubble1 { background: radial-gradient(circle at 30% 30%, rgba(46,168,255,0.45), rgba(46,168,255,0)); }
+.bubble2 { background: radial-gradient(circle at 30% 30%, rgba(255,93,93,0.40),  rgba(255,93,93,0)); }
+.bubble3 { background: radial-gradient(circle at 30% 30%, rgba(255,184,0,0.50),  rgba(255,184,0,0)); }
+.bubble4 { background: radial-gradient(circle at 30% 30%, rgba(52,199,89,0.42),  rgba(52,199,89,0)); }
+.bubble5 { background: radial-gradient(circle at 30% 30%, rgba(139,92,246,0.40), rgba(139,92,246,0)); }
+
+/* =====================================================================
+   2) כותרת עליונה — קורת עץ בהירה עם "עורקי עץ" עדינים
+===================================================================== */
+header {
+  background:
+    repeating-linear-gradient(90deg, rgba(169,113,63,0.05) 0 3px, transparent 3px 16px),
+    linear-gradient(180deg, #fffdf4, #fff3d8);
+  border-bottom: 4px solid var(--wood);
+  box-shadow: 0 6px 18px rgba(20,30,60,0.12);
+  padding: 12px 24px;
+}
+
+/* לוגו — "שלט זהב": גרדיאנט זהב אנכי + צל חום, בלי קשת ניאון נעה */
+.logo {
+  font-size: 30px;
+  background: linear-gradient(180deg, #ffcf3d 15%, var(--gold) 55%, #f08c00 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: none;
+  filter: drop-shadow(0 2px 0 rgba(125,79,36,0.45)) drop-shadow(0 4px 8px rgba(20,30,60,0.15));
+}
+
+/* טאבים של כיתות — שלטי עץ קטנים; הפעיל צבוע זהב */
+.tab {
+  font-size: var(--fs-md);
+  padding: 8px 18px;
+  background: var(--surface);
+  border: 3px solid var(--wood);
+  border-radius: 14px;
+  color: var(--ink);
+  box-shadow: 0 3px 0 rgba(169,113,63,0.5);
+}
+.tab:hover { background: var(--cream); transform: translateY(-1px); }
+.tab.active {
+  background: linear-gradient(180deg, #ffc83d, var(--gold));
+  border-color: var(--gold-deep);
+  color: #3a2a00;
+  box-shadow: 0 3px 0 var(--gold-deep);
+  text-shadow: none;
+}
+.tab .x { opacity: 0.75; }
+.tab .x:hover { background: rgba(0,0,0,0.15); }
+
+/* =====================================================================
+   3) כפתורים — "כפתורי צעצוע": מלאים, עגולים, צל תחתון קשיח, active מכווץ
+===================================================================== */
+.btn {
+  font-size: var(--fs-md);
+  padding: 10px 20px;
+  background: var(--surface);
+  border: 3px solid var(--wood);
+  border-radius: var(--r-btn);
+  color: var(--ink);
+  box-shadow: 0 4px 0 rgba(169,113,63,0.55), var(--shadow-sm);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+.btn:hover { background: var(--cream); transform: translateY(-2px); box-shadow: 0 6px 0 rgba(169,113,63,0.55), var(--shadow-md); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(169,113,63,0.55); }
+
+.btn-primary {
+  background: linear-gradient(180deg, #55b9ff, var(--sky));
+  border-color: var(--sky-deep);
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(9,70,120,0.5);
+  box-shadow: 0 4px 0 var(--sky-deep), var(--shadow-sm);
+}
+.btn-primary:hover { background: linear-gradient(180deg, #6cc3ff, #3fb0ff); box-shadow: 0 6px 0 var(--sky-deep), var(--shadow-md); }
+.btn-primary:active { box-shadow: 0 1px 0 var(--sky-deep); }
+
+.btn-warning {
+  background: linear-gradient(180deg, #ffc83d, var(--gold));
+  border-color: var(--gold-deep);
+  color: #3a2a00;
+  text-shadow: none;
+  box-shadow: 0 4px 0 var(--gold-deep), var(--shadow-sm);
+}
+.btn-warning:hover { box-shadow: 0 6px 0 var(--gold-deep), var(--shadow-md); }
+.btn-warning:active { box-shadow: 0 1px 0 var(--gold-deep); }
+
+.btn-danger {
+  background: linear-gradient(180deg, #ff7676, var(--coral));
+  border-color: var(--coral-deep);
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(120,20,20,0.5);
+  box-shadow: 0 4px 0 var(--coral-deep), var(--shadow-sm);
+}
+.btn-danger:hover { box-shadow: 0 6px 0 var(--coral-deep), var(--shadow-md); }
+.btn-danger:active { box-shadow: 0 1px 0 var(--coral-deep); }
+
+/* =====================================================================
+   4) הכיתה — עמודות כ"לוחות שעם" ממוסגרים בעץ
+===================================================================== */
+.classroom { gap: 18px; padding: 24px 24px 40px; }
+
+.column {
+  background:
+    radial-gradient(rgba(169,113,63,0.10) 1.5px, transparent 2px) 0 0 / 24px 24px,
+    linear-gradient(180deg, var(--cream), #fdf2d7);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 3px solid var(--wood);
+  border-radius: var(--r-card);
+  padding: 14px;
+  box-shadow: var(--shadow-md), inset 0 2px 0 rgba(255,255,255,0.65);
+}
+.column.drag-over {
+  border-color: var(--sky);
+  background:
+    radial-gradient(rgba(46,168,255,0.10) 1.5px, transparent 2px) 0 0 / 24px 24px,
+    linear-gradient(180deg, #f0f9ff, #e2f2ff);
+  box-shadow: 0 0 0 3px rgba(46,168,255,0.30), var(--shadow-md);
+}
+
+/* כותרת עמודה — שלט עץ תלוי: גרדיאנט חום + עורקי עץ + צל תחתון קשיח */
+.column-header {
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0 2px, transparent 2px 10px),
+    linear-gradient(180deg, var(--wood-light), var(--wood) 55%, #96622f);
+  border: 2px solid var(--wood-deep);
+  border-radius: var(--r-btn);
+  padding: 10px 14px;
+  color: #fff8e8;
+  font-size: 24px;
+  text-shadow: 0 2px 0 rgba(90,55,20,0.55);
+  box-shadow: 0 4px 0 var(--wood-deep), var(--shadow-sm);
+  margin-bottom: 14px;
+}
+.col-input {
+  background: var(--surface);
+  border: 2px solid var(--wood-deep);
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font-size: 20px;
+  width: 62px;
+  padding: 5px 8px;
+}
+.col-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,184,0,0.35); }
+.col-bonus {
+  font-size: 20px;
+  background: linear-gradient(180deg, #ffc83d, var(--gold));
+  border: 2px solid var(--gold-deep);
+  border-radius: var(--r-chip);
+  color: #3a2a00;
+  padding: 5px 14px;
+  box-shadow: 0 3px 0 var(--gold-deep);
+}
+.col-bonus:hover { transform: translateY(-1px); }
+.col-bonus:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--gold-deep); }
+
+/* =====================================================================
+   5) כרטיס תלמיד — "פתק על הלוח", הרכיב שמופיע 24 פעמים
+===================================================================== */
+.student {
+  background: var(--surface);
+  border: 3px solid var(--wood);
+  border-radius: var(--r-btn);
+  padding: 12px;
+  margin-bottom: 12px;
+  gap: 12px;
+  box-shadow: 0 3px 0 rgba(169,113,63,0.35), var(--shadow-sm);
+}
+.student:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold);
+  box-shadow: 0 6px 0 rgba(201,143,0,0.30), var(--shadow-md);
+}
+.student.dragging { opacity: 0.45; }
+
+.drag-handle { color: rgba(169,113,63,0.6); }
+.drag-handle:hover { color: var(--wood-deep); }
+
+/* אווטאר — "מדבקה" עם טבעת כפולה (box-shadow בלבד, לא נוגעים בממדי ה-canvas) */
+.avatar-canvas {
+  background: radial-gradient(circle at 50% 32%, #dff1ff, #f6fbff 78%);
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px rgba(169,113,63,0.45);
+}
+.avatar-canvas:hover {
+  filter: drop-shadow(0 4px 10px rgba(255,184,0,0.55));
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px var(--gold);
+}
+
+.student-name { font-size: 23px; color: var(--ink); }
+.name-edit { background: var(--surface-alt); color: var(--ink-dim); border: 1px solid rgba(91,102,136,0.35); font-size: 15px; }
+.name-edit:hover { background: var(--gold); border-color: var(--gold-deep); color: #3a2a00; }
+
+.student-rank { font-size: var(--fs-sm); font-weight: 900; color: var(--ink-dim); margin-top: 2px; }
+
+/* נקודות — מטבע זהב: שבב מלא עם טקסט כהה (קריא ממקרן, לא טקסט-גרדיאנט שקוף) */
+.student-points {
+  background: linear-gradient(180deg, #ffd34d, var(--gold));
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #3a2a00;
+  font-size: 24px;
+  line-height: 1;
+  padding: 8px 14px;
+  border: 2px solid var(--gold-deep);
+  border-radius: var(--r-pill);
+  box-shadow: 0 3px 0 var(--gold-deep), inset 0 2px 0 rgba(255,255,255,0.5);
+  flex-shrink: 0;
+}
+
+/* פס התקדמות לדרגה — עבה, מלא, בלי זוהר */
+.progress-bar { height: 9px; background: #e4ecf8; border-radius: var(--r-pill); margin-top: 6px; border: 1px solid rgba(91,102,136,0.25); }
+.progress-fill { background: linear-gradient(90deg, var(--gold), #ff8f1f); box-shadow: none; border-radius: var(--r-pill); }
+
+/* --- קיבל נקודות: חגיגה אמיתית — הבזק זהב, קפיצת כרטיס, קונפטי מה-::after --- */
+.student.celebrating {
+  border-color: var(--gold) !important;
+  background: linear-gradient(180deg, #ffffff, #fff2cf);
+  box-shadow: 0 0 0 4px rgba(255,184,0,0.40), 0 10px 26px rgba(255,184,0,0.45);
+  animation: cardCheer 0.7s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes cardCheer {
+  0%   { transform: scale(1) rotate(0); }
+  30%  { transform: scale(1.06) rotate(1.4deg); }
+  60%  { transform: scale(0.99) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.student.celebrating::after {
+  content: '🎉';
+  position: absolute;
+  top: -12px;
+  inset-inline-start: 14px;
+  font-size: 30px;
+  pointer-events: none;
+  animation: cheerPop 1s ease-out forwards;
+}
+@keyframes cheerPop {
+  0%   { transform: translateY(8px) scale(0) rotate(-25deg); opacity: 0; }
+  30%  { transform: translateY(-10px) scale(1.35) rotate(8deg); opacity: 1; }
+  100% { transform: translateY(-30px) scale(1) rotate(0); opacity: 0; }
+}
+
+/* --- ירד בנקודות: עצוב אך עדין — מסגרת אלמוג, טיפת דמעה */
+.student.disappointed {
+  border-color: var(--coral) !important;
+  background: linear-gradient(180deg, #ffffff, #ffecec);
+  box-shadow: 0 0 0 4px rgba(255,93,93,0.28), var(--shadow-sm);
+}
+.student.disappointed::after {
+  content: '💧';
+  position: absolute;
+  top: -8px;
+  inset-inline-start: 14px;
+  font-size: 24px;
+  pointer-events: none;
+  animation: dropFall 0.9s ease-in forwards;
+}
+@keyframes dropFall {
+  0%   { transform: translateY(-6px) scale(0.6); opacity: 0; }
+  30%  { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(18px) scale(0.9); opacity: 0; }
+}
+
+/* --- רצף (combo) — חם אבל לא ניאון; זוהר אמיתי רק ב-tier4 --- */
+.student.on-fire { border-color: #ff8f1f !important; box-shadow: 0 0 0 3px rgba(255,143,31,0.30), 0 3px 0 rgba(201,100,0,0.35) !important; }
+.student.on-fire.tier2 { border-color: var(--coral) !important; box-shadow: 0 0 0 3px rgba(255,93,93,0.32), 0 3px 0 rgba(209,60,60,0.35) !important; }
+.student.on-fire.tier3 { border-color: var(--grape) !important; box-shadow: 0 0 0 3px rgba(139,92,246,0.32), 0 3px 0 rgba(106,63,209,0.35) !important; }
+.student.on-fire.tier4 {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 3px rgba(255,184,0,0.45), 0 0 26px rgba(255,184,0,0.60), 0 3px 0 var(--gold-deep) !important;
+}
+.combo-badge { border: 2px solid #ffffff; box-shadow: 0 2px 0 rgba(60,30,0,0.30); font-size: 16px; }
+
+/* כפתור "הוסף תלמיד" — פתק ריק מקווקו בשמיים */
+.add-student-btn {
+  font-size: var(--fs-md);
+  background: #f2f9ff;
+  border: 3px dashed #6fbcff;
+  border-radius: var(--r-btn);
+  color: var(--sky-deep);
+  padding: 12px;
+}
+.add-student-btn:hover { background: #e3f2ff; border-color: var(--sky); }
+
+/* =====================================================================
+   6) מודלים — שלט-עץ בראש, גוף קרם
+===================================================================== */
+.modal-bg { background: rgba(28,35,64,0.55); backdrop-filter: blur(3px); }
+.modal {
+  background:
+    linear-gradient(180deg, rgba(169,113,63,0.06), transparent 90px),
+    var(--cream);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 3px solid var(--wood);
+  border-radius: var(--r-modal);
+  box-shadow: var(--shadow-lg), 0 0 0 6px rgba(255,255,255,0.40);
+  color: var(--ink);
+  padding: 26px;
+}
+.modal-hero { border-bottom: 3px dashed rgba(169,113,63,0.45); padding-bottom: 18px; margin-bottom: 18px; }
+#modalAvatar3D {
+  background: radial-gradient(circle at 50% 30%, #dff1ff, #f6fbff 80%);
+  box-shadow: 0 0 0 3px #ffffff, 0 0 0 6px rgba(169,113,63,0.45); /* טבעת בלי border — לא מעוותים canvas */
+}
+.modal-title { font-size: var(--fs-xl); color: var(--ink); }
+.modal-sub { font-size: var(--fs-md); color: var(--ink-dim); }
+
+.modal-tabs { border-bottom: 3px solid rgba(169,113,63,0.30); padding-bottom: 14px; }
+.modal-tab {
+  font-size: var(--fs-md);
+  background: var(--surface);
+  border: 2px solid var(--wood);
+  border-radius: 12px;
+  color: var(--ink);
+  padding: 8px 16px;
+  box-shadow: 0 3px 0 rgba(169,113,63,0.40);
+}
+.modal-tab:hover { background: var(--cream); }
+.modal-tab.active {
+  background: linear-gradient(180deg, #ffc83d, var(--gold));
+  border-color: var(--gold-deep);
+  color: #3a2a00;
+  box-shadow: 0 3px 0 var(--gold-deep);
+}
+.modal-tab.active:active, .modal-tab:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(169,113,63,0.40); }
+
+/* כפתורי נקודות — חמשת צבעי היסוד, כפתורי צעצוע גדולים */
+.point-btn {
+  font-size: 30px;
+  border-radius: var(--r-btn);
+  padding: 18px 8px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.point-btn.add-10  { background: linear-gradient(180deg, #55d879, var(--leaf));  border: 3px solid var(--leaf-deep);  box-shadow: 0 5px 0 var(--leaf-deep);  color: #fff; text-shadow: 0 1px 0 rgba(10,80,30,0.5); }
+.point-btn.add-20  { background: linear-gradient(180deg, #55b9ff, var(--sky));   border: 3px solid var(--sky-deep);   box-shadow: 0 5px 0 var(--sky-deep);   color: #fff; text-shadow: 0 1px 0 rgba(9,70,120,0.5); }
+.point-btn.add-50  { background: linear-gradient(180deg, #ffc83d, var(--gold));  border: 3px solid var(--gold-deep);  box-shadow: 0 5px 0 var(--gold-deep);  color: #3a2a00; }
+.point-btn.add-100 { background: linear-gradient(180deg, #a184f9, var(--grape)); border: 3px solid var(--grape-deep); box-shadow: 0 5px 0 var(--grape-deep); color: #fff; text-shadow: 0 1px 0 rgba(60,30,130,0.5); }
+.point-btn.minus-10{ background: linear-gradient(180deg, #ff7676, var(--coral)); border: 3px solid var(--coral-deep); box-shadow: 0 5px 0 var(--coral-deep); color: #fff; text-shadow: 0 1px 0 rgba(120,20,20,0.5); }
+.point-btn:hover  { transform: translateY(-2px); }
+.point-btn:active { transform: translateY(4px); }
+.point-btn.add-10:active  { box-shadow: 0 1px 0 var(--leaf-deep); }
+.point-btn.add-20:active  { box-shadow: 0 1px 0 var(--sky-deep); }
+.point-btn.add-50:active  { box-shadow: 0 1px 0 var(--gold-deep); }
+.point-btn.add-100:active { box-shadow: 0 1px 0 var(--grape-deep); }
+.point-btn.minus-10:active{ box-shadow: 0 1px 0 var(--coral-deep); }
+
+/* תיבת ההפתעה — "שלט ענב" חגיגי על קרם */
+.box-section {
+  background: linear-gradient(180deg, #f6f1ff, #ebe0ff);
+  border: 3px solid var(--grape);
+  border-radius: var(--r-card);
+  box-shadow: 0 4px 0 rgba(106,63,209,0.35), var(--shadow-sm);
+}
+
+/* שדות קלט — בהירים ומלאים */
+input[type=text] {
+  background: var(--surface);
+  border: 2px solid var(--wood);
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font-size: 20px;
+}
+input[type=text]:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255,184,0,0.35); }
+
+/* =====================================================================
+   7) לוח שיא, פוטר, כפתור מוזיקה
+===================================================================== */
+.lb-row {
+  background: var(--surface);
+  border: 2px solid var(--wood);
+  border-radius: 14px;
+  font-size: var(--fs-md);
+  box-shadow: var(--shadow-sm);
+}
+.lb-row.top1 { background: linear-gradient(90deg, #fff3cf, #ffffff); border: 3px solid var(--gold);  box-shadow: 0 3px 0 var(--gold-deep), var(--shadow-sm); }
+.lb-row.top2 { background: linear-gradient(90deg, #eef2f8, #ffffff); border: 3px solid #8d99b5; }
+.lb-row.top3 { background: linear-gradient(90deg, #fbe9d7, #ffffff); border: 3px solid #c9803e; }
+
+.footer-actions {
+  background: linear-gradient(180deg, rgba(255,250,238,0.85), rgba(255,243,216,0.95));
+  border-top: 3px solid rgba(169,113,63,0.55);
+  box-shadow: 0 -4px 14px rgba(20,30,60,0.08);
+}
+/* כפתורי-הדגל (האי / משחק / תיבת הפתעה) נושאים inline font-size:1.1em ישן
+   שהיה מקטין אותם מתחת לרצפת ה-22px — !important נדרש כדי לגבור על inline */
+.footer-actions .btn[style*="font-size"] { font-size: 26px !important; }
+.modal .btn[style*="font-size"] { font-size: 24px !important; }
+
+.music-btn {
+  background: linear-gradient(180deg, #ffc83d, #ff9d1f);
+  border: 3px solid var(--gold-deep);
+  color: #3a2a00;
+  box-shadow: 0 5px 0 var(--gold-deep), var(--shadow-md);
+}
+.music-btn:hover { transform: translateY(-2px) scale(1.05); }
+.music-btn.playing { animation: musicBob 1.5s ease-in-out infinite; }
+@keyframes musicBob {
+  0%, 100% { transform: scale(1) rotate(0); }
+  50%      { transform: scale(1.08) rotate(-6deg); }
+}
+
+/* =====================================================================
+   8) פופאפים צפים — קריאים על רקע בהיר (קו-מתאר לבן במקום זוהר ניאון)
+===================================================================== */
+.point-popup { text-shadow: 0 3px 0 #ffffff, 0 0 16px rgba(255,255,255,0.95), 0 0 5px currentColor; }
+
+.combo-popup-title { filter: drop-shadow(0 3px 0 rgba(255,255,255,0.85)); text-shadow: none; }
+.combo-popup-sub  { color: var(--ink); text-shadow: 0 2px 0 #ffffff, 0 0 12px #ffffff; }
+.combo-popup-mult { color: #b06a00;   text-shadow: 0 2px 0 #ffffff, 0 0 12px #ffffff; }
+
+/* מסך עליית דרגה — נשאר כהה-חגיגי (רגע glow מותר), רק מיושר לפלטה */
+.rank-up-title {
+  background: linear-gradient(90deg, var(--gold), #ff8f1f, var(--coral));
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 0 40px rgba(255,184,0,0.75));
+}
+
+/* תגים עתידיים (אם ייווספו במרקאפ) — שומרים על אותה שפה */
+.rank-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--cream);
+  border: 2px solid var(--wood);
+  border-radius: var(--r-pill);
+  color: var(--ink);
+  font-weight: 900;
+  font-size: var(--fs-sm);
+  padding: 3px 12px;
+}
+.points-display {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, #ffd34d, var(--gold));
+  border: 2px solid var(--gold-deep);
+  border-radius: var(--r-pill);
+  color: #3a2a00;
+  font-weight: 900;
+  font-size: var(--fs-md);
+  padding: 6px 16px;
+  box-shadow: 0 3px 0 var(--gold-deep);
+}
+
+/* =====================================================================
+   9) prefers-reduced-motion — כיבוי מלא של תנועה בשכבת העיצוב
+===================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+}

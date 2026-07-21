@@ -6,7 +6,7 @@
  *  בזמן טעינה; המנוע חייב לרוץ ולא לקרוס גם אם IslandContent עדיין לא נטען.
  *  Three.js r128 גלובלי בלבד (THREE). ES5-friendly, אין import/export, אין תלות חדשה.
  *  חשיפה יחידה החוצה: window.Island = {open,close,tick,unlockRegion,place,remove,
- *  focusRegion,setAmbient}.
+ *  focusRegion,groundHeightAt,setAmbient}.
  * ===================================================================================== */
 (function () {
 'use strict';
@@ -235,6 +235,77 @@ function regionCenter(idx) {
 }
 
 /* ===================================================================================
+ * 6.5 טופוגרפיה — שדה גובה דטרמיניסטי לכל אזור: גבעה מרכזית + רכס/דיונה בשוליים +
+ * קו-חוף אורגני (לא גיאומטרי) + מדרגות-סלע ברדות לים. הכל "מדורג" (terrace) בסגנון
+ * voxel/low-poly שכבר קיים בבוני-התוכן, וממוין ע"פ seed=אינדקס האזור כדי שאותו אי
+ * ייבנה בכל טעינה מחדש (לא רנדומלי בכל רענון).
+ * המשבצות (הרשת GRID×GRID) יושבות בפועל על שדה הגובה הזה: buildRegionItems /
+ * buildPersonalPlots למטה מדגמים אותו per-item, כך שבנייה אף פעם לא מרחפת/שוקעת.
+ * =================================================================================== */
+var TWO_PI = Math.PI * 2;
+var TERRACE_STEP = 0.24;         /* גובה כל "מדרגה" — נותן מראה מדורג/voxel, לא שיפוע חלק */
+var HILL_R = 4.1;                /* רדיוס הגבעה המרכזית סביב לב האזור */
+var HILL_AMP = 0.95;             /* גובה שיא הגבעה */
+var DUNE_R0 = HALF + 0.9;        /* היכן מתחיל רכס/דיונת השוליים (מעבר לרשת הבנייה) */
+var DUNE_W = 2.1;                /* רוחב רכס השוליים */
+var SHORE_BASE = DUNE_R0 + DUNE_W + 3.4; /* רדיוס בסיס לקו החוף, לפני עיוות אורגני */
+var SHELF_W = 1.7;               /* "מדף" תת-ימי מוסתר מתחת לים — מונע מרווח/תפר נראה */
+function terrace(h) { return Math.round(h / TERRACE_STEP) * TERRACE_STEP; }
+var _terrainParamsCache = {};
+/* פרמטרים דטרמיניסטיים ייחודיים לכל אזור — פאזות לרעש הזוויתי של הדיונות/קו-החוף */
+function terrainParams(idx) {
+  var cached = _terrainParamsCache[idx];
+  if (cached) return cached;
+  var rnd = seedRand(idx * 7919 + 401);
+  var p = {
+    duneSeed1: rnd() * TWO_PI, duneSeed2: rnd() * TWO_PI, duneSeed3: rnd() * TWO_PI,
+    shoreA: rnd() * TWO_PI, shoreB: rnd() * TWO_PI, shoreC: rnd() * TWO_PI,
+    hillWobble: rnd() * TWO_PI,
+    islet: rnd() > 0.45,              /* קצת יותר מחצי מהאזורים מקבלים אי-זעיר סמוך לחוף */
+    isletAngle: rnd() * TWO_PI
+  };
+  _terrainParamsCache[idx] = p;
+  return p;
+}
+/* רדיוס קו-החוף בזווית נתונה (יחסית למרכז האזור) — לא עיגול מושלם, מפרצים/לשונות יבשה */
+function regionShoreDist(idx, angle) {
+  var p = terrainParams(idx);
+  var j = Math.sin(angle * 2 + p.shoreA) * 2.4
+        + Math.sin(angle * 3 + p.shoreB) * 1.5
+        + Math.sin(angle * 5 + p.shoreC) * 0.9;
+  return Math.max(DUNE_R0 + DUNE_W + 1.4, SHORE_BASE + j);
+}
+/* גובה הקרקע המקומי (יחסי למרכז האזור idx) בנקודה (lx,lz) — משמש גם לבניית מש
+ * הטופוגרפיה וגם למיקום כל דבר שיושב עליה (מבנים/חלקות/עיטורים), כך שהם תמיד תואמים */
+function regionLocalHeight(idx, lx, lz) {
+  var r = Math.sqrt(lx * lx + lz * lz);
+  var a = Math.atan2(lz, lx);
+  var p = terrainParams(idx);
+  var hill = 0;
+  if (r < HILL_R) {
+    var hk = r / HILL_R;
+    hill = HILL_AMP * (0.5 + 0.5 * Math.cos(Math.PI * hk));
+    hill += Math.sin(a * 3 + p.hillWobble) * 0.05 * (1 - hk);
+  }
+  if (r <= DUNE_R0) return terrace(hill); /* לב הרשת + השוליים הקרובים — גבעה או שטוח */
+  var duneEnd = DUNE_R0 + DUNE_W;
+  var duneNoise = Math.sin(a * 5 + p.duneSeed1) * 0.5 + Math.sin(a * 8 + p.duneSeed2) * 0.3 + Math.sin(a * 2 + p.duneSeed3) * 0.35;
+  if (r <= duneEnd) {
+    var dk = (r - DUNE_R0) / DUNE_W;
+    var duneShape = Math.sin(Math.PI * clamp(dk, 0, 1));
+    return terrace(Math.max(0, 0.55 * duneShape + duneNoise * 0.32 * duneShape));
+  }
+  var shoreD = regionShoreDist(idx, a);
+  if (r <= shoreD) {
+    var tk = clamp((r - duneEnd) / Math.max(0.6, shoreD - duneEnd), 0, 1);
+    var startH = Math.max(0, duneNoise * 0.1);
+    return terrace(lerp(startH, -0.08, tk));
+  }
+  var beyond = clamp((r - shoreD) / SHELF_W, 0, 1);
+  return terrace(lerp(-0.08, -0.6, beyond));
+}
+
+/* ===================================================================================
  * 7. עולם משותף — ים מונפש, שמיים גרדיאנט, עננים, ציפורים, מחזור יום/לילה
  * =================================================================================== */
 function buildSky() {
@@ -256,29 +327,62 @@ function buildSky() {
   return dome;
 }
 function buildSea() {
-  var seg = 44;
+  /* seg הוגבר מ-44 ל-56 (גלים חלקים יותר) + צבעי-קודקוד לעומק (רדוד/בהיר ליד
+   * החוף, כהה/עמוק רחוק) + נצנוץ-שמש זול ב-updateSea. בלי טקסטורות/geometry ענק. */
+  var seg = 56;
   var size = (RING_R0 + REGION_DEFS.length * RING_STEP) * 2 + 60;
   var geo = new THREE.PlaneGeometry(size, size, seg, seg);
   geo.rotateX(-Math.PI / 2);
-  var m = new THREE.MeshPhongMaterial({ color: 0x2a7fd4, shininess: 60, transparent: true, opacity: 0.92 });
+  var shallow = new THREE.Color(0x8fe0f5), deep = new THREE.Color(0x0c3f78);
+  var centers = [];
+  for (var ci = 0; ci < REGION_DEFS.length; ci++) centers.push(regionCenter(ci));
+  var colors = [];
+  var p0 = geo.attributes.position;
+  for (var i = 0; i < p0.count; i++) {
+    var x = p0.getX(i), z = p0.getZ(i);
+    var minD = 1e9;
+    for (var cj = 0; cj < centers.length; cj++) {
+      var dxp = x - centers[cj].x, dzp = z - centers[cj].z;
+      var dd = Math.sqrt(dxp * dxp + dzp * dzp);
+      if (dd < minD) minD = dd;
+    }
+    var depthT = clamp((minD - 8) / 34, 0, 1);
+    var c = shallow.clone().lerp(deep, depthT);
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  var m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 70, transparent: true, opacity: 0.92 });
   var mesh = new THREE.Mesh(geo, m);
   mesh.position.y = -0.35;
   mesh.receiveShadow = true;
   ISL.seaGeo = geo;
   ISL.seaBaseY = [];
+  ISL.seaBaseColor = colors;
   var p = geo.attributes.position;
-  for (var i = 0; i < p.count; i++) ISL.seaBaseY.push(p.getY(i));
+  for (var j = 0; j < p.count; j++) ISL.seaBaseY.push(p.getY(j));
   return mesh;
 }
 function updateSea(t) {
   if (!ISL.seaGeo) return;
   var p = ISL.seaGeo.attributes.position;
+  var cAttr = ISL.seaGeo.attributes.color;
+  var baseCol = ISL.seaBaseColor;
   for (var i = 0; i < p.count; i++) {
     var x = p.getX(i), z = p.getZ(i);
     var wave = Math.sin(x * 0.12 + t * 1.1) * 0.22 + Math.sin(z * 0.09 - t * 0.8) * 0.18;
     p.setY(i, ISL.seaBaseY[i] + wave);
+    if (cAttr && baseCol) {
+      /* נצנוץ-שמש זול: פס בהירות נעה שמאירה נקודות פזורות על פני הים */
+      var sparkle = Math.max(0, Math.sin(x * 0.6 + t * 2.1) * Math.sin(z * 0.5 - t * 1.7));
+      var boost = sparkle > 0.82 ? (sparkle - 0.82) * 2.2 : 0;
+      var bi = i * 3;
+      cAttr.array[bi] = Math.min(1, baseCol[bi] + boost);
+      cAttr.array[bi + 1] = Math.min(1, baseCol[bi + 1] + boost);
+      cAttr.array[bi + 2] = Math.min(1, baseCol[bi + 2] + boost * 0.9);
+    }
   }
   p.needsUpdate = true;
+  if (cAttr) cAttr.needsUpdate = true;
 }
 function buildClouds(scene) {
   ISL.clouds = [];
@@ -353,18 +457,26 @@ function updateDayNight(t, scene) {
  * 8. בניית אזור — שלוש רמות פירוט: locked / lod / full
  * =================================================================================== */
 function buildRegionLocked(idx) {
+  /* אזור נעול נראה כמו "אי בערפל" — גבעת-צל שטוחה-רכה + הילה, לא קופסה אפורה */
   var def = REGION_DEFS[idx], c = regionCenter(idx);
   var g = new THREE.Group();
   g.position.set(c.x, 0, c.z);
-  var silo = new THREE.Mesh(new THREE.BoxGeometry(GRID * 0.72, 1.4, GRID * 0.72),
-    new THREE.MeshBasicMaterial({ color: 0x1c2433, transparent: true, opacity: 0.55, fog: false }));
-  silo.position.y = -0.2;
-  g.add(silo);
+  var fogColor = new THREE.Color(def.theme.fog).lerp(new THREE.Color(0x44526a), 0.55);
+  var moundR = GRID * 0.42;
+  var mound = new THREE.Mesh(new THREE.SphereGeometry(moundR, 12, 8),
+    new THREE.MeshBasicMaterial({ color: fogColor, transparent: true, opacity: 0.5, fog: false, side: THREE.DoubleSide }));
+  mound.scale.set(1, 0.5, 1);
+  mound.position.y = -(moundR * 0.5) + 0.4;
+  g.add(mound);
+  var halo = new THREE.Mesh(new THREE.RingGeometry(moundR * 0.9, moundR * 1.3, 20),
+    new THREE.MeshBasicMaterial({ color: fogColor, transparent: true, opacity: 0.22, fog: false, side: THREE.DoubleSide }));
+  halo.rotation.x = -Math.PI / 2; halo.position.y = -0.28;
+  g.add(halo);
   var sign = makeLabel(def.icon + ' ' + def.name + '  🔒', { worldHeight: 1.5, fontSize: 46 });
-  sign.position.set(0, 4.2, 0);
+  sign.position.set(0, 3.6, 0);
   g.add(sign);
   var sub = makeLabel('נפתח ב־… אבנים', { worldHeight: 1.0, fontSize: 34, bg: 'rgba(255,250,238,0.94)', color: '#3d2a17' });
-  sub.position.set(0, 2.6, 0);
+  sub.position.set(0, 2.2, 0);
   g.add(sub);
   g.userData.sub = sub;
   g.userData.updateLock = function (isl) {
@@ -373,26 +485,139 @@ function buildRegionLocked(idx) {
   };
   return g;
 }
-function biomeGroundColor(def) { return def.theme.ground; }
+/* טבעות המש (רדיוס לפי k, יכול להיות תלוי-זווית ברדיוסים החיצוניים — קו-חוף אורגני) */
+var TERRAIN_SEG = 18, TERRAIN_RINGS = 11;
+function terrainRingRadius(k, a, idx) {
+  var duneEnd = DUNE_R0 + DUNE_W;
+  switch (k) {
+    case 0: return 0;
+    case 1: return 1.4;
+    case 2: return 2.8;
+    case 3: return HILL_R;
+    case 4: return (HILL_R + DUNE_R0) / 2;
+    case 5: return DUNE_R0;
+    case 6: return DUNE_R0 + DUNE_W * 0.5;
+    case 7: return duneEnd;
+    case 8: return lerp(duneEnd, regionShoreDist(idx, a), 0.5);
+    case 9: return regionShoreDist(idx, a);
+    case 10: return regionShoreDist(idx, a) + SHELF_W;
+  }
+  return 0;
+}
+/* בונה את מש הקרקע האורגני (גבעה+דיונות+חוף+מדף) לאזור idx — קודקוד-צבע מפלטת האזור.
+ * side:DoubleSide כדי שכיוון-הפנים (winding) של המניפה לעולם לא ייצור מש "בלתי-נראה". */
+function buildTerrainMesh(idx, def) {
+  var seg = TERRAIN_SEG, rings = TERRAIN_RINGS;
+  var groundColor = new THREE.Color(def.theme.ground);
+  var accentColor = new THREE.Color(def.theme.accent);
+  var rockColor = accentColor.clone().multiplyScalar(0.62);
+  var deepColor = new THREE.Color(0x1c3550);
+  var rnd = seedRand(idx * 331 + 71);
+  var posArr = [], colArr = [];
+  for (var k = 0; k < rings; k++) {
+    for (var s = 0; s < seg; s++) {
+      var a = (s / seg) * TWO_PI;
+      var rad = terrainRingRadius(k, a, idx);
+      var lx = Math.cos(a) * rad, lz = Math.sin(a) * rad;
+      var h = (k === 0) ? regionLocalHeight(idx, 0, 0) : regionLocalHeight(idx, lx, lz);
+      if (k > 0 && k < rings - 1) h += (rnd() - 0.5) * 0.05; /* חספוס עדין, לא על הגבול החיצוני */
+      posArr.push(lx, h, lz);
+      var col = (k <= 5) ? groundColor : (k <= 7) ? accentColor : (k === 8) ? rockColor : deepColor;
+      colArr.push(col.r, col.g, col.b);
+    }
+  }
+  function vi(kk, ss) { return kk * seg + (((ss % seg) + seg) % seg); }
+  var index = [];
+  for (var k2 = 0; k2 < rings - 1; k2++) {
+    for (var s2 = 0; s2 < seg; s2++) {
+      var a0 = vi(k2, s2), a1 = vi(k2, s2 + 1), b0 = vi(k2 + 1, s2), b1 = vi(k2 + 1, s2 + 1);
+      if (k2 === 0) { index.push(a0, b0, b1); }
+      else { index.push(a0, b0, b1); index.push(a0, b1, a1); }
+    }
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colArr, 3));
+  geo.setIndex(index);
+  geo.computeVertexNormals();
+  var mat3 = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  var mesh = new THREE.Mesh(geo, mat3);
+  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+  return mesh;
+}
+/* אי-זעיר נפרד ליד החוף — רק לאזורים שנבחרו דטרמיניסטית (terrainParams(idx).islet) */
+function buildIslet(idx, def) {
+  var p = terrainParams(idx);
+  if (!p.islet) return null;
+  var a = p.isletAngle;
+  var r = regionShoreDist(idx, a) + 1.6 + hash01('islet' + idx) * 1.2;
+  var lx = Math.cos(a) * r, lz = Math.sin(a) * r;
+  var g = new THREE.Group();
+  var top = new THREE.Mesh(new THREE.ConeGeometry(0.9, 0.55, 7), new THREE.MeshLambertMaterial({ color: def.theme.ground }));
+  top.position.y = 0.1; top.receiveShadow = true; g.add(top);
+  var rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32, 0), new THREE.MeshLambertMaterial({ color: def.theme.accent }));
+  rock.position.set(0.35, 0.35, -0.2); rock.castShadow = true; g.add(rock);
+  g.position.set(lx, -0.15, lz);
+  return g;
+}
+/* קצף-גלים לבן לאורך קו החוף האורגני — טבעת חלקיקים "נושמת" (userData.animate,
+ * מונע ע"י לולאת ה-tick הראשית הקיימת ב-stepFrame, אותו חוזה כמו BUILDERS) */
+function buildCoastFoam(idx, def) {
+  var seg = TERRAIN_SEG;
+  var geo = new THREE.BoxGeometry(0.6, 0.07, 0.34);
+  var m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.72 });
+  var im = new THREE.InstancedMesh(geo, m, seg);
+  im.castShadow = false; im.receiveShadow = false;
+  var base = [];
+  for (var s = 0; s < seg; s++) {
+    var a = (s / seg) * TWO_PI;
+    var r = Math.max(0.5, regionShoreDist(idx, a) - 0.3);
+    var lx = Math.cos(a) * r, lz = Math.sin(a) * r;
+    var h = regionLocalHeight(idx, lx, lz);
+    base.push({ x: lx, y: h + 0.05, z: lz, rot: a, phase: s * 1.7 });
+  }
+  var dummy = new THREE.Object3D();
+  function applyFrame(t) {
+    for (var i = 0; i < seg; i++) {
+      var bpt = base[i];
+      var sc = 0.8 + Math.sin((t || 0) * 1.5 + bpt.phase) * 0.25;
+      dummy.position.set(bpt.x, bpt.y, bpt.z);
+      dummy.rotation.set(0, bpt.rot, 0);
+      dummy.scale.set(sc, 1, sc);
+      dummy.updateMatrix();
+      im.setMatrixAt(i, dummy.matrix);
+    }
+    im.instanceMatrix.needsUpdate = true;
+  }
+  applyFrame(0);
+  im.userData.animate = applyFrame;
+  return im;
+}
 function buildRegionBase(idx, detailed) {
   var def = REGION_DEFS[idx];
   var g = new THREE.Group();
   var c = regionCenter(idx);
   g.position.set(c.x, 0, c.z);
-  var dirt = box(GRID + 1.4, 1.1, GRID + 1.4, 0x8a5a2b, 0, -0.55, 0); dirt.castShadow = false; g.add(dirt);
-  var top = box(GRID + 1.6, 0.24, GRID + 1.6, biomeGroundColor(def), 0, -0.02, 0); top.castShadow = false; g.add(top);
-  var rim = box(GRID + 2.6, 0.5, GRID + 2.6, def.theme.accent, 0, -0.62, 0); rim.castShadow = false; rim.receiveShadow = false; g.add(rim);
+  var terrainMesh = buildTerrainMesh(idx, def);
+  g.add(terrainMesh);
+  g.userData.terrainMesh = terrainMesh; /* ריי-קאסטינג מדויק לבחירת משבצת — ראו pickGroundPoint */
   if (detailed) {
-    /* עיטור ביומה — דשא/סלעים/קרח/חול מפוזרים ב-InstancedMesh (זול לביצועים) */
+    /* עיטור ביומה — דשא/סלעים/קרח/חול מפוזרים ב-InstancedMesh (זול לביצועים), יושבים
+     * על גובה הקרקע המקומי כדי לא לרחף/לשקוע כשיש גבעה */
     var rnd = seedRand(idx * 977 + 13);
-    var deco = biomeDecoMesh(def, rnd);
+    var deco = biomeDecoMesh(idx, def, rnd);
     if (deco) g.add(deco);
+    var foam = buildCoastFoam(idx, def);
+    if (foam) g.add(foam);
+    var islet = buildIslet(idx, def);
+    if (islet) g.add(islet);
   }
   g.userData.regionId = def.id;
   return g;
 }
-function biomeDecoMesh(def, rnd) {
-  var geo, color, count = 46, yOff = 0.14, scaleFn;
+function biomeDecoMesh(idx, def, rnd) {
+  var geo, color, count = 46, scaleFn;
   if (def.id === 'forest' || def.id === 'village' || def.id === 'farm') {
     geo = new THREE.BoxGeometry(0.14, 0.32, 0.14); color = 0x2f6a30; scaleFn = function () { return 0.7 + rnd() * 0.7; };
   } else if (def.id === 'mountain' || def.id === 'sky') {
@@ -409,7 +634,8 @@ function biomeDecoMesh(def, rnd) {
   for (var i = 0; i < count; i++) {
     var x = (rnd() - 0.5) * (GRID - 1.5), z = (rnd() - 0.5) * (GRID - 1.5);
     /* מרחיק מהמרכז (חלקת ה"שלנו") ומהחלקות האישיות בהיקף */
-    dummy.position.set(x, yOff, z);
+    var y = regionLocalHeight(idx, x, z) + 0.14;
+    dummy.position.set(x, y, z);
     var s = scaleFn();
     dummy.scale.set(s, s, s);
     dummy.rotation.y = rnd() * Math.PI * 2;
@@ -431,8 +657,12 @@ function buildRegionItems(idx, isl) {
       try { node = b(); } catch (e) { console.error('[Island] שגיאת builder עבור "' + it.id + '":', e); node = null; }
     }
     if (!node) node = placeholderMesh(it.id, def.id);
-    /* מיקום מוחלט בעולם (מרכז האזור + היסט מקומי) — עקבי עם tileFromWorld */
-    node.position.set(c.x + (it.x - HALF) * TILE, 0.1, c.z + (it.z - HALF) * TILE);
+    /* מיקום מוחלט בעולם (מרכז האזור + היסט מקומי) — עקבי עם tileFromWorld.
+     * הגובה נדגם מתוך regionLocalHeight כדי שהמבנה ישב על הקרקע המקומית (גבעה/דיונה/
+     * שטוח) ולעולם לא ירחף/ישקע — זה בדיוק חוזה groundHeightAt החשוף למטה. */
+    var lx = (it.x - HALF) * TILE, lz = (it.z - HALF) * TILE;
+    var ly = regionLocalHeight(idx, lx, lz) + 0.1;
+    node.position.set(c.x + lx, ly, c.z + lz);
     node.rotation.y = it.rot || 0;
     node.userData.tile = it.x + '_' + it.z;
     node.userData.itemId = it.id;
@@ -468,9 +698,13 @@ function buildPersonalPlots(idx, isl) {
   var c = regionCenter(idx);
   students.forEach(function (st, i) {
     var angle = (i / n) * Math.PI * 2;
-    var px = c.x + Math.cos(angle) * plotR, pz = c.z + Math.sin(angle) * plotR;
+    var lx = Math.cos(angle) * plotR, lz = Math.sin(angle) * plotR;
+    var px = c.x + lx, pz = c.z + lz;
+    /* החלקה יושבת על גובה הקרקע המקומי באותה נקודה (לרוב קרוב לחוף/שונית) — כך היא
+     * נראית כמו אי-לוויין קטן בארכיפלג, לא כמו פלטפורמה מרחפת סתמית */
+    var baseY = regionLocalHeight(idx, lx, lz);
     var pg = new THREE.Group();
-    pg.position.set(px, 0, pz);
+    pg.position.set(px, baseY, pz);
     pg.rotation.y = -angle + Math.PI / 2;
     var base = box(PLOT + 0.5, 0.5, PLOT + 0.5, 0xd8c48a, 0, -0.28, 0); base.castShadow = false; pg.add(base);
     var top = box(PLOT + 0.6, 0.18, PLOT + 0.6, 0x6fae4a, 0, -0.05, 0); top.castShadow = false; pg.add(top);
@@ -495,7 +729,7 @@ function buildPersonalPlots(idx, isl) {
       pg.add(node);
     });
     pg.userData.plotId = st.id;
-    pg.userData.plotOrigin = { x: px, z: pz, rotY: pg.rotation.y };
+    pg.userData.plotOrigin = { x: px, z: pz, rotY: pg.rotation.y, y: baseY };
     grp.add(pg);
   });
   return grp;
@@ -542,7 +776,9 @@ function refreshRegions() {
       /* base/items/plots כולם ממקמים את עצמם במיקום מוחלט בעולם (regionCenter(i) פנימי
        * לכל אחד), כך שהעטיפה כאן נשארת ב-(0,0,0) בלי צורך בהיסט נוסף */
       group = new THREE.Group();
-      group.add(buildRegionBase(i, true));
+      var baseGroup = buildRegionBase(i, true);
+      group.add(baseGroup);
+      group.userData.terrainMesh = baseGroup.userData.terrainMesh; /* לריי-קאסטינג — ראו pickGroundPoint */
       group.add(buildRegionItems(i, isl));
       if (def.id === ISL.activeId) group.add(buildPersonalPlots(i, isl));
     }
@@ -554,7 +790,9 @@ function refreshRegions() {
   }
   buildBridges();
 }
-/* גשרים בין אזורים פתוחים סמוכים — מחזק את תחושת "ארכיפלג" אחד מחובר */
+/* גשרים בין אזורים פתוחים סמוכים — מגיעים בפועל לקצה קו-החוף של כל אזור (לא נמשכים
+ * ל"שום מקום" כמו קודם), עם שקע קל באמצע (תחושת גשר חבלים) ואבני-קפיצה/סלעים
+ * לאורך הדרך — מחזק את תחושת "ארכיפלג" אחד מחובר */
 function buildBridges() {
   if (ISL.bridgesGroup) { ISL.scene.remove(ISL.bridgesGroup); disposeGroup(ISL.bridgesGroup); }
   var klass = activeClass();
@@ -565,13 +803,42 @@ function buildBridges() {
     if (isl.regions.indexOf(a.id) < 0 || isl.regions.indexOf(b.id) < 0) continue;
     var ca = regionCenter(i), cb = regionCenter(i + 1);
     var dx = cb.x - ca.x, dz = cb.z - ca.z;
-    var len = Math.sqrt(dx * dx + dz * dz) - GRID * 0.7;
-    if (len <= 0) continue;
-    var mid = { x: (ca.x + cb.x) / 2, z: (ca.z + cb.z) / 2 };
-    var plank = box(1.1, 0.14, len, 0x9c7a45, mid.x, -0.15, 0);
-    plank.rotation.y = Math.atan2(dx, dz);
-    plank.position.set(mid.x, -0.15, mid.z);
-    grp.add(plank);
+    var dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < 1) continue;
+    var dirx = dx / dist, dirz = dz / dist;
+    var angA = Math.atan2(dz, dx);       /* זווית מ-a אל b, בפריים המקומי של a (אין סיבוב לקבוצות אזור) */
+    var angB = Math.atan2(-dz, -dx);     /* זווית מ-b אל a */
+    var shoreA = regionShoreDist(i, angA);
+    var shoreB = regionShoreDist(i + 1, angB);
+    var startX = ca.x + dirx * shoreA, startZ = ca.z + dirz * shoreA;
+    var endX = cb.x - dirx * shoreB, endZ = cb.z - dirz * shoreB;
+    var span = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endZ - startZ, 2));
+    if (span <= 0.6) continue;
+    var startY = regionLocalHeight(i, dirx * shoreA, dirz * shoreA) - 0.05;
+    var endY = regionLocalHeight(i + 1, -dirx * shoreB, -dirz * shoreB) - 0.05;
+    var segs = Math.max(3, Math.round(span / 1.4));
+    var rnd = seedRand(i * 5011 + 3);
+    var prevPos = null;
+    for (var s = 0; s <= segs; s++) {
+      var tt = s / segs;
+      var px = lerp(startX, endX, tt), pz = lerp(startZ, endZ, tt);
+      var sag = Math.sin(Math.PI * tt) * 0.35; /* שקע קל באמצע — גשר חבלים, לא לוח נוקשה */
+      var py = lerp(startY, endY, tt) - sag;
+      if (prevPos) {
+        var segLen = Math.sqrt(Math.pow(px - prevPos.x, 2) + Math.pow(pz - prevPos.z, 2));
+        var plank = box(1.05, 0.14, segLen + 0.15, 0x9c7a45, (px + prevPos.x) / 2, (py + prevPos.y) / 2 - 0.06, (pz + prevPos.z) / 2);
+        plank.rotation.y = Math.atan2(px - prevPos.x, pz - prevPos.z);
+        plank.castShadow = false;
+        grp.add(plank);
+        if (s % 2 === 0) { /* אבן-קפיצה/סלע קטן מתחת לגשר, מחבר חזותית בין האיים */
+          var rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22 + rnd() * 0.12, 0), mat(0x8a8578));
+          rock.position.set(px + (rnd() - 0.5) * 0.6, py - 0.32, pz + (rnd() - 0.5) * 0.6);
+          rock.castShadow = true; rock.receiveShadow = true;
+          grp.add(rock);
+        }
+      }
+      prevPos = { x: px, z: pz, y: py };
+    }
   }
   ISL.bridgesGroup = grp;
   ISL.scene.add(grp);
@@ -654,6 +921,18 @@ function pickPoint(x, y) {
   ISL.raycaster.setFromCamera(new THREE.Vector2(mx, my), ISL.camera);
   return ISL.raycaster;
 }
+/* בחירת נקודת-קרקע לריי-קאסט: מנסה קודם את מש הטופוגרפיה האמיתי של האזור הפעיל
+ * (מדויק גם כשיש גבעה/דיונה), ונופל בחזרה למישור השטוח הבלתי-נראה אם אין התאמה
+ * (למשל בזמן טעינה) — כך שבחירת משבצת/בנייה לעולם לא נשברת. */
+function pickGroundPoint(ray) {
+  var grp = ISL.regionGroups[ISL.activeId];
+  var terrain = grp && grp.userData && grp.userData.terrainMesh;
+  if (terrain) {
+    var hits = ray.intersectObject(terrain);
+    if (hits.length) return hits;
+  }
+  return ray.intersectObject(ISL.groundPlaneMesh);
+}
 function activeRegionOriginAndGrid() {
   /* אם המשתמש בוחר משבצת בחלקה אישית, buildSel.regionId יתחיל ב-'plot_' */
   if (ISL.buildSel && ISL.buildSel.regionId && ISL.buildSel.regionId.indexOf('plot_') === 0) {
@@ -677,14 +956,23 @@ function tileFromWorld(px, pz, ctx) {
 function updateHoverTile(x, y) {
   if (!ISL.buildSel && !ISL.delMode) { if (ISL.highlightTile) ISL.highlightTile.visible = false; return; }
   var ray = pickPoint(x, y);
-  var hit = ray.intersectObject(ISL.groundPlaneMesh);
+  var hit = pickGroundPoint(ray);
   if (!hit.length) { if (ISL.highlightTile) ISL.highlightTile.visible = false; return; }
   var ctx = activeRegionOriginAndGrid();
   var t = tileFromWorld(hit[0].point.x, hit[0].point.z, ctx);
   if (!t.ok) { if (ISL.highlightTile) ISL.highlightTile.visible = false; return; }
   var half = (ctx.size - 1) / 2;
   var wx = ctx.origin.x + (t.tx - half), wz = ctx.origin.z + (t.tz - half);
-  ISL.highlightTile.position.set(wx, 0.16, wz);
+  /* גובה הסמן עוקב אחרי הקרקע המקומית (גבעה/דיונה/חלקה) — לא מרחף/שוקע ביחס למה שרואים */
+  var markY;
+  if (ctx.origin.y != null) {
+    markY = ctx.origin.y + 0.2; /* על גבי סיפון החלקה האישית */
+  } else {
+    var actIdx = regionIndex(ISL.activeId);
+    var rc = regionCenter(actIdx);
+    markY = (actIdx >= 0 ? regionLocalHeight(actIdx, wx - rc.x, wz - rc.z) : 0) + 0.06;
+  }
+  ISL.highlightTile.position.set(wx, markY, wz);
   ISL.highlightTile.visible = true;
 }
 function onTap(x, y) {
@@ -706,7 +994,7 @@ function onTap(x, y) {
     return;
   }
   if (!ISL.buildSel) return;
-  var hit = ray.intersectObject(ISL.groundPlaneMesh);
+  var hit = pickGroundPoint(ray);
   if (!hit.length) return;
   var ctx = activeRegionOriginAndGrid();
   var t = tileFromWorld(hit[0].point.x, hit[0].point.z, ctx);
@@ -796,11 +1084,14 @@ function findNodeWorldPos(regionKey, x, z, itemId) {
     });
   }
   if (found) { var wp = new THREE.Vector3(); found.getWorldPosition(wp); return wp; }
-  /* גיבוי: מרכז האזור/החלקה בקירוב */
+  /* גיבוי: מרכז האזור/החלקה בקירוב, כולל דגימת גובה הקרקע המקומי */
   if (regionKey.indexOf('plot_') === 0) return new THREE.Vector3(ISL.cam.cx, 0.3, ISL.cam.cz);
-  var c = regionCenter(regionIndex(regionKey));
+  var idx2 = regionIndex(regionKey);
+  var c = regionCenter(idx2);
   var half = (GRID - 1) / 2;
-  return new THREE.Vector3(c.x + (x - half), 0.3, c.z + (z - half));
+  var lx = x - half, lz = z - half;
+  var ly = idx2 >= 0 ? regionLocalHeight(idx2, lx, lz) + 0.3 : 0.3;
+  return new THREE.Vector3(c.x + lx, ly, c.z + lz);
 }
 function spawnPoofAt(worldPos) {
   spawnBurst(worldPos, 0xffffff, 12);
@@ -1244,6 +1535,17 @@ window.Island = {
   },
   remove: function (regionId, x, z) { return removeAt(regionId, x, z); },
   focusRegion: function (id) { focusRegionInternal(id, false); },
+  /* groundHeightAt(x,z,regionId?) — גובה הקרקע המקומי בנקודת עולם (x,z), לפי הטופוגרפיה
+   * האורגנית (גבעה מרכזית/דיונות/מדרגות-חוף) של regionId (ברירת מחדל: האזור הפעיל).
+   * מיועד למודולים אחרים (כגון island-life.js) שמציבים מסקוט/עץ/דמויות ורוצים לשבת
+   * נכון על הטופוגרפיה במקום y=0 קבוע. ראו js/island-terrain.README.md לדוגמת שימוש. */
+  groundHeightAt: function (x, z, regionId) {
+    var id = regionId || ISL.activeId || 'beach';
+    var idx = regionIndex(id);
+    if (idx < 0) return 0;
+    var c = regionCenter(idx);
+    return regionLocalHeight(idx, x - c.x, z - c.z);
+  },
   setAmbient: function (on) {
     ISL.ambient = !!on;
     ISL.ambientTimer = 0; ISL.ambientNextSwap = 10;
