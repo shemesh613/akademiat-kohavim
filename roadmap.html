@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🗺️ אקדמיית כוכבים — לוח בקרה ושלבי המשך</title>
+<style>
+:root{
+  --bg:#080b1c; --card:#141833; --card2:#1b2044; --line:#2c3466;
+  --cy:#00f5ff; --yl:#ffe600; --pk:#ff2e93; --gr:#00ff88; --or:#ff9d3c;
+  --tx:#eef1ff; --dim:#98a1c8;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(165deg,#080b1c,#151a3a 60%,#0e1229);color:var(--tx);
+  font-family:"Segoe UI",system-ui,Arial,sans-serif;padding:24px 16px 60px;line-height:1.65}
+.wrap{max-width:1080px;margin:0 auto}
+h1{font-size:clamp(1.7em,4vw,2.5em);margin:0 0 4px;
+  background:linear-gradient(90deg,var(--cy),var(--yl),var(--pk));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);margin-bottom:8px}
+.updated{font-size:.85em;color:var(--dim);margin-bottom:26px}
+
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;position:sticky;top:0;
+  background:rgba(8,11,28,.94);padding:12px 0;z-index:20;backdrop-filter:blur(8px)}
+.tab{background:var(--card);border:2px solid var(--line);color:var(--tx);font:inherit;font-weight:800;
+  padding:10px 22px;border-radius:999px;cursor:pointer;font-size:1.02em;transition:.15s}
+.tab:hover{border-color:var(--cy)}
+.tab.on{background:linear-gradient(135deg,var(--cy),#0af);color:#04121f;border-color:transparent}
+.panel{display:none} .panel.on{display:block}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 22px;margin-bottom:16px}
+.card h2{font-size:1.28em;margin:0 0 14px;color:var(--cy);display:flex;align-items:center;gap:10px}
+.card h3{font-size:1.05em;margin:18px 0 8px;color:var(--yl)}
+
+.hero{background:linear-gradient(135deg,rgba(0,245,255,.13),rgba(255,46,147,.09));border-color:rgba(0,245,255,.4)}
+.warn{background:linear-gradient(135deg,rgba(255,46,147,.13),rgba(255,157,60,.07));border-color:rgba(255,46,147,.45)}
+.good{background:linear-gradient(135deg,rgba(0,255,136,.11),rgba(0,245,255,.05));border-color:rgba(0,255,136,.4)}
+
+ul{margin:8px 0;padding-inline-start:22px} li{margin-bottom:8px}
+b{color:var(--yl)}
+code{background:rgba(255,255,255,.09);padding:2px 7px;border-radius:5px;font-family:Consolas,monospace;
+  direction:ltr;display:inline-block;font-size:.9em}
+a{color:var(--cy)}
+
+table{width:100%;border-collapse:collapse;font-size:.95em;margin-top:6px}
+th,td{text-align:right;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--yl);font-size:.9em;white-space:nowrap}
+.st{font-weight:800;white-space:nowrap}
+.done{color:var(--gr)} .prog{color:var(--or)} .todo{color:var(--dim)} .bug{color:var(--pk)}
+
+.steps{list-style:none;padding:0;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:14px 56px 14px 14px;background:var(--card2);
+  border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
+.steps li::before{content:counter(s);position:absolute;right:14px;top:14px;width:30px;height:30px;
+  background:linear-gradient(135deg,var(--cy),#0af);color:#04121f;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-weight:900}
+.steps .t{font-weight:800;color:var(--yl);display:block;margin-bottom:2px}
+
+.big{font-size:1.3em;font-weight:900;color:var(--gr);text-align:center;
+  background:rgba(0,255,136,.09);border:1px solid rgba(0,255,136,.3);
+  border-radius:12px;padding:16px;margin:14px 0;direction:ltr;font-family:Consolas,monospace}
+.pill{display:inline-block;background:rgba(0,245,255,.13);border:1px solid rgba(0,245,255,.38);
+  border-radius:999px;padding:4px 14px;font-size:.88em;margin:3px 4px 3px 0}
+.q{background:rgba(255,230,0,.08);border-right:4px solid var(--yl);padding:12px 16px;border-radius:0 12px 12px 0;margin:12px 0}
+.links a{display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:12px;
+  padding:10px 18px;margin:4px 6px 4px 0;text-decoration:none;font-weight:700}
+.links a:hover{border-color:var(--cy)}
+@media(max-width:640px){ th,td{padding:8px 4px;font-size:.9em} .card{padding:14px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🗺️ אקדמיית כוכבים — לוח בקרה</h1>
+<div class="sub">האי הכיתתי · משחק הצהריים · שלבי המשך</div>
+<div class="updated">עודכן: 21.7.2026</div>
+
+<div class="tabs">
+  <button class="tab on" data-p="teacher">👨‍🏫 בשביל המורה</button>
+  <button class="tab" data-p="dev">🔧 בשביל המפתח</button>
+  <button class="tab" data-p="open">⚠️ פתוח / דורש החלטה</button>
+  <button class="tab" data-p="future">🚀 שלבי המשך</button>
+</div>
+
+<!-- ============ מורה ============ -->
+<div class="panel on" id="teacher">
+
+<div class="card hero">
+<h2>🎯 מה זה נותן לך בפועל</h2>
+<p style="margin-top:0">שתי מערכות שמתחברות לאותה מערכת נקודות שכבר יש לך — <b>בלי שתצטרך לנהל כלום</b>:</p>
+<ul>
+<li><b>🏝️ האי הכיתתי</b> — כל 10 נקודות שתלמיד מקבל הופכות לאבן בניין לכיתה. האי גדל לאורך כל השנה, 8 אזורים נפתחים מעצמם.</li>
+<li><b>🎮 משחק הצהריים</b> — הנקודות של היום קונות שניות משחק. יום טוב = משחק ארוך יותר. הכל על המקרן, סבב אחד ביום.</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>▶️ איך מפעילים</h2>
+<ol class="steps">
+<li><span class="t">נותן נקודות כרגיל</span>שום שינוי בשגרה שלך. ההמרה לאבני בניין קורית לבד ברקע.</li>
+<li><span class="t">בהפסקה — לוחץ "🎮 משחק הצהריים"</span>האפליקציה בוחרת לבד את המשחק ואת השחקן/ית, מחשבת את הזמן ומריצה הכל. אתה רק צופה.</li>
+<li><span class="t">מדי פעם — "🏝️ האי של הכיתה"</span>מקרין את האי כדי שיראו כמה הם בנו. אפשר להשאיר אותו על המסך ברקע.</li>
+</ol>
+<div class="q"><b>סה"כ זמן שנדרש ממך:</b> לחיצה אחת ביום. אין הכנה, אין הזנת שאלות, אין בחירת שחקן.</div>
+</div>
+
+<div class="card">
+<h2>⏱️ נוסחת הזמן — כמה משחקים היום</h2>
+<div class="big">20 + min(40, נקודות ÷ 3)</div>
+<table>
+<tr><th>נקודות הכיתה היום</th><th>אורך המשחק</th></tr>
+<tr><td>0–30 (יום חלש)</td><td>20–30 שניות</td></tr>
+<tr><td>60 (יום ממוצע)</td><td>40 שניות</td></tr>
+<tr><td>120+ (יום מצוין)</td><td>60 שניות — תקרה</td></tr>
+</table>
+<p style="margin-bottom:0"><b>אף פעם לא פחות מ-20 שניות</b> — גם ביום בלי נקודות בכלל. זו לא ענישה, זה תמריץ.</p>
+</div>
+
+<div class="card good">
+<h2>🛡️ מה שמור מראש — כדי שלא ייווצר ריב</h2>
+<p style="margin-top:0">המחקר הראה שילדים תופסים "ענישה קולקטיבית" כלא-הוגנת כבר בגיל צעיר. לכן נבנו הגנות קשיחות:</p>
+<ul>
+<li><b>ניסוח חיובי בלבד</b> — תמיד "הרווחנו X שניות!". המילים "הפסדנו" / "רק" לא קיימות במערכת.</li>
+<li><b>אסור טכנית</b> להציג שתלמיד מסוים "תרם פחות" — בשום מסך.</li>
+<li><b>אין לוח בושה</b> בשום צורה.</li>
+<li><b>בחירת השחקן</b> — חצי לפי נקודות היום, חצי הגרלה למי שעוד לא שיחק. המנגנון מוסתר, כדי שלא ירגיש כמו פרס ניחומים.</li>
+<li><b>יום שישי</b> — מסיבת קונפטי בלי תחרות בכלל. איזון לשבוע.</li>
+</ul>
+</div>
+
+<div class="links">
+  <a href="./?t=shay2026nikud">🔑 כניסת מורה</a>
+  <a href="./">👦 כניסת תלמיד</a>
+  <a href="./?t=shay2026nikud&projector=1">📽️ מצב מקרן</a>
+</div>
+</div>
+
+<!-- ============ מפתח ============ -->
+<div class="panel" id="dev">
+
+<div class="card">
+<h2>🧩 ארכיטקטורה</h2>
+<p style="margin-top:0"><code>index.html</code> (190KB) נשאר כמעט ללא שינוי. כל החדש במודולים נפרדים שמתחברים דרך גשר אחד.</p>
+<table>
+<tr><th>קובץ</th><th>תפקיד</th><th>גודל</th></tr>
+<tr><td><code>js/ak-bridge.js</code></td><td>שכבת <code>window.AK</code> — הגשר היחיד ל-index.html</td><td>~5KB</td></tr>
+<tr><td><code>js/island-engine.js</code></td><td>מנוע תלת-מימד, מצלמה, בנייה, פתיחת אזורים</td><td>59KB</td></tr>
+<tr><td><code>js/island-content.js</code></td><td>8 אזורים + 80 builders</td><td>69KB</td></tr>
+<tr><td><code>js/class-games.js</code></td><td>4 משחקים, טיימרים, בחירת שחקן</td><td>~50KB</td></tr>
+<tr><td><code>js/avatar-plus.js</code></td><td>שדרוג דמויות (chibi, מצמוץ, נשימה)</td><td>16KB</td></tr>
+<tr><td><code>css/shop-plus.css</code></td><td>עיצוב חנות לפי נדירות</td><td>12KB</td></tr>
+<tr><td><code>vendor/three.min.js</code></td><td>Three.js r128 מקומי</td><td>603KB</td></tr>
+</table>
+<h3>נקודות החיבור ב-index.html</h3>
+<ul>
+<li><code>addPoints()</code> — שני hooks: המרה 10:1 לאבני בניין (עם שמירת שארית), ו-<code>ClassGames.onPointsAdded</code></li>
+<li><code>build3DCharacter()</code> — hooks ל-<code>AvatarPlus.enhance/idle/lights</code> + 14 תיוגי <code>userData.ak</code></li>
+<li>שני כפתורים ב-<code>.footer-actions</code> + טאב "האי שלנו" במסך התלמיד</li>
+</ul>
+</div>
+
+<div class="card">
+<h2>✅ מה נבנה ואומת</h2>
+<table>
+<tr><th>רכיב</th><th>סטטוס</th><th>אימות</th></tr>
+<tr><td>מחקר עומק (RESEARCH.md)</td><td class="st done">✓ הושלם</td><td>397 שורות, 30+ מקורות</td></tr>
+<tr><td>מנוע האי — 8 אזורים</td><td class="st done">✓ הושלם</td><td>נבדק בדפדפן</td></tr>
+<tr><td>80 מבנים</td><td class="st done">✓ הושלם</td><td>80/80 builders תואמים</td></tr>
+<tr><td>4 משחקים</td><td class="st done">✓ הושלם</td><td>צילומי מסך לכל אחד</td></tr>
+<tr><td>דמויות + חנות</td><td class="st done">✓ הושלם</td><td>patch הוחל, 20 עוגנים</td></tr>
+<tr><td>המרת נקודות → אבנים</td><td class="st done">✓ הושלם</td><td>נבדק: 50 נק' → 5 אבנים</td></tr>
+<tr><td>נוסחת הזמן</td><td class="st done">✓ הושלם</td><td>נבדק: רצפה 20, תקרה 60</td></tr>
+<tr><td>פריסה ל-GitHub Pages</td><td class="st done">✓ חי</td><td>200 על כל הקבצים</td></tr>
+</table>
+</div>
+
+<div class="card warn">
+<h2>🐛 באגים שנתפסו ותוקנו</h2>
+<table>
+<tr><th>הבאג</th><th>למה זה היה קריטי</th></tr>
+<tr><td><b>Three.js מ-CDN</b></td><td>ה-CDN נחסם ← <b>כל האפליקציה קרסה</b>, לא רק האי. רשתות בתי ספר חוסמות CDN-ים. עבר לקובץ מקומי עם CDN כגיבוי.</td></tr>
+<tr><td><b>האי נטען בדמדומים</b></td><td><code>phase=0.28</code> נחשב "יום קבוע" אבל זה 40% אור בלבד — לא קריא על מקרן דהוי.</td></tr>
+<tr><td><b>סנכרון הענן דרס את האי</b></td><td>ה-state מהשרת נשמר לפני שהאי היה קיים ← שדות האי נמחקו. הגשר עוטף <code>getActiveClass</code>.</td></tr>
+<tr><td><b>זמן משחק חוזר ללא הגבלה</b></td><td><code>dailyDone</code> נבדק רק בהפעלה אוטומטית ← כל לחיצה חילקה מחדש 60 שניות. <b>הזמן הפסיק להיות משאב.</b></td></tr>
+<tr><td><b>"מירוץ הצבעים" מסך מת</b></td><td>2–5 סיבובים לכל המשחק ← 13 שניות בלי כלום בין הכרזות. עכשיו סיבוב כל 2.6 שניות.</td></tr>
+<tr><td><b>הכרזת הקהל הסתירה את המשחק</b></td><td>הכיתוב ישב בדיוק על קו הרצפה שבו רצה הדמות.</td></tr>
+</table>
+</div>
+</div>
+
+<!-- ============ פתוח ============ -->
+<div class="panel" id="open">
+
+<div class="card warn">
+<h2>🚨 דורש טיפול לפני שימוש אמיתי</h2>
+
+<h3>1. נתוני בדיקה נכנסו ל-Firebase האמיתי</h3>
+<p>בדיקות ה-QA רצו מול אותו בסיס נתונים של הכיתה והוסיפו נקודות לתלמידים אמיתיים, וכן אבני בניין לקופה.
+<b>צריך להחליט מה לאפס</b> — רק קופת האי, או גם הנקודות.</p>
+
+<h3>2. אין כרגע שום הרשאת בנייה</h3>
+<p>זו הבעיה הכי חשובה. כרגע <b>כל מי שפותח את האי — כולל כל תלמיד — יכול להוציא את כל קופת הכיתה</b>,
+וגם למחוק מבנים שאחרים בנו. ילד אחד יכול לקנות ספינה ב-390 ולרוקן שבועיים של עבודה.</p>
+<div class="q">🔬 <b>סוכן מחקר רץ כרגע</b> על השאלה הזו — כולל הפחד שהעלית מטענות על ועדה, והרעיון של בנייה אוטומטית בכיתה + תקציב אישי לחלקה מהבית.</div>
+</div>
+
+<div class="card">
+<h2>❓ החלטות שכבר קיבלת</h2>
+<table>
+<tr><th>שאלה</th><th>ההחלטה</th></tr>
+<tr><td>ועדת בנייה?</td><td class="st bug">✗ נפסל</td></tr>
+<tr><td>מחיקת מבנים?</td><td class="st done">אף אחד — <b>בנייה סופית</b></td></tr>
+<tr><td>תקציב אישי</td><td>משולב בכיתתי, לא מנותק</td></tr>
+<tr><td>בנייה בשטח המשותף</td><td>נוטה ל<b>אוטומטי</b> — בלי מחליט אנושי</td></tr>
+<tr><td>בנייה מהבית</td><td>בחלקה האישית בלבד</td></tr>
+</table>
+<p style="margin-bottom:0">הרציונל שהנחה הכל: <b>אם אף אחד לא מחליט — אין על מי להתלונן.</b></p>
+</div>
+</div>
+
+<!-- ============ המשך ============ -->
+<div class="panel" id="future">
+
+<div class="card hero">
+<h2>📍 השלב הבא — מיד</h2>
+<ol class="steps">
+<li><span class="t">מנגנון הבעלות</span>לפי תוצאות המחקר: בנייה אוטומטית בשטח המשותף + ארנק אישי לחלקה. זה חוסם שימוש אמיתי — הכי דחוף.</li>
+<li><span class="t">איפוס נתוני הבדיקה</span>ניקוי מה שהבדיקות הכניסו ל-Firebase.</li>
+<li><span class="t">בדיקת 7 האזורים הנותרים</span>ראיתי בעיניים רק את "חוף הכוכבים". יער/חווה/כפר/הר/מדבר/הר-אש/שמיים לא אומתו ויזואלית.</li>
+</ol>
+</div>
+
+<div class="card">
+<h2>🔭 אחר כך</h2>
+<table>
+<tr><th>משימה</th><th>מה זה</th><th>עדיפות</th></tr>
+<tr><td>6 המשחקים הנותרים</td><td>המחקר פיתח 10 רעיונות, מומשו 4. יש עוד: מכונה קופצת, שיר הפעמון, מגדל הקוביות, מי מסתתר, מרוץ הכוכבים.</td><td class="st prog">בינונית</td></tr>
+<tr><td>מצב אמביינט</td><td>האי כמסך רקע של הכיתה כל היום, עם סיור מצלמה אוטומטי. הקוד קיים — חסר כפתור.</td><td class="st prog">בינונית</td></tr>
+<tr><td>מצב מקרן מלא</td><td><code>?projector=1</code> קיים אבל לא נבדק לעומק.</td><td class="st prog">בינונית</td></tr>
+<tr><td>הפעלה עצמית</td><td>המשחק מתחיל לבד ב-12:15 בלי אף לחיצה.</td><td class="st todo">נמוכה</td></tr>
+<tr><td>תפקידי אי</td><td>תורן/ועדה/קופאי ברוטציה אוטומטית. הקוד קיים חלקית.</td><td class="st todo">נמוכה</td></tr>
+<tr><td>בדיקת עומס</td><td>24 תלמידים + אי מלא — לוודא 60fps על טאבלט של בית ספר.</td><td class="st todo">לפני ספטמבר</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2>📅 לוח שנה מתוכנן</h2>
+<table>
+<tr><th>חודש</th><th>אזור שנפתח</th><th>סף</th></tr>
+<tr><td>ספטמבר</td><td>🏖️ חוף הכוכבים</td><td>0</td></tr>
+<tr><td>אוקטובר</td><td>🌲 יער הלחישות</td><td>120</td></tr>
+<tr><td>נובמבר</td><td>🚜 חוות האלופים</td><td>300</td></tr>
+<tr><td>דצמבר–ינואר</td><td>🏘️ כפר הידע</td><td>520</td></tr>
+<tr><td>פברואר</td><td>🏔️ הר הקרח</td><td>780</td></tr>
+<tr><td>מרץ</td><td>🏜️ מדבר הזהב</td><td>1,050</td></tr>
+<tr><td>אפריל–מאי</td><td>🌋 הר האש</td><td>1,350</td></tr>
+<tr><td>יוני</td><td>☁️ איי השמיים</td><td>1,700</td></tr>
+</table>
+<p style="margin-bottom:0;color:var(--dim)">מבוסס על ~50 אבנים בשבוע (כיתה של 24 עם 60–120 נקודות ביום).</p>
+</div>
+
+<div class="card">
+<h2>📚 מסמכים</h2>
+<div class="links">
+  <a href="RESEARCH.md">📄 מחקר העומק</a>
+  <a href="RESEARCH_OWNERSHIP.md">📄 מחקר הבעלות</a>
+  <a href="SPEC.md">📄 חוזה טכני</a>
+  <a href="https://github.com/shemesh613/akademiat-kohavim">💻 GitHub</a>
+</div>
+</div>
+</div>
+
+</div>
+<script>
+document.querySelectorAll('.tab').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.panel').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById(b.dataset.p).classList.add('on');
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+});
+</script>
+</body>
+</html>
