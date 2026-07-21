@@ -198,7 +198,7 @@ function activeIslState() { var k = activeClass(); return k ? ensureLifeState(k)
  * 5. תושבים — 24 התלמידים כדמויות תלת-מימדיות אמיתיות (build3DCharacter הקיים)
  * =================================================================================== */
 var MAX_FULL_VILLAGERS = 6;      /* LOD: כמה דמויות מלאות בו-זמנית (6-8 לפי המשימה — 6 לבטיחות ביצועים) */
-var VILLAGER_SCALE = 0.58;
+var VILLAGER_SCALE = 0.36;   /* קטנטנות — 0.58 היה גדול מדי ביחס למבנים ולאי */
 var _tempCharScene = null;
 function tempCharScene() { if (!_tempCharScene) _tempCharScene = new THREE.Scene(); return _tempCharScene; }
 
@@ -301,6 +301,10 @@ function makeImpostor(student) {
   try { var bodyItem = window.findItem && window.findItem(student.equipped && student.equipped.body); if (bodyItem && bodyItem.shirt != null) color = bodyItem.shirt; } catch (e) {}
   var body = cyl(0.13, 0.16, 0.55, color, 0, 0.55, 0, 6); body.castShadow = true; g.add(body);
   var head = sph(0.18, 0xffd9a8, 0, 1.0, 0, 8); g.add(head);
+  /* שיער גם ב-LOD הזול: בלעדיו הדמויות הרחוקות נראו ככתמים קירחים לצד המלאות */
+  var hairCol = 0x6b3410;
+  try { var bi = window.findItem && window.findItem(student.equipped && student.equipped.body); if (bi && bi.hair != null) hairCol = bi.hair; } catch (e) {}
+  var hair = sph(0.185, hairCol, 0, 1.05, 0, 8); hair.scale.set(1, 0.62, 1); g.add(hair);
   var badge = badgeSprite((student.name || '?').charAt(0), color);
   badge.position.y = 1.42; g.add(badge);
   g.userData.impostor = true; g.userData.headMesh = head; g.userData.bodyColor = color;
@@ -436,8 +440,8 @@ function setVillagerLod(v, want) {
 }
 function ensureNameSprite(v) {
   if (v.nameSprite) return;
-  var spr = makeSprite(v.student.name || 'תלמיד/ה', { fontSize: 26, worldHeight: 0.34, bg: 'rgba(15,20,35,0.6)' });
-  spr.position.y = 2.55;
+  var spr = makeSprite(v.student.name || 'תלמיד/ה', { fontSize: 26, worldHeight: 0.26, bg: 'rgba(15,20,35,0.5)' });
+  spr.position.y = 2.35;
   v.wrapper.add(spr);
   v.nameSprite = spr;
 }

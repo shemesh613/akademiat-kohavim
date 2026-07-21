@@ -891,7 +891,7 @@ function ensureHudCss() {
     + '.ak-isl-top{position:absolute;top:18px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-start;padding:0 24px;}'
     + '.ak-isl-badge{pointer-events:none;background:rgba(15,20,35,0.72);border:2px solid rgba(255,255,255,0.35);border-radius:20px;padding:10px 22px;color:#fff;font-weight:800;font-size:30px;box-shadow:0 6px 18px rgba(0,0,0,.35);}'
     + '.ak-isl-region{font-size:48px;font-weight:900;color:#fff;text-shadow:0 3px 10px rgba(0,0,0,.6);background:rgba(15,20,35,0.55);border-radius:22px;padding:10px 30px;}'
-    + '.ak-isl-progress-wrap{position:absolute;top:96px;left:50%;transform:translateX(-50%);width:min(70vw,720px);pointer-events:none;}'
+    + '.ak-isl-progress-wrap{position:absolute;top:152px;left:50%;transform:translateX(-50%);width:min(70vw,720px);pointer-events:none;}'
     + '.ak-isl-progress-label{color:#fff;font-size:28px;font-weight:700;text-align:center;margin-bottom:6px;text-shadow:0 2px 6px rgba(0,0,0,.6);}'
     + '.ak-isl-progress-bar{height:26px;border-radius:14px;background:rgba(10,14,24,0.55);border:2px solid rgba(255,255,255,.4);overflow:hidden;}'
     + '.ak-isl-progress-fill{height:100%;background:linear-gradient(90deg,#ffd54a,#ff9a3c);border-radius:14px;transition:width .6s ease;}'
@@ -906,7 +906,7 @@ function ensureHudCss() {
     + '.ak-isl-hint{position:absolute;bottom:190px;left:50%;transform:translateX(-50%);color:#fff;font-size:30px;font-weight:800;text-shadow:0 3px 10px rgba(0,0,0,.7);background:rgba(15,20,35,.55);padding:10px 26px;border-radius:18px;pointer-events:none;}'
     + '.ak-isl-ambientflag{position:absolute;top:18px;left:24px;font-size:28px;color:#fff;background:rgba(255,213,74,.85);color:#3a2c00;font-weight:900;padding:8px 18px;border-radius:16px;display:none;}'
     + '.ak-isl-ambientflag.on{display:block;}'
-    + '.ak-isl-plots{position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(15,20,35,0.6);border:2px solid rgba(255,255,255,.25);border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}'
+    + '.ak-isl-regions{position:absolute;top:96px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(15,20,35,0.72);border:2px solid rgba(255,255,255,.3);border-radius:16px;padding:6px 10px;pointer-events:auto;max-width:94vw;overflow-x:auto;}.ak-isl-rchip{white-space:nowrap;font-size:20px;font-weight:800;color:#fff;background:rgba(255,255,255,0.08);border-radius:12px;padding:5px 14px;cursor:pointer;border:2px solid transparent;}.ak-isl-rchip.on{border-color:#ffd54a;background:rgba(255,213,74,0.25);}.ak-isl-rchip.lock{opacity:.45;cursor:not-allowed;}.ak-isl-plots{position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(15,20,35,0.6);border:2px solid rgba(255,255,255,.25);border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}'
     + '.ak-isl-plot-chip{white-space:nowrap;font-size:18px;font-weight:700;color:#fff;background:rgba(255,255,255,0.08);border-radius:12px;padding:4px 12px;cursor:pointer;border:2px solid transparent;}'
     + '.ak-isl-plot-chip.sel{border-color:#7dffa8;background:rgba(125,255,168,0.25);}';
   var style = document.createElement('style');
@@ -929,6 +929,7 @@ function buildHud(container) {
     '  <div class="ak-isl-progress-bar"><div class="ak-isl-progress-fill" data-role="progfill" style="width:0%"></div></div>' +
     '</div>' +
     '<div class="ak-isl-hint" data-role="hint" style="display:none">🏗️ בחרו פריט למטה ואז הקישו על הדשא</div>' +
+    '<div class="ak-isl-regions" data-role="regions"></div>' +
     '<div class="ak-isl-plots" data-role="plots"></div>' +
     '<div class="ak-isl-shop" data-role="shop"></div>';
   container.appendChild(hud);
@@ -936,6 +937,7 @@ function buildHud(container) {
     root: hud,
     coins: hud.querySelector('[data-role=coins]'),
     region: hud.querySelector('[data-role=region]'),
+    regions: hud.querySelector('[data-role=regions]'),
     proglabel: hud.querySelector('[data-role=proglabel]'),
     progfill: hud.querySelector('[data-role=progfill]'),
     shop: hud.querySelector('[data-role=shop]'),
@@ -976,6 +978,32 @@ function updateHudRegionName() {
   ISL.plotTarget = null; /* מעבר אזור מאפס בחירת חלקה, כדי לא לבנות בטעות באזור הלא נכון */
   renderPlotPicker();
   renderShopPalette();
+  renderRegionNav();
+}
+/* סרגל ניווט בין אזורים — בלעדיו אין שום דרך לעבור לאזורים האחרים
+ * (focusRegion היה קיים ב-API אבל בלי ממשק). אזור נעול מוצג עם המחיר. */
+function renderRegionNav() {
+  if (!ISL.hud || !ISL.hud.regions) return;
+  var klass = activeClass();
+  var isl = klass ? ensureIslandState(klass) : { regions: ['beach'], coins: 0, spent: 0 };
+  var el = ISL.hud.regions;
+  el.innerHTML = '';
+  for (var i = 0; i < REGION_DEFS.length; i++) {
+    (function (def) {
+      var unlocked = isl.regions.indexOf(def.id) >= 0;
+      var d = document.createElement('div');
+      d.className = 'ak-isl-rchip' + (def.id === ISL.activeId ? ' on' : '') + (unlocked ? '' : ' lock');
+      d.innerHTML = unlocked
+        ? (def.icon + ' ' + def.name)
+        : ('🔒 ' + def.icon + ' ' + def.threshold);
+      d.onclick = function () {
+        if (!unlocked) { akToast('האזור נפתח ב-' + def.threshold + ' אבני בנייה 🔒'); akSound('error'); return; }
+        focusRegionInternal(def.id, false);
+        renderRegionNav();
+      };
+      el.appendChild(d);
+    })(REGION_DEFS[i]);
+  }
 }
 function renderShopPalette() {
   if (!ISL.hud) return;
