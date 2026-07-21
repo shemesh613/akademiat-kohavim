@@ -130,11 +130,11 @@ function makeSprite(text, opts) {
   opts = opts || {};
   var scale = 2, padX = 18, padY = 10, fontSize = opts.fontSize || 30;
   var cvs = document.createElement('canvas'); var ctx = cvs.getContext('2d');
-  ctx.font = 'bold ' + fontSize + 'px Arial, Rubik, sans-serif';
+  ctx.font = '900 ' + fontSize + 'px Heebo, Arial, sans-serif';
   var w = Math.ceil(ctx.measureText(text).width) + padX * 2, h = fontSize + padY * 2;
   cvs.width = w * scale; cvs.height = h * scale;
   ctx = cvs.getContext('2d'); ctx.scale(scale, scale);
-  ctx.font = 'bold ' + fontSize + 'px Arial, Rubik, sans-serif';
+  ctx.font = '900 ' + fontSize + 'px Heebo, Arial, sans-serif';
   ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   if (!opts.noBg) { ctx.fillStyle = opts.bg || 'rgba(20,20,20,0.6)'; roundRect(ctx, 2, 2, w - 4, h - 4, 10); ctx.fill(); }
   ctx.fillStyle = opts.color || '#ffffff';
@@ -440,7 +440,7 @@ function setVillagerLod(v, want) {
 }
 function ensureNameSprite(v) {
   if (v.nameSprite) return;
-  var spr = makeSprite(v.student.name || 'תלמיד/ה', { fontSize: 26, worldHeight: 0.26, bg: 'rgba(15,20,35,0.5)' });
+  var spr = makeSprite(v.student.name || 'תלמיד/ה', { fontSize: 26, worldHeight: 0.26, bg: 'rgba(255,250,238,0.9)', color: '#3d2a17' });
   spr.position.y = 2.35;
   v.wrapper.add(spr);
   v.nameSprite = spr;
@@ -902,9 +902,9 @@ function buildGrowthRuler(key, obj, minStage, maxStage, x, z, speciesName) {
   var mmY = 0.08 + (clamp(mm.stage, 0, n) / n) * (postH - 0.16);
   var flag = box(0.12, 0.1, 0.015, 0x4ac9ff, -0.1, mmY, 0);
   g.add(flag);
-  var flagLbl = makeSprite('לפני חודש', { fontSize: 20, worldHeight: 0.16, bg: 'rgba(20,50,80,0.75)' });
+  var flagLbl = makeSprite('לפני חודש', { fontSize: 20, worldHeight: 0.16, bg: 'rgba(255,250,238,0.92)', color: '#3d2a17' });
   flagLbl.position.set(-0.32, mmY, 0); g.add(flagLbl);
-  var title = makeSprite((speciesName ? ('עץ ' + speciesName) : 'חיית הכיתה') + ' · שלב ' + stage, { fontSize: 22, worldHeight: 0.2, bg: 'rgba(20,20,20,0.7)' });
+  var title = makeSprite((speciesName ? ('עץ ' + speciesName) : 'חיית הכיתה') + ' · שלב ' + stage, { fontSize: 22, worldHeight: 0.2, bg: 'rgba(255,250,238,0.92)', color: '#3d2a17' });
   title.position.set(0, postH + 0.16, 0); g.add(title);
   g.position.set(x, 0, z);
   sc.add(g);
