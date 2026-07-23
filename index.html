@@ -797,6 +797,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 
 <div id="particleLayer"></div>
 <button class="music-btn" id="musicBtn" onclick="toggleMusic()" title="מוזיקת רקע">🎵</button>
+<button class="music-btn" id="muteBtn" onclick="toggleMute()" title="השתקת סאונד" style="bottom:86px;background:linear-gradient(135deg,#64748b,#334155);box-shadow:0 8px 30px rgba(51,65,85,.5)">🔊</button>
 
 <div id="boxOpenOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(10px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;cursor:pointer" onclick="this.style.display='none'">
   <div id="boxStage" style="position:relative;width:300px;height:300px;display:flex;align-items:center;justify-content:center"></div>
@@ -3080,6 +3081,19 @@ function burstConfetti(x, y, count = 40) {
 }
 
 let audioCtx;
+// ===== השתקת סאונד ראשית (אפקטים + מוזיקה). נשמר בין ביקורים =====
+let SOUND_MUTED = (localStorage.getItem('cps_muted_v1') === '1');
+function isMuted() { return SOUND_MUTED; }
+function setMuted(m) {
+  SOUND_MUTED = !!m;
+  localStorage.setItem('cps_muted_v1', SOUND_MUTED ? '1' : '0');
+  if (SOUND_MUTED && typeof stopMusic === 'function') { try { stopMusic(); } catch(e){} }
+  const mb = document.getElementById('muteBtn');
+  if (mb) mb.textContent = SOUND_MUTED ? '🔇' : '🔊';
+  if (window.Island && Island.hud && typeof Island.hud.syncMuteIcon === 'function') Island.hud.syncMuteIcon();
+}
+function toggleMute() { setMuted(!SOUND_MUTED); }
+window.isMuted = isMuted; window.setMuted = setMuted; window.toggleMute = toggleMute;
 function playTone(freq, dur, startTime, type = 'sine', vol = 0.18) {
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -3093,6 +3107,7 @@ function playTone(freq, dur, startTime, type = 'sine', vol = 0.18) {
 }
 function playSound(type) {
   try {
+    if (SOUND_MUTED) return;
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     let t = audioCtx.currentTime;
     const tunes = {
@@ -3725,6 +3740,7 @@ const MUSIC_KEY = 'cps_music_on_v1';
 
 function startMusic() {
   if (musicPlaying) return;
+  if (SOUND_MUTED) return;
   musicPlaying = true;
   if (!musicCtx) musicCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (musicCtx.state === 'suspended') musicCtx.resume();
@@ -4000,6 +4016,7 @@ function maybeAutoMusic() {
 
 spawnParticles();
 maybeAutoMusic();
+(function(){ var mb = document.getElementById('muteBtn'); if (mb) mb.textContent = SOUND_MUTED ? '🔇' : '🔊'; })();
 
 // ==================== INIT ====================
 async function init() {

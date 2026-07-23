@@ -1491,6 +1491,10 @@ function ensureHudCss() {
     + '.ak-isl-hint{position:absolute;bottom:190px;left:50%;transform:translateX(-50%);color:#3d2a17;font-size:30px;font-weight:900;background:rgba(255,250,238,0.94);border:3px solid #a9713f;padding:10px 26px;border-radius:18px;pointer-events:none;box-shadow:0 6px 18px rgba(60,40,20,.28);}'
     + '.ak-isl-ambientflag{position:absolute;top:18px;left:24px;font-size:28px;color:#fff;background:rgba(255,213,74,.85);color:#3a2c00;font-weight:900;padding:8px 18px;border-radius:16px;display:none;}'
     + '.ak-isl-ambientflag.on{display:block;}'
+    + '.ak-isl-ctrl{position:absolute;top:50%;right:18px;transform:translateY(-50%);display:flex;flex-direction:column;gap:12px;pointer-events:auto;z-index:6;}'
+    + '.ak-isl-cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #a9713f;background:rgba(255,250,238,0.94);color:#3d2a17;font-size:30px;font-weight:900;cursor:pointer;box-shadow:0 5px 14px rgba(60,40,20,.28);display:flex;align-items:center;justify-content:center;line-height:1;transition:transform .1s;}'
+    + '.ak-isl-cbtn:hover{transform:scale(1.08);}'
+    + '.ak-isl-cbtn:active{transform:scale(0.94);}'
     + '.ak-isl-regions{position:absolute;top:96px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(255,250,238,0.94);border:3px solid #a9713f;border-radius:16px;padding:6px 10px;pointer-events:auto;max-width:94vw;overflow-x:auto;}.ak-isl-rchip{white-space:nowrap;font-size:20px;font-weight:900;color:#3d2a17;background:rgba(169,113,63,0.14);border-radius:12px;padding:5px 14px;cursor:pointer;border:2px solid transparent;}.ak-isl-rchip.on{border-color:#c8891f;background:#ffd54a;}.ak-isl-rchip.lock{opacity:.45;cursor:not-allowed;}.ak-isl-plots{position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(255,250,238,0.94);border:3px solid #a9713f;border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}'
     + '.ak-isl-plot-chip{white-space:nowrap;font-size:18px;font-weight:900;color:#3d2a17;background:rgba(169,113,63,0.14);border-radius:12px;padding:4px 12px;cursor:pointer;border:2px solid transparent;}'
     + '.ak-isl-plot-chip.sel{border-color:#7dffa8;background:rgba(125,255,168,0.25);}';
@@ -1516,7 +1520,11 @@ function buildHud(container) {
     '<div class="ak-isl-hint" data-role="hint" style="display:none">🏗️ בחרו פריט למטה ואז הקישו על הדשא</div>' +
     '<div class="ak-isl-regions" data-role="regions"></div>' +
     '<div class="ak-isl-plots" data-role="plots"></div>' +
-    '<div class="ak-isl-shop" data-role="shop"></div>';
+    '<div class="ak-isl-shop" data-role="shop"></div>' +
+    '<div class="ak-isl-ctrl">' +
+    '  <button class="ak-isl-cbtn" data-role="home" title="חזרה לכיתה">🏠</button>' +
+    '  <button class="ak-isl-cbtn" data-role="mute" title="השתקת סאונד">🔊</button>' +
+    '</div>';
   /* ויניטה קולנועית עדינה — ממקדת את העין למרכז, בלי לגעת בקריאות ה-HUD */
   var vin = document.createElement('div');
   vin.className = 'ak-isl-vignette';
@@ -1536,8 +1544,30 @@ function buildHud(container) {
     hint: hud.querySelector('[data-role=hint]'),
     ambientflag: hud.querySelector('[data-role=ambientflag]')
   };
+  /* כפתורי בקרה: חזרה לכיתה + השתקת סאונד. שני הכפתורים תוספתיים בלבד ולא נוגעים
+     בשום מנגנון קיים — "חזרה" סוגר את שכבת האי, "סאונד" מפעיל את ההשתקה הראשית. */
+  var homeBtn = hud.querySelector('[data-role=home]');
+  var muteBtn = hud.querySelector('[data-role=mute]');
+  function syncMuteIcon() {
+    if (muteBtn) muteBtn.textContent = (window.isMuted && window.isMuted()) ? '🔇' : '🔊';
+  }
+  if (homeBtn) homeBtn.addEventListener('click', function () { closeIslandToHome(); });
+  if (muteBtn) muteBtn.addEventListener('click', function () {
+    if (window.toggleMute) window.toggleMute(); else syncMuteIcon();
+    syncMuteIcon();
+  });
+  syncMuteIcon();
+  ISL.hud.muteBtn = muteBtn;
+  ISL.hud.syncMuteIcon = syncMuteIcon;
+  if (window.Island) window.Island.hud = ISL.hud; /* לסנכרון אייקון ההשתקה ממסך הכיתה */
   renderPlotPicker();
   renderShopPalette();
+}
+/* סגירת שכבת האי וחזרה למסך הכיתה — עוצר את הלולאה ומסתיר את המכולה המלאה */
+function closeIslandToHome() {
+  try { window.Island.close(); } catch (e) {}
+  var root = document.getElementById('ak-island-root');
+  if (root) root.style.display = 'none';
 }
 /* פס בחירה: "בונים במשותף" מול "בחלקה האישית של תלמיד/ה פלוני" — זה מה שהופך את
  * מנגנון החלקות האישיות (סעיף 6 ב-SPEC) לזמין בפועל דרך קלט יחיד על המקרן */
@@ -1799,6 +1829,7 @@ window.Island = {
   open: function (container, opts) {
     opts = opts || {};
     var target = resolveContainer(container);
+    if (target && target.style.display === 'none') target.style.display = ''; /* חזרה מכפתור "בית" הסתירה — מציגים שוב */
     if (!ISL.inited) {
       initScene(target);
       ISL.inited = true;
