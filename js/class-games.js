@@ -304,6 +304,12 @@ function injectStyle() {
     '.ak-cg-key.ok{background:linear-gradient(135deg,#34c759,#2ea8ff);color:#04211a;}' +
     '.ak-cg-key.del{background:linear-gradient(135deg,#ff5d5d,#ff2e2e);color:#2a0505;}' +
     '.ak-cg-guessbox{font-family:Heebo,Arial,sans-serif;font-size:9vh;color:#1c2340;min-height:11vh;letter-spacing:.4vw;font-weight:900;}' +
+    '.ak-cg-guessfb{font-family:Heebo,Arial,sans-serif;font-size:4.6vh;font-weight:900;padding:.5vh 3vw;border-radius:16px;animation:ak-cg-pop .35s;}' +
+    '.ak-cg-guessfb.fb-hit{background:#ffd54a;color:#5c3a00;}' +
+    '.ak-cg-guessfb.fb-hot{background:#ff5d5d;color:#fff;}' +
+    '.ak-cg-guessfb.fb-warm{background:#ff9a3c;color:#3a1c00;}' +
+    '.ak-cg-guessfb.fb-cold{background:#2ea8ff;color:#04223a;}' +
+    '@keyframes ak-cg-pop{0%{transform:scale(.6);opacity:0;}70%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}' +
     '.ak-cg-treasureui{position:absolute;left:0;right:0;bottom:1vh;display:flex;flex-direction:column;align-items:center;gap:1vh;}' +
     '.ak-cg-shake{animation:ak-cg-shake .4s;}' +
     '.ak-cg-shake-big{animation:ak-cg-shake-big .5s;}' +
@@ -622,10 +628,12 @@ function renderPlay() {
  * 11. מסך חגיגה — מכפיל x1/x1.5/x2, קונפטי, המרה ל-island.coins, ניסוח חיובי בלעדי
  * =================================================================================== */
 var BASE_BONUS = 4;
+/* פער מחודד: הצלחה שווה בבירור יותר. BASE_BONUS=4 → כישלון 2 / בינוני 6 / מעולה 12.
+ * אף פעם לא 0 (עיקרון "לא מענישים"), אבל מצוינות מתגמלת פי 6 מכישלון. */
 function tierFor(perf) {
-  if (perf >= 0.75) return { mult: 2, stars: '⭐⭐⭐', label: 'מעולה!' };
+  if (perf >= 0.75) return { mult: 3, stars: '⭐⭐⭐', label: 'מעולה!' };
   if (perf >= 0.4) return { mult: 1.5, stars: '⭐⭐', label: 'יופי!' };
-  return { mult: 1, stars: '⭐', label: 'כל הכבוד!' };
+  return { mult: 0.5, stars: '⭐', label: 'כל הכבוד!' };
 }
 function renderCelebrate(perf) {
   var klass = SESSION.klass, g = SESSION.gState;
@@ -1141,6 +1149,7 @@ RUNNERS.meteor = (function () {
 RUNNERS.treasure = (function () {
   var secret, guessStr, locked, lo, hi, stageEl, uiEl, keyFn, resizeFn, lastResult;
   var canvas, cx, W, H, active, chestAngle, particles;
+  var attempts, bestDiff, bestGuess, hit, feedback, fbClass; /* חם/קר: ניחושים חוזרים */
 
   function roundRectP(c, x, y, w, h, r) {
     c.beginPath();
@@ -1233,12 +1242,25 @@ RUNNERS.treasure = (function () {
     trackRaf(raf(chestLoop));
   }
   function renderUI() {
-    var rangeTxt = 'בין ' + lo + ' ל-' + hi;
+    var fbHtml = feedback ? '<div class="ak-cg-guessfb ' + fbClass + '">' + feedback + '</div>' : '';
+    if (hit) {
+      uiEl.innerHTML =
+        '<div class="ak-cg-h2" style="font-size:4.4vh">🎯 פגעתם בול!</div>' +
+        fbHtml +
+        '<div class="ak-cg-body" style="font-size:3.2vh">מחכים לחשיפה... ⏳</div>';
+      return;
+    }
+    var rangeTxt = 'המספר בין ' + lo + ' ל-' + hi;
+    var attHtml = attempts
+      ? '<div class="ak-cg-body" style="font-size:2.6vh">ניחוש מס\' ' + (attempts + 1) + ' • הכי קרוב עד עכשיו: ' + (bestGuess == null ? '—' : bestGuess) + '</div>'
+      : '<div class="ak-cg-body" style="font-size:2.6vh">נחשו — ואם לא פגעתם, תקבלו רמז ותנחשו שוב! 🔥</div>';
     uiEl.innerHTML =
-      '<div class="ak-cg-h2" style="font-size:4.4vh">' + (locked ? '🔒 התשובה ננעלה!' : rangeTxt) + '</div>' +
+      '<div class="ak-cg-h2" style="font-size:4vh">' + rangeTxt + '</div>' +
+      fbHtml +
       '<div class="ak-cg-guessbox">' + (guessStr || '?') + '</div>' +
-      (locked ? '<div class="ak-cg-body" style="font-size:3.2vh">מחכים לחשיפה... ⏳</div>' : keypadHtml());
-    if (!locked) bindKeypad();
+      attHtml +
+      keypadHtml();
+    bindKeypad();
   }
   function keypadHtml() {
     var digits = ['1','2','3','4','5','6','7','8','9','⌫','0','✔'];
@@ -1261,25 +1283,38 @@ RUNNERS.treasure = (function () {
     }
   }
   function pressKey(k) {
-    if (locked) return;
+    if (hit) return;
+    if (k === '✔') { if (guessStr && guessStr.length) submitGuess(); return; }
     if (k === '⌫') guessStr = (guessStr || '').slice(0, -1);
-    else if (k === '✔') { if (guessStr && guessStr.length) lockGuess(); }
     else if ((guessStr || '').length < 3) guessStr = (guessStr || '') + k;
     renderUI();
   }
-  function lockGuess() {
-    locked = true;
+  /* ניחוש חוזר עם משוב חם/קר — כל ניחוש מצמצם את הטווח המוצג; יותר זמן = יותר ניסיונות */
+  function submitGuess() {
+    var g = parseInt(guessStr, 10);
+    if (isNaN(g)) { guessStr = ''; renderUI(); return; }
+    attempts++;
+    var diff = Math.abs(secret - g);
+    if (diff < bestDiff) { bestDiff = diff; bestGuess = g; }
+    if (g === secret) {
+      hit = true; locked = true;
+      feedback = '🎯 בול! ' + g + ' זה המספר הסודי!'; fbClass = 'fb-hit';
+      akSound('rankup');
+    } else {
+      if (g > secret) hi = Math.min(hi, g); else lo = Math.max(lo, g);
+      var dir = g > secret ? 'נמוך יותר ⬇️' : 'גבוה יותר ⬆️';
+      if (diff <= 8) { feedback = '🔥 חם מאוד! נסו ' + dir; fbClass = 'fb-hot'; }
+      else if (diff <= 25) { feedback = '🌡️ מתחממים — ' + dir; fbClass = 'fb-warm'; }
+      else { feedback = (g > secret ? '⬆️ גבוה מדי!' : '⬇️ נמוך מדי!'); fbClass = 'fb-cold'; }
+      akSound('coin');
+    }
+    guessStr = '';
     renderUI();
-  }
-  function narrowHint() {
-    var span = Math.max(20, Math.round((hi - lo) * 0.42));
-    lo = Math.max(0, secret - Math.floor(span / 2));
-    hi = secret + Math.ceil(span / 2);
-    if (!locked) renderUI();
   }
   function start(ctx) {
     secret = 40 + Math.floor(Math.random() * 160);
     lo = 0; hi = 250; guessStr = ''; locked = false; lastResult = null;
+    attempts = 0; bestDiff = Infinity; bestGuess = null; hit = false; feedback = ''; fbClass = '';
     stageEl = ctx.stage; particles = []; chestAngle = 0; active = true;
     stageEl.innerHTML = '<canvas class="ak-cg-canvas" id="ak-cg-chestcv"></canvas>' +
       '<div class="ak-cg-treasureui" id="ak-cg-tui"></div>' +
@@ -1298,19 +1333,15 @@ RUNNERS.treasure = (function () {
       else if (e.key === 'Enter') pressKey('✔');
     };
     trackListener(document, 'keydown', keyFn);
-    var hints = ctx.duration <= 30 ? 0 : (ctx.duration <= 45 ? 1 : 2);
-    var i;
-    for (i = 0; i < hints; i++) {
-      (function (delay) { trackTimer(setTimeout(narrowHint, delay)); })(ctx.duration * 1000 * (0.35 + i * 0.28));
-    }
+    /* אין רמזים מבוססי-זמן — המשוב חם/קר מחליף אותם, ויותר זמן = יותר ניסיונות לנחש */
   }
   function finish() {
     active = false;
-    var finalGuess = locked && guessStr ? parseInt(guessStr, 10) : Math.round((lo + hi) / 2);
-    if (isNaN(finalGuess)) finalGuess = Math.round((lo + hi) / 2);
+    var finalGuess = bestGuess != null ? bestGuess : Math.round((lo + hi) / 2);
     var diff = Math.abs(secret - finalGuess);
     lastResult = { secret: secret, guess: finalGuess };
     RUNNERS.treasure.lastResult = lastResult;
+    if (hit) return 1; /* פגיעה מדויקת = ציון מלא */
     return clamp(1 - diff / 60, 0, 1);
   }
   /* פלישר-סיום: התיבה נפתחת דרמטית, מטבעות מתפזרים, רעידה+הבזק ברגע ה"פופ" */
