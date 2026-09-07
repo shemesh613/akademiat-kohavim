@@ -50,8 +50,29 @@
   function defaultGames() {
     return { lastPlayed: 0, totalScore: 0, plays: [], dailyDone: false };
   }
+  /* ---------- כלכלה לפי כיתה: מכפיל מחירים/ספים (klass.econ.scale) ----------
+     כיתה שצוברת הרבה נקודות (למשל 3400 בשבוע) "שוברת" מחירים שתוכננו ל-500
+     בשבוע. במקום לשנות את המחירים לכולם — לכל כיתה יש מכפיל משלה.
+     scale=1 (ברירת מחדל) = הכלכלה המקורית. scale=10 = הכל פי 10. */
+  function ensureEcon(k) {
+    if (!k) return { scale: 1 };
+    var e = k.econ;
+    if (!e || typeof e.scale !== 'number' || !(e.scale > 0)) { e = { scale: 1 }; k.econ = e; }
+    return e;
+  }
+  function econScale(k) {
+    if (!k) { var f = g('getActiveClass'); k = f ? f() : null; }
+    return ensureEcon(k).scale;
+  }
+  /* מחיר/סף מותאם לכיתה — נקודה אחת של אמת לכל המודולים */
+  function econPrice(n, k) {
+    var v = Math.round((Number(n) || 0) * econScale(k));
+    return v;
+  }
+
   function ensureKlass(k) {
     if (!k) return k;
+    ensureEcon(k);
     if (!k.island) k.island = defaultIsland();
     else {
       var i = k.island;
@@ -120,6 +141,19 @@
     /* עזר פנימי — מודולים יכולים לקרוא לזה על כיתה שהם מקבלים מבחוץ */
     ensureKlass: ensureKlass,
     ensureAll: ensureAll,
+
+    /* כלכלה לפי כיתה */
+    scale: econScale,
+    price: econPrice,
+    setScale: function (n, k) {
+      if (!k) { var f = g('getActiveClass'); k = f ? f() : null; }
+      if (!k) return 1;
+      var v = Number(n);
+      if (!(v > 0)) v = 1;
+      ensureEcon(k).scale = v;
+      var sv = g('save'); if (sv) sv();
+      return v;
+    },
 
     /* היום הנוכחי כמפתח יציב (למונה נקודות יומי) */
     today: function () {

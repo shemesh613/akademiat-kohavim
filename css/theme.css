@@ -280,7 +280,16 @@ header {
   box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px var(--gold);
 }
 
-.student-name { font-size: 23px; color: var(--ink); }
+.student-name {
+  font-size: 23px;
+  color: var(--ink);
+  /* שם ארוך נשבר לשתי שורות במקום להצטמצם ל"נ..." — הכרטיס מתגבה, השם נשאר קריא */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: break-word;
+  line-height: 1.12;
+}
 .name-edit { background: var(--surface-alt); color: var(--ink-dim); border: 1px solid rgba(91,102,136,0.35); font-size: 15px; }
 .name-edit:hover { background: var(--gold); border-color: var(--gold-deep); color: #3a2a00; }
 
@@ -420,10 +429,15 @@ header {
 
 /* כפתורי נקודות — חמשת צבעי היסוד, כפתורי צעצוע גדולים */
 .point-btn {
-  font-size: 30px;
+  font-size: 44px;
   border-radius: var(--r-btn);
-  padding: 18px 8px;
+  padding: 34px 10px;
+  min-height: 120px;          /* כפתורים גבוהים — נוח ללחוץ, נראה מהשורה האחורית */
+  letter-spacing: 0.5px;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+@media (max-width: 700px) {
+  .point-btn { font-size: 32px; padding: 22px 6px; min-height: 88px; }
 }
 .point-btn.add-10  { background: linear-gradient(180deg, #55d879, var(--leaf));  border: 3px solid var(--leaf-deep);  box-shadow: 0 5px 0 var(--leaf-deep);  color: #fff; text-shadow: 0 1px 0 rgba(10,80,30,0.5); }
 .point-btn.add-20  { background: linear-gradient(180deg, #55b9ff, var(--sky));   border: 3px solid var(--sky-deep);   box-shadow: 0 5px 0 var(--sky-deep);   color: #fff; text-shadow: 0 1px 0 rgba(9,70,120,0.5); }

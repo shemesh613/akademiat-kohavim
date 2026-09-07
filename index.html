@@ -202,6 +202,7 @@ header {
   min-height: 200px;
   transition: all 0.2s;
 }
+.classroom > .column { min-width: 0; }   /* בלי זה שם ארוך מרחיב את הלוח וגורם לגלילה אופקית */
 .column.drag-over { border-color: var(--neon-cyan); background: rgba(0,245,255,0.08); }
 .column-header {
   display: flex;
@@ -302,7 +303,30 @@ header {
 .cb-input:focus { border-color: var(--neon-yellow); outline: none; }
 .cb-input::-webkit-outer-spin-button,
 .cb-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.class-bar .cb-spacer { flex: 1; }
+.class-bar .cb-spacer { flex: 1 1 0; min-width: 0; }
+.class-bar .cb-econ { margin-inline-start: auto; }
+.cb-econ {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 0.95em;
+  background: rgba(0,0,0,0.3);
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+.cb-econ select {
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 1em;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.25);
+  background: #1a1e3a;
+  color: #fff;
+  cursor: pointer;
+}
 .cb-view {
   display: flex;
   gap: 0;
@@ -336,6 +360,145 @@ header {
   .class-bar { padding: 12px; }
   .class-bar .cb-spacer { display: none; }
 }
+
+/* ==================== מפת האיים — מה עוד נשאר לפתוח ==================== */
+.island-map {
+  max-width: 1700px;
+  margin: 12px auto 0;
+  padding: 14px 18px 16px;
+  background: linear-gradient(135deg, rgba(255,214,102,0.16), rgba(0,245,255,0.12));
+  border: 2px solid rgba(255,190,60,0.45);
+  border-radius: 18px;
+}
+.island-map .im-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-weight: 900;
+  font-size: 1.15em;
+}
+.island-map .im-next {
+  font-size: 1.05em;
+  font-weight: 900;
+  color: #b45309;
+  background: rgba(255,255,255,0.55);
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+.island-map .im-bar {
+  height: 16px;
+  background: rgba(0,0,0,0.18);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.island-map .im-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #34d399, #fbbf24, #f97316);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.im-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.im-chip {
+  flex: 1 1 0;
+  min-width: 128px;
+  text-align: center;
+  padding: 10px 6px;
+  border-radius: 14px;
+  border: 2px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.5);
+  position: relative;
+}
+.im-chip .im-ico { font-size: 30px; line-height: 1.1; }
+.im-chip .im-name { font-weight: 900; font-size: 0.95em; margin-top: 2px; }
+.im-chip .im-need { font-size: 0.85em; font-weight: 800; opacity: 0.75; margin-top: 2px; }
+.im-chip.done { background: linear-gradient(180deg, #d1fae5, #a7f3d0); border-color: #34d399; }
+.im-chip.done .im-need { color: #047857; opacity: 1; }
+.im-chip.next {
+  background: linear-gradient(180deg, #fff7cc, #ffe17a);
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.35), 0 8px 22px rgba(245,158,11,0.3);
+  transform: scale(1.04);
+}
+.im-chip.locked { opacity: 0.55; filter: grayscale(0.55); }
+.im-chip .im-step {
+  position: absolute; top: -9px; inset-inline-start: 8px;
+  background: #1f2937; color: #fff;
+  font-size: 0.7em; font-weight: 900;
+  border-radius: 999px; padding: 1px 7px;
+}
+
+/* ==================== עריכת שמות — inline + דיאלוג פנימי ==================== */
+.name-inline {
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 1em;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 2px solid var(--neon-cyan, #00a2b8);
+  background: #fff;
+  color: #111;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0,162,184,0.25);
+}
+.ak-dialog-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 100001;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.ak-dialog {
+  background: #fffaf0;
+  color: #2b1b0e;
+  border: 3px solid #a9713f;
+  border-radius: 20px;
+  padding: 24px;
+  width: min(680px, 96vw);
+  max-height: 88vh;
+  overflow: auto;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.5);
+}
+.ak-dialog h3 { margin: 0 0 14px; font-size: 1.5em; font-weight: 900; }
+.ak-dialog input[type=text], .ak-dialog textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1.25em;
+  font-weight: 800;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 3px solid #a9713f;
+  background: #fff;
+  color: #2b1b0e;
+  outline: none;
+  box-sizing: border-box;
+}
+.ak-dialog textarea { font-size: 1.05em; line-height: 1.9; min-height: 320px; resize: vertical; }
+.ak-dialog input[type=text]:focus, .ak-dialog textarea:focus { border-color: #00a2b8; box-shadow: 0 0 0 4px rgba(0,162,184,0.25); }
+.ak-dialog .ak-dlg-actions { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; flex-wrap: wrap; }
+.ak-dialog .ak-dlg-btn {
+  font-family: inherit; font-weight: 900; font-size: 1.1em;
+  padding: 12px 26px; border-radius: 12px; cursor: pointer; border: 3px solid transparent;
+}
+.ak-dialog .ak-dlg-btn.ok { background: linear-gradient(180deg,#6ee7a0,#22c55e); border-color:#15803d; color:#04310f; }
+.ak-dialog .ak-dlg-btn.cancel { background: #efe3d2; border-color:#a9713f; color:#5b3d20; }
+.ak-dialog .ak-dlg-hint { font-size: 0.95em; opacity: 0.8; margin: 0 0 12px; line-height: 1.6; }
+.ak-names-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.ak-names-grid label { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.ak-names-grid label span { opacity: 0.55; min-width: 26px; text-align: end; }
+.ak-names-grid input { font-size: 1.05em !important; padding: 8px 10px !important; }
+
 
 .student {
   background: #ffffff;
@@ -411,15 +574,18 @@ header {
 .student-info { flex: 1; min-width: 0; cursor: pointer; }
 .student-name-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
+  min-width: 0;
 }
+.student-name-row .student-name { flex: 1 1 auto; min-width: 0; }
+.name-edit { flex: 0 0 auto; align-self: center; }
 .student-name {
   font-weight: 900;
   font-size: 0.95em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
+  line-height: 1.12;
 }
 .name-edit {
   background: rgba(255,255,255,0.1);
@@ -546,12 +712,13 @@ header {
   margin-bottom: 16px;
 }
 .point-btn {
-  padding: 16px 8px;
+  padding: 30px 8px;
+  min-height: 110px;
   border: none;
   border-radius: 12px;
   font-family: inherit;
   font-weight: 900;
-  font-size: 1.2em;
+  font-size: 2.2em;
   cursor: pointer;
   transition: all 0.15s;
   color: white;
@@ -877,6 +1044,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 </header>
 
 <div class="class-bar" id="classBar" style="display:none"></div>
+<div class="island-map" id="islandMap" style="display:none"></div>
 
 <div class="classroom" id="classroom"></div>
 
@@ -1012,6 +1180,19 @@ const SHOP = {
 };
 
 const MYSTERY_BOX_PRICE = 75;
+/* מכפיל הכלכלה של הכיתה הפעילה (klass.econ.scale, ברירת מחדל 1).
+   כל מחיר/סף באפליקציה עובר דרך P() כדי שכיתה "עשירה" תשלם מחירים אמיתיים. */
+function econClass() {
+  try {
+    if (APP_MODE === 'student' && typeof studentSelectedId !== 'undefined' && studentSelectedId) {
+      const f = findStudent(studentSelectedId);
+      if (f) return f.cls || f.klass;
+    }
+  } catch (e) {}
+  return getActiveClass();
+}
+function econScale(k) { try { return (window.AK && AK.scale) ? (AK.scale(k || econClass()) || 1) : 1; } catch (e) { return 1; } }
+function P(n, k) { return Math.round((Number(n) || 0) * econScale(k)); }
 
 // ==================== COMBO / FIRE MODE ====================
 // Combo never modifies the teacher's input amount — it only ADDS a bonus on top.
@@ -2677,6 +2858,7 @@ function renderClassroom() {
   }
 
   renderClassBar();
+  renderIslandMap();
 
   // Render 3D for each student
   cls.students.forEach(s => {
@@ -2704,8 +2886,8 @@ function renderStudent(s) {
               onclick="openStudent('${s.id}')"></canvas>
       <div class="student-info" onclick="openStudent('${s.id}')">
         <div class="student-name-row">
-          <span class="student-name">${escapeHtml(s.name)}</span>
-          <button class="name-edit" onclick="event.stopPropagation();renameStudent('${s.id}')" title="שנה שם">✏️</button>
+          <span class="student-name" ondblclick="event.stopPropagation();startInlineRename('${s.id}')" title="לחיצה כפולה לשינוי שם">${escapeHtml(s.name)}</span>
+          <button class="name-edit" onclick="event.stopPropagation();startInlineRename('${s.id}')" title="שנה שם">✏️</button>
         </div>
         <div class="student-rank">
           <span>${rank.current.icon}</span>
@@ -2720,29 +2902,32 @@ function renderStudent(s) {
 
 // ==================== ACTIONS ====================
 function addClass() {
-  const name = prompt('שם הכיתה החדשה?', 'כיתה ' + String.fromCharCode(1488 + state.classes.length));
-  if (!name) return;
-  const c = createClass(name);
-  state.classes.push(c);
-  state.activeClassId = c.id;
-  save(); renderAll();
+  akPrompt('שם הכיתה החדשה?', 'כיתה ' + String.fromCharCode(1488 + state.classes.length), (name) => {
+    const c = createClass(name);
+    state.classes.push(c);
+    state.activeClassId = c.id;
+    save(); renderAll();
+  });
 }
 function renameClass(id) {
   const c = state.classes.find(c => c.id === id);
-  const name = prompt('שם חדש לכיתה:', c.name);
-  if (name) { c.name = name; save(); renderAll(); }
+  if (!c) return;
+  akPrompt('שם חדש לכיתה:', c.name, (name) => { c.name = name; save(); renderAll(); });
 }
 function deleteClass(id) {
-  if (!confirm('למחוק את הכיתה? הכל יימחק לצמיתות!')) return;
-  state.classes = state.classes.filter(c => c.id !== id);
-  if (state.activeClassId === id) state.activeClassId = state.classes[0].id;
-  save(); renderAll();
+  const c = state.classes.find(c => c.id === id);
+  akConfirm(`למחוק את ${c ? escapeHtml(c.name) : 'הכיתה'}?`, () => {
+    state.classes = state.classes.filter(c => c.id !== id);
+    if (state.activeClassId === id) state.activeClassId = state.classes[0].id;
+    save(); renderAll();
+  }, 'כל התלמידים, הנקודות והאי של הכיתה יימחקו לצמיתות.', '🗑️ כן, למחוק');
 }
 function switchClass(id) { state.activeClassId = id; save(); renderAll(); }
 
 function addStudent(col) {
-  const name = prompt('שם התלמיד החדש?');
-  if (!name) return;
+  akPrompt('שם התלמיד/ה החדש/ה?', '', (name) => finishAddStudent(col, name));
+}
+function finishAddStudent(col, name) {
   const cls = getActiveClass();
   if (col === null || col === undefined) {
     // תצוגת "כיתה אחת": משבצים בטור הכי ריק, כדי שהמעבר חזרה לטורים יישאר מאוזן
@@ -2750,8 +2935,10 @@ function addStudent(col) {
     cls.students.forEach(s => { counts[Math.min(3, Math.max(0, s.column || 0))]++; });
     col = counts.indexOf(Math.min(...counts));
   }
-  cls.students.push(createStudent(name, col));
+  const st = createStudent(name, col);
+  cls.students.push(st);
   save(); renderClassroom();
+  setTimeout(() => startInlineRename(st.id), 60); // אפשר להמשיך מיד לשם הבא ב-Tab
 }
 
 function dragStart(e, id) {
@@ -2955,7 +3142,11 @@ function classBonus(amount) {
   }
   amount = parseInt(amount, 10) || 0;
   if (!amount) return;
-  if (amount < 0 && !confirm(`להוריד ${Math.abs(amount)} נקודות לכל ${cls.students.length} התלמידים?`)) return;
+  if (amount < 0) {
+    akConfirm(`להוריד ${Math.abs(amount)} נקודות לכל ${cls.students.length} התלמידים?`,
+      () => awardToStudents(cls.students, amount, { label: '➖ כל הכיתה' }), '', 'כן, להוריד');
+    return;
+  }
   awardToStudents(cls.students, amount, { label: `🎉 כל הכיתה` });
 }
 
@@ -2965,6 +3156,96 @@ function setClassView(mode) {
   cls.viewMode = (mode === 'class') ? 'class' : 'columns';
   save();
   renderClassroom();
+}
+
+function setEconScale(v) {
+  if (APP_MODE === 'student') return;
+  const cls = getActiveClass();
+  if (!cls) return;
+  const n = Math.max(1, parseInt(v, 10) || 1);
+  try { if (window.AK && AK.setScale) AK.setScale(n, cls); } catch (e) {}
+  if (!cls.econ || cls.econ.scale !== n) { cls.econ = { scale: n }; save(); }
+  try { if (window.AK && AK.toast) AK.toast(`⚖️ המחירים והספים של ${cls.name} עכשיו ×${n}`); } catch (e) {}
+  renderClassroom();
+  if (document.getElementById('studentModal').classList.contains('show') && currentShopStudentSid) openStudent(currentShopStudentSid);
+}
+
+/* ---------------- מפת האיים: מה כבר נפתח ומה עוד לפנינו ----------------
+ * נבנית מאותה טבלה של island-engine (REGION_DEFS) ומאותו מכפיל כלכלה,
+ * כדי שהמספר על המסך הראשי יהיה בדיוק המספר שבתוך האי. */
+function islandRegionDefs() {
+  try {
+    if (window.Island && typeof window.Island.regions === 'function') {
+      const r = window.Island.regions();
+      if (Array.isArray(r) && r.length) return r;
+    }
+  } catch (e) {}
+  return [
+    { id:'beach',    name:'חוף הכוכבים',  threshold:0,    icon:'🏖️' },
+    { id:'forest',   name:'יער הלחישות',  threshold:120,  icon:'🌲' },
+    { id:'farm',     name:'חוות האלופים', threshold:300,  icon:'🐑' },
+    { id:'village',  name:'כפר הידע',     threshold:520,  icon:'🏘️' },
+    { id:'mountain', name:'הר הקרח',      threshold:780,  icon:'🏔️' },
+    { id:'desert',   name:'מדבר הזהב',    threshold:1050, icon:'🏜️' },
+    { id:'volcano',  name:'הר האש',       threshold:1350, icon:'🌋' },
+    { id:'sky',      name:'איי השמיים',   threshold:1700, icon:'☁️' }
+  ];
+}
+
+function renderIslandMap() {
+  const el = document.getElementById('islandMap');
+  if (!el) return;
+  const cls = getActiveClass();
+  if (APP_MODE === 'student' || !cls) { el.style.display = 'none'; return; }
+  try { if (window.AK && AK.ensureKlass) AK.ensureKlass(cls); } catch (e) {}
+  const isl = cls.island || { coins: 0, spent: 0, regions: ['beach'] };
+  const owned = Array.isArray(isl.regions) ? isl.regions : ['beach'];
+  const total = (isl.coins || 0) + (isl.spent || 0);   // אבנים שנצברו אי־פעם
+  const defs = islandRegionDefs();
+
+  let nextIdx = -1;
+  for (let i = 0; i < defs.length; i++) { if (owned.indexOf(defs[i].id) < 0) { nextIdx = i; break; } }
+
+  let headRight, pct = 100;
+  if (nextIdx < 0) {
+    headRight = `<span class="im-next">🌟 כל 8 האיים נפתחו — כל הכבוד!</span>`;
+  } else {
+    const next = defs[nextIdx];
+    const nextNeed = P(next.threshold);
+    let prev = 0;
+    for (let j = 0; j < nextIdx; j++) prev = P(defs[j].threshold);
+    const span = Math.max(1, nextNeed - prev);
+    pct = Math.max(0, Math.min(100, ((total - prev) / span) * 100));
+    const left = nextNeed - total;
+    headRight = left > 0
+      ? `<span class="im-next">עוד ${left.toLocaleString('he-IL')} 🪙 עד ${next.icon} ${escapeHtml(next.name)}</span>`
+      : `<span class="im-next">🎉 ${next.icon} ${escapeHtml(next.name)} מוכן להיפתח — היכנסו לאי!</span>`;
+  }
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="im-head">
+      <span>🗺️ מסע האיים · ${owned.length}/${defs.length} נפתחו</span>
+      <span style="font-size:0.85em;opacity:0.8">🪙 ${(isl.coins || 0).toLocaleString('he-IL')} בקופה · ${total.toLocaleString('he-IL')} נצברו מתחילת הדרך</span>
+      <span class="cb-spacer" style="flex:1"></span>
+      ${headRight}
+    </div>
+    <div class="im-bar"><div class="im-fill" style="width:${pct.toFixed(0)}%"></div></div>
+    <div class="im-chips">
+      ${defs.map((d, i) => {
+        const done = owned.indexOf(d.id) >= 0;
+        const isNext = i === nextIdx;
+        const need = P(d.threshold);
+        return `
+          <div class="im-chip ${done ? 'done' : isNext ? 'next' : 'locked'}" title="${escapeHtml(d.name)}">
+            <div class="im-step">${i + 1}</div>
+            <div class="im-ico">${done ? d.icon : '🔒'}</div>
+            <div class="im-name">${escapeHtml(d.name)}</div>
+            <div class="im-need">${done ? '✓ נפתח' : (isNext && total >= need) ? '🎉 מוכן!' : need.toLocaleString('he-IL') + ' 🪙'}</div>
+          </div>`;
+      }).join('')}
+    </div>
+  `;
 }
 
 function renderClassBar() {
@@ -2989,7 +3270,14 @@ function renderClassBar() {
            onkeydown="if(event.key==='Enter')classBonus()" />
     <button class="cb-btn cb-give" onclick="classBonus()">⭐ תן לכל הכיתה</button>
     <button class="cb-btn cb-take" onclick="classBonus(-Math.abs(parseInt(document.getElementById('classBonusInput').value,10)||10))">➖ הורד לכולם</button>
+    <button class="cb-btn" onclick="openNamesEditor()" title="עריכת כל השמות במסך אחד">✏️ שמות</button>
     <div class="cb-spacer"></div>
+    <label class="cb-econ" title="מכפיל המחירים והספים של הכיתה — לכיתה שצוברת הרבה נקודות">
+      ⚖️ מחירים
+      <select id="econSelect" onchange="setEconScale(this.value)">
+        ${[1,2,3,5,10,20].map(v => `<option value="${v}" ${econScale() === v ? 'selected' : ''}>×${v}</option>`).join('')}
+      </select>
+    </label>
     <div class="cb-view">
       <button class="${view === 'columns' ? 'active' : ''}" onclick="setClassView('columns')">🧱 טורים</button>
       <button class="${view === 'class' ? 'active' : ''}" onclick="setClassView('class')">👥 כיתה אחת</button>
@@ -3094,11 +3382,11 @@ function renderModalBody(s) {
       <div class="box-section">
         <div class="box-emoji">🎁</div>
         <h2 style="margin:12px 0">תיבת הפתעה!</h2>
-        <p style="color:var(--text-dim);margin-bottom:14px">פותחים ומקבלים פריט אקראי. אם כבר יש לך אותו — תקבל ${MYSTERY_BOX_PRICE/2} נקודות בחזרה!</p>
+        <p style="color:var(--text-dim);margin-bottom:14px">פותחים ומקבלים פריט אקראי. אם כבר יש לך אותו — תקבל ${Math.round(P(MYSTERY_BOX_PRICE)/2)} נקודות בחזרה!</p>
         <button class="btn btn-warning" style="font-size:1.1em;padding:14px 32px"
                 onclick="openMysteryBox('${s.id}')"
-                ${s.points < MYSTERY_BOX_PRICE ? 'disabled style="opacity:0.5"' : ''}>
-          🎲 פתח · ${MYSTERY_BOX_PRICE} נקודות
+                ${s.points < P(MYSTERY_BOX_PRICE) ? 'disabled style="opacity:0.5"' : ''}>
+          🎲 פתח · ${P(MYSTERY_BOX_PRICE)} נקודות
         </button>
       </div>
     `;
@@ -3108,7 +3396,8 @@ function renderModalBody(s) {
 function renderShopItem(s, item, slot, cat) {
   const owned = s.owned.includes(item.id);
   const equipped = s.equipped[slot] === item.id;
-  const canAfford = s.points >= item.price;
+  const price = P(item.price);
+  const canAfford = s.points >= price;
   const cls = equipped ? 'equipped' : owned ? 'owned' : (canAfford ? '' : 'locked');
   const action = equipped ? '' : owned
     ? `onclick="equipItem('${s.id}','${slot}','${item.id}')"`
@@ -3122,7 +3411,7 @@ function renderShopItem(s, item, slot, cat) {
       <div class="shop-name">${escapeHtml(item.name)}</div>
       ${equipped ? '<div class="shop-status">✓ לבוש</div>'
         : owned ? '<div class="shop-status">קליק להלביש</div>'
-        : `<div class="shop-price">⭐ ${item.price}</div>`}
+        : `<div class="shop-price">⭐ ${price}</div>`}
     </div>
   `;
 }
@@ -3178,8 +3467,9 @@ function renderShopPreview(canvas, s) {
 function buyItem(sid, slot, itemId) {
   const s = getActiveClass().students.find(s => s.id === sid);
   const item = findItem(itemId);
-  if (s.points < item.price) return;
-  s.points -= item.price;
+  const price = P(item.price);
+  if (s.points < price) return;
+  s.points -= price;
   s.owned.push(itemId);
   s.equipped[slot] = itemId;
   playSound('buy');
@@ -3195,12 +3485,13 @@ function equipItem(sid, slot, itemId) {
 
 function openMysteryBox(sid) {
   const s = getActiveClass().students.find(s => s.id === sid);
-  if (s.points < MYSTERY_BOX_PRICE) return;
-  s.points -= MYSTERY_BOX_PRICE;
+  const boxPrice = P(MYSTERY_BOX_PRICE);
+  if (s.points < boxPrice) return;
+  s.points -= boxPrice;
   const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)]; // characters not in mystery box
   const item = allItems[Math.floor(Math.random() * allItems.length)];
   const isDuplicate = s.owned.includes(item.id);
-  if (isDuplicate) s.points += MYSTERY_BOX_PRICE / 2;
+  if (isDuplicate) s.points += Math.round(boxPrice / 2);
   else s.owned.push(item.id);
   save(); renderClassroom();
   playBoxCinematic(item, isDuplicate, () => { openStudent(sid); });
@@ -3240,7 +3531,7 @@ function playBoxCinematic(item, isDuplicate, onDone) {
       reveal.textContent = emoji;
       stage.appendChild(reveal);
       result.textContent = isDuplicate
-        ? `כבר יש לך ${item.name}! הוחזרו ${MYSTERY_BOX_PRICE/2} נק׳`
+        ? `כבר יש לך ${item.name}! הוחזרו ${Math.round(P(MYSTERY_BOX_PRICE)/2)} נק׳`
         : `🎉 קיבלת: ${item.name}!`;
       playSound('boxItem');
     }, 600);
@@ -3253,19 +3544,162 @@ function playBoxCinematic(item, isDuplicate, onDone) {
   };
 }
 
+/* ==================================================================================
+ * עריכת שמות — בלי prompt().
+ * prompt() נתקע: אחרי כמה פעמים כרום מציע "מנע מהדף ליצור דיאלוגים נוספים",
+ * ומרגע שסימנו את זה prompt() מחזיר null בשקט — "לא מתחלף, תקוע".
+ * לכן: עריכה במקום על הכרטיס + דיאלוג פנימי של האפליקציה.
+ * ================================================================================== */
+let _akDlgOpen = false;
+function akDialog(opts) {
+  // opts: {title, hint, bodyHTML, focusSel, onOk(root), okText, cancelText}
+  if (_akDlgOpen) return;
+  _akDlgOpen = true;
+  const bg = document.createElement('div');
+  bg.className = 'ak-dialog-bg';
+  bg.innerHTML = `
+    <div class="ak-dialog" role="dialog" aria-modal="true">
+      <h3>${opts.title || ''}</h3>
+      ${opts.hint ? `<p class="ak-dlg-hint">${opts.hint}</p>` : ''}
+      <div class="ak-dlg-body">${opts.bodyHTML || ''}</div>
+      <div class="ak-dlg-actions">
+        <button class="ak-dlg-btn cancel" data-act="cancel">✕ ${opts.cancelText || 'ביטול'}</button>
+        <button class="ak-dlg-btn ok" data-act="ok">✓ ${opts.okText || 'שמור'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  const close = () => { if (!bg.parentNode) return; bg.remove(); _akDlgOpen = false; };
+  bg.querySelector('[data-act=cancel]').onclick = close;
+  bg.querySelector('[data-act=ok]').onclick = () => {
+    let keepOpen = false;
+    try { keepOpen = opts.onOk && opts.onOk(bg) === false; } catch (e) { console.warn(e); }
+    if (!keepOpen) close();
+  };
+  bg.onclick = e => { if (e.target === bg) close(); };
+  bg.addEventListener('keydown', e => {
+    e.stopPropagation(); // שלא ייסגר מודל התלמיד שמאחור
+    if (e.key === 'Escape') { close(); }
+    else if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { bg.querySelector('[data-act=ok]').click(); }
+  });
+  const f = bg.querySelector(opts.focusSel || 'input, textarea');
+  if (f) { f.focus(); if (f.select) f.select(); }
+  return bg;
+}
+
+/* דיאלוג שדה-אחד — מחליף את prompt() בכל מקום באפליקציה */
+function akPrompt(title, value, onOk, hint) {
+  akDialog({
+    title: title, hint: hint,
+    bodyHTML: `<input type="text" id="akPromptInput" value="${escapeHtml(value == null ? '' : value)}" />`,
+    focusSel: '#akPromptInput',
+    onOk: (root) => {
+      const v = root.querySelector('#akPromptInput').value.trim();
+      if (!v) return false; // ריק — לא סוגרים, שלא ייעלם בשקט
+      onOk(v);
+    }
+  });
+}
+
+/* אישור פנימי — confirm() סובל מאותה חסימת-דיאלוגים של כרום */
+function akConfirm(title, onYes, hint, okText) {
+  akDialog({
+    title: title, hint: hint,
+    bodyHTML: '',
+    okText: okText || 'כן, בצע',
+    cancelText: 'לא',
+    onOk: () => { onYes(); }
+  });
+}
+
+/* עריכה במקום על כרטיס התלמיד — הדרך המהירה ביותר; Tab עובר לתלמיד הבא */
+function startInlineRename(sid) {
+  if (APP_MODE === 'student') return;
+  const cls = getActiveClass();
+  const s = cls && cls.students.find(x => x.id === sid);
+  if (!s) return;
+  const card = document.querySelector(`.student[data-id="${sid}"]`);
+  const row = card && card.querySelector('.student-name-row');
+  if (!card || !row) { renameStudent(sid); return; }   // לא על הלוח — דיאלוג רגיל
+  if (row.querySelector('input')) return;
+
+  const wasDraggable = card.getAttribute('draggable');
+  card.setAttribute('draggable', 'false');  // בלי זה אי אפשר לסמן טקסט בתוך כרטיס נגרר
+  const old = row.innerHTML;
+  row.innerHTML = `<input class="name-inline" type="text" value="${escapeHtml(s.name)}" maxlength="40" />`;
+  const inp = row.querySelector('input');
+  let done = false;
+  const finish = (commit, thenNext) => {
+    if (done) return;
+    done = true;
+    card.setAttribute('draggable', wasDraggable === null ? 'true' : wasDraggable);
+    const v = inp.value.trim();
+    if (commit && v && v !== s.name) {
+      s.name = v;
+      save();
+      renderClassroom();
+    } else {
+      row.innerHTML = old;
+    }
+    if (thenNext) {
+      const list = cls.students;
+      const i = list.findIndex(x => x.id === sid);
+      const next = list[(i + 1) % list.length];
+      if (next) setTimeout(() => startInlineRename(next.id), 30);
+    }
+  };
+  const stop = e => e.stopPropagation();
+  inp.onclick = stop; inp.onmousedown = stop; inp.ondblclick = stop;
+  inp.onkeydown = e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true, false); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false, false); }
+    else if (e.key === 'Tab') { e.preventDefault(); finish(true, true); }
+  };
+  inp.onblur = () => finish(true, false);
+  inp.focus();
+  inp.select();
+}
+
+/* עריכת כל השמות במסך אחד — הדרך המהירה להקים או לתקן כיתה שלמה */
+function openNamesEditor() {
+  if (APP_MODE === 'student') return;
+  const cls = getActiveClass();
+  if (!cls) return;
+  akDialog({
+    title: `✏️ שמות התלמידים · ${escapeHtml(cls.name)}`,
+    hint: 'עורכים ישירות בשדות ולוחצים שמור. שדה שנשאר ריק — השם לא משתנה. אף תלמיד לא נמחק כאן.',
+    bodyHTML: `<div class="ak-names-grid">${cls.students.map((st, i) =>
+        `<label><span>${i + 1}.</span><input type="text" data-sid="${st.id}" value="${escapeHtml(st.name)}" maxlength="40" /></label>`
+      ).join('')}</div>`,
+    onOk: (root) => {
+      let changed = 0;
+      root.querySelectorAll('input[data-sid]').forEach(inp => {
+        const st = cls.students.find(x => x.id === inp.dataset.sid);
+        const v = inp.value.trim();
+        if (st && v && v !== st.name) { st.name = v; changed++; }
+      });
+      if (changed) { save(); renderClassroom(); }
+      try { if (window.AK && AK.toast) AK.toast(changed ? `✓ עודכנו ${changed} שמות` : 'לא היה מה לשנות'); } catch (e) {}
+    }
+  });
+}
+
 function renameStudent(sid) {
+  if (APP_MODE === 'student') return;
   const s = getActiveClass().students.find(s => s.id === sid);
-  const n = prompt('שם חדש:', s.name);
-  if (n) {
+  if (!s) return;
+  akPrompt('שם חדש לתלמיד/ה:', s.name, (n) => {
     s.name = n; save(); renderClassroom();
     if (document.getElementById('studentModal').classList.contains('show')) openStudent(sid);
-  }
+  });
 }
 function deleteStudent(sid) {
-  if (!confirm('למחוק את התלמיד? כל הניקוד והפריטים יימחקו!')) return;
   const cls = getActiveClass();
-  cls.students = cls.students.filter(s => s.id !== sid);
-  save(); renderClassroom(); closeModal();
+  const st = cls && cls.students.find(s => s.id === sid);
+  akConfirm(`למחוק את ${st ? escapeHtml(st.name) : 'התלמיד'}?`, () => {
+    cls.students = cls.students.filter(s => s.id !== sid);
+    save(); renderClassroom(); closeModal();
+  }, 'כל הניקוד והפריטים שלו יימחקו לצמיתות.', '🗑️ כן, למחוק');
 }
 
 // ==================== EFFECTS ====================
@@ -3445,9 +3879,11 @@ function openLeaderboard() {
 }
 
 function resetWeek() {
-  if (!confirm('לאפס את הניקוד השבועי? (הניקוד הכולל לא יושפע)')) return;
-  getActiveClass().students.forEach(s => s.weeklyPoints = 0);
-  save(); alert('✅ הניקוד השבועי אופס');
+  akConfirm('לאפס את הניקוד השבועי?', () => {
+    getActiveClass().students.forEach(s => s.weeklyPoints = 0);
+    save(); renderClassroom();
+    try { if (window.AK && AK.toast) AK.toast('✅ הניקוד השבועי אופס'); } catch (e) {}
+  }, 'הניקוד הכולל, האי והמדבקות לא יושפעו — רק המונה השבועי.', '🔄 כן, לאפס');
 }
 
 // ==================== BACKUP ====================
@@ -3687,6 +4123,8 @@ function renderStudentApp() {
   if (footer) footer.style.display = 'none';
   const cbar = document.getElementById('classBar');
   if (cbar) cbar.style.display = 'none';
+  const imap = document.getElementById('islandMap');
+  if (imap) imap.style.display = 'none';
   document.querySelector('header > .btn').style.display = 'none';
 
   if (!studentSelectedId) renderStudentPicker();
@@ -3867,8 +4305,8 @@ function setStudentTab(t) {
         <div class="box-emoji">🎁</div>
         <h2 style="margin:12px 0">תיבת הפתעה!</h2>
         <p style="color:var(--text-dim);margin-bottom:14px">פותח? תקבל פריט אקראי שצריך אישור המורה</p>
-        <button class="btn btn-warning" style="font-size:1.1em;padding:14px 32px" onclick="studentOpenBox()" ${previewPts < MYSTERY_BOX_PRICE ? 'disabled style="opacity:0.5"' : ''}>
-          🎲 פתח · ${MYSTERY_BOX_PRICE} נקודות
+        <button class="btn btn-warning" style="font-size:1.1em;padding:14px 32px" onclick="studentOpenBox()" ${previewPts < P(MYSTERY_BOX_PRICE) ? 'disabled style="opacity:0.5"' : ''}>
+          🎲 פתח · ${P(MYSTERY_BOX_PRICE)} נקודות
         </button>
       </div>
     `;
@@ -3902,7 +4340,8 @@ function setStudentTab(t) {
 function renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts) {
   const owned = previewOw.includes(item.id);
   const equipped = previewEq[slot] === item.id;
-  const canAfford = previewPts >= item.price;
+  const price = P(item.price);
+  const canAfford = previewPts >= price;
   const pendingThis = pendingForStudent(s.id).some(p => p.itemId === item.id);
   const rarity = getItemRarity(item);
   let cls = '';
@@ -3912,7 +4351,7 @@ function renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts) 
   if (rarity !== RARITY.common) cls += ' rarity-' + (rarity === RARITY.rare ? 'rare' : rarity === RARITY.epic ? 'epic' : 'mythic');
   const action = equipped ? ''
     : owned ? `onclick="studentEquip('${slot}','${item.id}')"`
-    : (canAfford ? `onclick="studentBuy('${slot}','${item.id}', ${item.price})"` : '');
+    : (canAfford ? `onclick="studentBuy('${slot}','${item.id}', ${price})"` : '');
   const isNone = item.id.endsWith('-none');
   return `
     <div class="shop-item ${cls}" ${action} style="position:relative">
@@ -3924,7 +4363,7 @@ function renderStudentShopItem(s, item, slot, previewOw, previewEq, previewPts) 
       <div class="shop-name">${escapeHtml(item.name)}</div>
       ${equipped ? '<div class="shop-status">✓ לבוש</div>'
         : owned ? '<div class="shop-status">קליק להלביש</div>'
-        : `<div class="shop-price">⭐ ${item.price}</div>`}
+        : `<div class="shop-price">⭐ ${price}</div>`}
     </div>
   `;
 }
@@ -3953,7 +4392,8 @@ function studentEquip(slot, itemId) {
 function studentOpenBox() {
   const found = findStudent(studentSelectedId);
   if (!found) return;
-  if (previewPoints(found.student) < MYSTERY_BOX_PRICE) return;
+  const boxPrice = P(MYSTERY_BOX_PRICE);
+  if (previewPoints(found.student) < boxPrice) return;
   const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)]; // characters not in mystery box
   const item = allItems[Math.floor(Math.random() * allItems.length)];
   let slot = 'hat';
@@ -3961,8 +4401,10 @@ function studentOpenBox() {
   else if (SHOP.glasses.find(i => i.id === item.id)) slot = 'glasses';
   else if (SHOP.pets.find(i => i.id === item.id)) slot = 'pet';
   else if (SHOP.auras.find(i => i.id === item.id)) slot = 'aura';
-  addPending({ type: 'buy', studentId: found.student.id, classId: found.cls.id, slot, itemId: item.id, price: MYSTERY_BOX_PRICE });
-  alert(`🎉 קיבלת: ${item.name}! ממתין לאישור המורה.`);
+  addPending({ type: 'buy', studentId: found.student.id, classId: found.cls.id, slot, itemId: item.id, price: boxPrice });
+  try {
+    if (window.AK && AK.toast) AK.toast(`🎉 קיבלת: ${item.name}! ממתין לאישור המורה.`);
+  } catch (e) {}
 }
 
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
@@ -4444,8 +4886,9 @@ function awardStickersForPoints(s, amountAdded) {
   if (amountAdded <= 0) return [];
   const before = s.stickerProgress;
   s.stickerProgress = before + amountAdded;
-  const dropsBefore = Math.floor(before / STICKER_POINTS_PER_DROP);
-  const dropsAfter  = Math.floor(s.stickerProgress / STICKER_POINTS_PER_DROP);
+  const perDrop = Math.max(1, P(STICKER_POINTS_PER_DROP)); // קצב המדבקות מתכוונן לכלכלת הכיתה
+  const dropsBefore = Math.floor(before / perDrop);
+  const dropsAfter  = Math.floor(s.stickerProgress / perDrop);
   const drops = dropsAfter - dropsBefore;
   const awards = [];
   for (let i = 0; i < drops; i++) {
@@ -4514,8 +4957,9 @@ function renderStickerAlbum(s, opts = {}) {
     const c = s.stickers[t][st.id] || 0;
     if (c >= STICKER_SWAP_COST) dupsBySticker.push({ theme:t, sticker:st, count:c });
   }));
-  const pointsToNext = STICKER_POINTS_PER_DROP - (s.stickerProgress % STICKER_POINTS_PER_DROP);
-  const progressPct = ((s.stickerProgress % STICKER_POINTS_PER_DROP) / STICKER_POINTS_PER_DROP) * 100;
+  const perDrop = Math.max(1, P(STICKER_POINTS_PER_DROP));
+  const pointsToNext = perDrop - (s.stickerProgress % perDrop);
+  const progressPct = ((s.stickerProgress % perDrop) / perDrop) * 100;
 
   const albumsHtml = STICKER_THEMES.map(theme => {
     const meta = STICKER_THEME_META[theme];

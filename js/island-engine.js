@@ -16,6 +16,7 @@ if (typeof THREE === 'undefined') {
   console.error('[Island] THREE.js לא נמצא (window.THREE) — מנוע האי מבוטל, מוצג API ריק.');
   window.Island = {
     open: function () {}, close: function () {}, tick: function () {},
+    regions: function () { return []; },
     unlockRegion: function () {}, place: function () { return false; },
     remove: function () { return false; }, focusRegion: function () {},
     setAmbient: function () {}
@@ -78,6 +79,17 @@ function akSound(t) { var ak = AKref(); if (ak && typeof ak.playSound === 'funct
 function akConfetti(x, y, n) { var ak = AKref(); if (ak && typeof ak.burstConfetti === 'function') { try { ak.burstConfetti(x, y, n); } catch (e) {} } }
 function akEsc(s) { var ak = AKref(); if (ak && typeof ak.escapeHtml === 'function') { try { return ak.escapeHtml(s); } catch (e) {} } return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function activeClass() { var ak = AKref(); if (ak && typeof ak.getActiveClass === 'function') { try { return ak.getActiveClass(); } catch (e) {} } return null; }
+/* ---- מכפיל הכלכלה של הכיתה (klass.econ.scale) ----
+ * כיתה שצוברת הרבה נקודות שוברת את טבלת הספים המקורית. במקום לשנות ספים
+ * גלובליים — כל סף/מחיר באי עובר דרך akPrice(). ברירת מחדל 1 = ללא שינוי. */
+function akScale(k) {
+  var ak = AKref();
+  if (ak && typeof ak.scale === 'function') { try { return ak.scale(k || activeClass()) || 1; } catch (e) {} }
+  return 1;
+}
+function akPrice(n, k) { return Math.round((Number(n) || 0) * akScale(k)); }
+function regThreshold(def, k) { return akPrice(def ? def.threshold : 0, k); }
+function itemCost(it, k) { return akPrice(it ? it.cost : 10, k); }
 function contentRef() { return window.IslandContent || null; }
 function contentRegion(id) {
   var c = contentRef();
@@ -623,7 +635,7 @@ function buildRegionLocked(idx) {
   g.add(sub);
   g.userData.sub = sub;
   g.userData.updateLock = function (isl) {
-    var need = Math.max(0, def.threshold - totalEarned(isl));
+    var need = Math.max(0, regThreshold(def) - totalEarned(isl));
     sub.userData.setText(need > 0 ? ('נפתח בעוד ' + need + ' 🪙') : 'נפתח עכשיו!');
   };
   return g;
@@ -1310,7 +1322,7 @@ function placeAt(regionKey, itemId, x, z, studentId) {
   if (!regionOk) { akToast('האזור עוד נעול 🔒'); akSound('error'); return false; }
   if (tileOccupied(isl, regionKey, x, z)) { akToast('המשבצת הזו כבר תפוסה'); akSound('error'); return false; }
   var cat = catalogItem(regionKey.indexOf('plot_') === 0 ? ISL.activeId : regionKey, itemId);
-  var cost = cat ? cat.cost : 10;
+  var cost = itemCost(cat);
   if (isl.coins < cost) { akToast('חסרות ' + (cost - isl.coins) + ' 🪙 אבני בנייה'); akSound('error'); return false; }
   isl.coins -= cost;
   isl.spent = (isl.spent || 0) + cost;
@@ -1335,7 +1347,7 @@ function removeAt(regionKey, x, z) {
   if (idx < 0) return false;
   var it = isl.items[idx];
   var cat = catalogItem(regionKey.indexOf('plot_') === 0 ? ISL.activeId : regionKey, it.id);
-  var refund = Math.floor((cat ? cat.cost : 10) / 2);
+  var refund = Math.floor(itemCost(cat) / 2);
   var poofPos = findNodeWorldPos(regionKey, x, z, it.id); /* חייב להימצא לפני שהצומת נהרס ב-rebuild */
   isl.coins += refund;
   isl.items.splice(idx, 1);
@@ -1447,7 +1459,7 @@ function checkAutoUnlocks(klass, isl) {
   var total = totalEarned(isl);
   for (var i = 0; i < REGION_DEFS.length; i++) {
     var def = REGION_DEFS[i];
-    if (isl.regions.indexOf(def.id) < 0 && total >= def.threshold) {
+    if (isl.regions.indexOf(def.id) < 0 && total >= regThreshold(def, klass)) {
       doUnlock(klass, isl, def.id, true);
     }
   }
@@ -1514,7 +1526,7 @@ function buildHud(container) {
     '</div>' +
     '<div class="ak-isl-ambientflag" data-role="ambientflag">🌙 מצב אמביינט — סיור אוטומטי</div>' +
     '<div class="ak-isl-progress-wrap">' +
-    '  <div class="ak-isl-progress-label" data-role="proglabel">עוד 120 אבנים לאזור הבא</div>' +
+    '  <div class="ak-isl-progress-label" data-role="proglabel">מחשב את הדרך לאזור הבא…</div>' +
     '  <div class="ak-isl-progress-bar"><div class="ak-isl-progress-fill" data-role="progfill" style="width:0%"></div></div>' +
     '</div>' +
     '<div class="ak-isl-hint" data-role="hint" style="display:none">🏗️ בחרו פריט למטה ואז הקישו על הדשא</div>' +
@@ -1616,9 +1628,9 @@ function renderRegionNav() {
       d.className = 'ak-isl-rchip' + (def.id === ISL.activeId ? ' on' : '') + (unlocked ? '' : ' lock');
       d.innerHTML = unlocked
         ? (def.icon + ' ' + def.name)
-        : ('🔒 ' + def.icon + ' ' + def.threshold);
+        : ('🔒 ' + def.icon + ' ' + regThreshold(def, klass));
       d.onclick = function () {
-        if (!unlocked) { akToast('האזור נפתח ב-' + def.threshold + ' אבני בנייה 🔒'); akSound('error'); return; }
+        if (!unlocked) { akToast('האזור נפתח ב-' + regThreshold(def, klass) + ' אבני בנייה 🔒'); akSound('error'); return; }
         focusRegionInternal(def.id, false);
         renderRegionNav();
       };
@@ -1642,10 +1654,11 @@ function renderShopPalette() {
   cat.forEach(function (it) {
     var d = document.createElement('div');
     var isSel = ISL.buildSel && ISL.buildSel.itemId === it.id && ISL.buildSel.regionId === targetRegion;
-    d.className = 'ak-isl-item' + (isSel ? ' sel' : '') + (isl.coins < it.cost ? ' cant' : '');
-    d.innerHTML = '<span class="em">' + (it.em || '❔') + '</span><div class="nm">' + akEsc(it.n || it.id) + '</div><div class="cs">🪙 ' + it.cost + '</div>';
+    var cst = itemCost(it, klass);
+    d.className = 'ak-isl-item' + (isSel ? ' sel' : '') + (isl.coins < cst ? ' cant' : '');
+    d.innerHTML = '<span class="em">' + (it.em || '❔') + '</span><div class="nm">' + akEsc(it.n || it.id) + '</div><div class="cs">🪙 ' + cst + '</div>';
     d.onclick = function () {
-      if (isl.coins < it.cost) { akToast('צריך עוד ' + (it.cost - isl.coins) + ' 🪙'); akSound('error'); return; }
+      if (isl.coins < cst) { akToast('צריך עוד ' + (cst - isl.coins) + ' 🪙'); akSound('error'); return; }
       ISL.delMode = false;
       ISL.buildSel = (isSel) ? null : { regionId: targetRegion, itemId: it.id };
       renderShopPalette();
@@ -1666,11 +1679,12 @@ function updateHud(now) {
   for (var i = 0; i < REGION_DEFS.length; i++) { if (isl.regions.indexOf(REGION_DEFS[i].id) < 0) { next = REGION_DEFS[i]; break; } }
   if (next) {
     var prevThreshold = 0;
-    for (var j = REGION_DEFS.length - 1; j >= 0; j--) { if (isl.regions.indexOf(REGION_DEFS[j].id) >= 0) { prevThreshold = REGION_DEFS[j].threshold; } }
-    var span = Math.max(1, next.threshold - prevThreshold);
+    for (var j = REGION_DEFS.length - 1; j >= 0; j--) { if (isl.regions.indexOf(REGION_DEFS[j].id) >= 0) { prevThreshold = regThreshold(REGION_DEFS[j], klass); } }
+    var nextThreshold = regThreshold(next, klass);
+    var span = Math.max(1, nextThreshold - prevThreshold);
     var pct = clamp(((total - prevThreshold) / span) * 100, 0, 100);
     ISL.hud.progfill.style.width = pct.toFixed(0) + '%';
-    ISL.hud.proglabel.textContent = 'עוד ' + Math.max(0, next.threshold - total) + ' 🪙 עד ' + next.icon + ' ' + next.name;
+    ISL.hud.proglabel.textContent = 'עוד ' + Math.max(0, nextThreshold - total) + ' 🪙 עד ' + next.icon + ' ' + next.name;
   } else {
     ISL.hud.progfill.style.width = '100%';
     ISL.hud.proglabel.textContent = '🌟 כל האי נפתח — כל הכבוד לכיתה!';
@@ -1825,6 +1839,13 @@ function resolveContainer(container) {
   return el2;
 }
 window.Island = {
+  /* טבלת האזורים לקריאה בלבד — כדי שמסך הכיתה יציג בדיוק את אותם ספים */
+  regions: function () {
+    return REGION_DEFS.map(function (d) {
+      return { id: d.id, name: d.name, icon: d.icon, threshold: d.threshold };
+    });
+  },
+
   /* open(container?, opts?) — container: DOM element או id; opts:{ambient:bool} */
   open: function (container, opts) {
     opts = opts || {};

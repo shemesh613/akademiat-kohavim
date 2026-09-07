@@ -36,6 +36,13 @@
  * =================================================================================== */
 function AKref() { return window.AK || null; }
 function akSave() { var ak = AKref(); if (ak && typeof ak.save === 'function') { try { ak.save(); } catch (e) {} } }
+/* מכפיל הכלכלה של הכיתה (klass.econ.scale) — ברירת מחדל 1 */
+function akScale(k) {
+  var ak = AKref();
+  if (ak && typeof ak.scale === 'function') { try { return ak.scale(k || activeClass()) || 1; } catch (e) {} }
+  return 1;
+}
+function akPrice(n, k) { return Math.round((Number(n) || 0) * akScale(k)); }
 function akToast(msg) { var ak = AKref(); if (ak && typeof ak.toast === 'function') { try { ak.toast(msg); } catch (e) {} } else { try { console.log('[ClassGames] ' + msg); } catch (e2) {} } }
 function akSound(t) { var ak = AKref(); if (ak && typeof ak.playSound === 'function') { try { ak.playSound(t); } catch (e) {} } }
 function akConfetti(x, y, n) { var ak = AKref(); if (ak && typeof ak.burstConfetti === 'function') { try { ak.burstConfetti(x, y, n); } catch (e) {} } }
@@ -163,7 +170,8 @@ function timeBank(klass) {
   if (!klass) return 20;
   var g = ensureGamesState(klass);
   var pts = Math.max(0, g.dailyPoints || 0);
-  return clampInt(20 + Math.min(40, Math.floor(pts / 3)), 20, 60);
+  var div = Math.max(1, 3 * akScale(klass)); /* כיתה עשירה לא מגיעה לתקרה בכל יום */
+  return clampInt(20 + Math.min(40, Math.floor(pts / div)), 20, 60);
 }
 
 /* ===================================================================================
@@ -639,7 +647,7 @@ function renderCelebrate(perf) {
   var klass = SESSION.klass, g = SESSION.gState;
   var meta = GAME_META[SESSION.game];
   var tier = tierFor(perf);
-  var coins = Math.round(BASE_BONUS * tier.mult);
+  var coins = Math.max(1, akPrice(BASE_BONUS * tier.mult, klass));
   ensureIslandDefaults(klass).coins += coins;
   pushIslandHistory(klass, '🎮 קיבלנו ' + coins + ' אבני בניין ממשחק ה' + meta.name + '!');
   g.totalScore = (g.totalScore || 0) + coins;
@@ -763,7 +771,7 @@ function cycleNames(container, students, totalMs) {
 }
 function renderConfettiCelebrate() {
   var klass = SESSION.klass, g = SESSION.gState;
-  var bonus = 5;
+  var bonus = Math.max(1, akPrice(5, klass));
   ensureIslandDefaults(klass).coins += bonus;
   pushIslandHistory(klass, '🎉 מתנת מסיבת סיום השבוע: ' + bonus + ' אבני בניין!');
   g.totalScore = (g.totalScore || 0) + bonus;

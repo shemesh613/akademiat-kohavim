@@ -165,6 +165,13 @@
     });
   }
   function activeClass() { var ak = AKref(); if (ak && typeof ak.getActiveClass === 'function') { try { return ak.getActiveClass(); } catch (e) {} } return null; }
+  /* מכפיל הכלכלה של הכיתה — כל עלות פריט עוברת דרכו (ברירת מחדל 1) */
+  function akScale(k) {
+    var ak = AKref();
+    if (ak && typeof ak.scale === 'function') { try { return ak.scale(k || activeClass()) || 1; } catch (e) {} }
+    return 1;
+  }
+  function akPrice(n, k) { return Math.round((Number(n) || 0) * akScale(k)); }
   function findStudentSafe(id) { var ak = AKref(); if (ak && typeof ak.findStudent === 'function') { try { return ak.findStudent(id); } catch (e) {} } return null; }
 
   function isTeacher() {
@@ -231,7 +238,8 @@
 
   /* מחיר במטבעות אישיים — נגזר ממחיר האבנים. הפריט הראשון בכל אזור עולה 1 מטבע
      (= 10 נקודות בלבד) כדי שכמעט כל תלמיד יגיע לפריט ראשון תוך שבוע-שבועיים. */
-  function personalCostOf(stoneCost) { return Math.max(1, Math.ceil(stoneCost / 10)); }
+  /* מקבל עלות-אבנים כבר מוכפלת ב-scale (ראו akPrice) */
+  function personalCostOf(scaledStoneCost) { return Math.max(1, Math.ceil(scaledStoneCost / 10)); }
 
   function hasSharedItem(isl, regionId, itemId) {
     for (var i = 0; i < isl.items.length; i++) {
@@ -331,7 +339,7 @@
     var isl = ensureIsl(klass);
     if (!isl) return false;
     var info = findItemInfo(itemId);
-    var stones = info.cost;
+    var stones = akPrice(info.cost, klass);
     var pcost = personalCostOf(stones);
     var si = ensureStudentIsland(found.student);
     if (si.personalCoins < pcost) {
@@ -428,7 +436,7 @@
       var nx = nextPlanned(isl);
       if (!nx) return false;
       var info = findItemInfo(nx.entry.id);
-      if ((isl.coins || 0) < info.cost) return false;              /* הקופה עוד לא חצתה את הסף */
+      if ((isl.coins || 0) < akPrice(info.cost, klass)) return false;   /* הקופה עוד לא חצתה את הסף */
       if (Date.now() - lastAutoBuildAt < AUTO_COOLDOWN_MS) return false; /* מרווח דרמטי בין גילויים */
       if (!engineReady()) return false;                            /* בונים רק כשהמנוע חי */
       var cell = freeSharedCell(isl, nx.rid, nx.entry.x, nx.entry.z);
@@ -459,7 +467,7 @@
       var isl = ensureIsl(klass);
       var nx = nextPlanned(isl);
       if (!nx) return { pct: 1, ready: false, done: true };
-      var cost = findItemInfo(nx.entry.id).cost;
+      var cost = akPrice(findItemInfo(nx.entry.id).cost, klass);
       var pct = cost > 0 ? Math.min(1, (isl.coins || 0) / cost) : 1;
       return { pct: Math.round(pct * 100) / 100, ready: pct >= 1, done: false };
     } catch (e) { return { pct: 0, ready: false, done: false }; }
@@ -518,7 +526,8 @@
             var it = reg.items[j];
             if (!it || seen[it.id] || builtIds[it.id]) continue;
             seen[it.id] = true;
-            pool.push({ id: it.id, em: it.em || '🎁', n: it.n || it.id, cost: (typeof it.cost === 'number' ? it.cost : 10), pcost: personalCostOf(typeof it.cost === 'number' ? it.cost : 10) });
+            var rawCost = akPrice(typeof it.cost === 'number' ? it.cost : 10);
+            pool.push({ id: it.id, em: it.em || '🎁', n: it.n || it.id, cost: rawCost, pcost: personalCostOf(rawCost) });
           }
         }
       }
