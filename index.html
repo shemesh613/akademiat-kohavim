@@ -436,6 +436,61 @@ header {
 }
 
 /* ==================== עריכת שמות — inline + דיאלוג פנימי ==================== */
+.class-score {
+  max-width: 1700px;
+  margin: 12px auto 0;
+  padding: 18px 24px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #12305e, #2a1d5e 55%, #4a1d52);
+  border: 3px solid rgba(255,214,102,0.7);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  color: #fff;
+}
+.class-score .cs-wrap {
+  display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+}
+.class-score .cs-main { text-align: center; min-width: 240px; }
+.class-score .cs-label { font-size: 1.15em; font-weight: 900; opacity: 0.9; }
+.class-score .cs-big {
+  font-size: clamp(56px, 7vw, 108px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+  background: linear-gradient(180deg, #fff3b0, #ffc83d 55%, #ff8c00);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 0 rgba(0,0,0,0.25));
+}
+.class-score .cs-sub { font-size: 1em; font-weight: 800; opacity: 0.85; margin-top: 2px; }
+.class-score .cs-side { flex: 1 1 320px; min-width: 260px; }
+.class-score .cs-rank { font-size: 1.6em; font-weight: 900; margin-bottom: 8px; }
+.class-score .cs-bar {
+  height: 18px; border-radius: 999px; background: rgba(0,0,0,0.35); overflow: hidden; margin-bottom: 10px;
+}
+.class-score .cs-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #34d399, #fbbf24, #f97316);
+  transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.class-score .cs-stats {
+  display: flex; gap: 8px 20px; flex-wrap: wrap; font-size: 1.05em; font-weight: 700; opacity: 0.95;
+}
+.class-score .cs-stats b { color: #ffd54a; }
+
+/* כרטיס במצב כיתתי — אותו מספר לכולם, והתרומה האישית קטנה מתחת */
+.student-points.shared {
+  background: linear-gradient(180deg, #bfe6ff, #6fc6ff) !important;
+  border-color: #2b7fb8 !important;
+  box-shadow: 0 3px 0 #2b7fb8, inset 0 2px 0 rgba(255,255,255,0.55) !important;
+  color: #06283d !important;
+}
+.my-share {
+  margin-top: 4px;
+  font-size: 0.85em;
+  font-weight: 800;
+  color: var(--ink-dim, #5b6688);
+}
+.my-share b { color: #d97706; }
+
 .name-inline {
   font-family: inherit;
   font-weight: 900;
@@ -1044,6 +1099,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
 </header>
 
 <div class="class-bar" id="classBar" style="display:none"></div>
+<div class="class-score" id="classScore" style="display:none"></div>
 <div class="island-map" id="islandMap" style="display:none"></div>
 
 <div class="classroom" id="classroom"></div>
@@ -1182,6 +1238,57 @@ const SHOP = {
 const MYSTERY_BOX_PRICE = 75;
 /* מכפיל הכלכלה של הכיתה הפעילה (klass.econ.scale, ברירת מחדל 1).
    כל מחיר/סף באפליקציה עובר דרך P() כדי שכיתה "עשירה" תשלם מחירים אמיתיים. */
+/* ==================================================================================
+ * מצב "ניקוד כיתתי" (klass.scoreMode === 'class')
+ * ----------------------------------------------------------------------------------
+ * המודל: הנקודות של כל תלמיד הן ה‏תרומה שלו לקופה המשותפת. הקופה = סכום התרומות.
+ * הוצאות (חנות/תיבה) יורדות מהקופה המשותפת (klass.classSpent) ולא מהתרומה של אף אחד —
+ * כך שאף ילד לא "מפסיד" מה שהוא הביא, ובכל זאת כולם חולקים ארנק אחד.
+ * שום שדה קיים לא משנה משמעות, ולכן אפשר לעבור בין המצבים הלוך ושוב בלי לאבד דבר.
+ * ================================================================================== */
+function isClassMode(k) {
+  k = k || getActiveClass();
+  return !!(k && k.scoreMode === 'class');
+}
+function classEarned(k) {
+  k = k || getActiveClass();
+  if (!k) return 0;
+  return k.students.reduce((a, s) => a + (s.points || 0), 0);
+}
+function classWeekly(k) {
+  k = k || getActiveClass();
+  if (!k) return 0;
+  return k.students.reduce((a, s) => a + (s.weeklyPoints || 0), 0);
+}
+function classSpentOf(k) { k = k || getActiveClass(); return Math.max(0, (k && k.classSpent) || 0); }
+function classBalance(k) {
+  k = k || getActiveClass();
+  return Math.max(0, classEarned(k) - classSpentOf(k));
+}
+/* דרגת הכיתה = הדרגה של הממוצע, אחרת כיתה של 24 מגיעה ל"אגדה" בשבועיים */
+function classRank(k) {
+  k = k || getActiveClass();
+  const n = Math.max(1, k && k.students ? k.students.length : 1);
+  return getRank(Math.round(classEarned(k) / n));
+}
+/* כמה אפשר להוציא בשם התלמיד הזה — במצב כיתתי זו יתרת הכיתה */
+function spendableFor(student, k) {
+  k = k || getActiveClass();
+  return isClassMode(k) ? classBalance(k) : (student ? student.points : 0);
+}
+function chargePoints(student, amount, k) {
+  k = k || getActiveClass();
+  amount = Math.max(0, Math.round(amount) || 0);
+  if (isClassMode(k)) k.classSpent = classSpentOf(k) + amount;
+  else if (student) student.points = Math.max(0, student.points - amount);
+}
+function refundPoints(student, amount, k) {
+  k = k || getActiveClass();
+  amount = Math.max(0, Math.round(amount) || 0);
+  if (isClassMode(k)) k.classSpent = Math.max(0, classSpentOf(k) - amount);
+  else if (student) student.points += amount;
+}
+
 function econClass() {
   try {
     if (APP_MODE === 'student' && typeof studentSelectedId !== 'undefined' && studentSelectedId) {
@@ -2858,6 +2965,7 @@ function renderClassroom() {
   }
 
   renderClassBar();
+  renderClassScore();
   renderIslandMap();
 
   // Render 3D for each student
@@ -2868,7 +2976,9 @@ function renderClassroom() {
 }
 
 function renderStudent(s) {
-  const rank = getRank(s.points);
+  const klassMode = isClassMode();
+  const rank = klassMode ? classRank() : getRank(s.points);
+  const bigNumber = klassMode ? classBalance() : s.points;
   // Combo / fire mode badge (purely visual; recomputed each render so expiry is honored)
   const combo = s.combo || 0;
   const lastTime = s.lastComboTime || 0;
@@ -2891,11 +3001,12 @@ function renderStudent(s) {
         </div>
         <div class="student-rank">
           <span>${rank.current.icon}</span>
-          <span style="color:${rank.current.color}">${rank.current.name}</span>
+          <span style="color:${rank.current.color}">${klassMode ? 'הכיתה · ' : ''}${rank.current.name}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${rank.progress}%"></div></div>
+        ${klassMode ? `<div class="my-share">תרם/ה <b>${s.points}</b></div>` : ''}
       </div>
-      <div class="student-points">${s.points}</div>
+      <div class="student-points${klassMode ? ' shared' : ''}">${bigNumber.toLocaleString('he-IL')}</div>
     </div>
   `;
 }
@@ -3150,6 +3261,23 @@ function classBonus(amount) {
   awardToStudents(cls.students, amount, { label: `🎉 כל הכיתה` });
 }
 
+function setScoreMode(mode) {
+  if (APP_MODE === 'student') return;
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.scoreMode = (mode === 'class') ? 'class' : 'individual';
+  save();
+  renderClassroom();
+  if (document.getElementById('studentModal').classList.contains('show') && currentShopStudentSid) openStudent(currentShopStudentSid);
+  try {
+    if (window.AK && AK.toast) {
+      AK.toast(cls.scoreMode === 'class'
+        ? `🎯 ${cls.name} עברה לניקוד כיתתי — קופה אחת לכולם`
+        : `👤 ${cls.name} חזרה לניקוד אישי`);
+    }
+  } catch (e) {}
+}
+
 function setClassView(mode) {
   const cls = getActiveClass();
   if (!cls) return;
@@ -3168,6 +3296,38 @@ function setEconScale(v) {
   try { if (window.AK && AK.toast) AK.toast(`⚖️ המחירים והספים של ${cls.name} עכשיו ×${n}`); } catch (e) {}
   renderClassroom();
   if (document.getElementById('studentModal').classList.contains('show') && currentShopStudentSid) openStudent(currentShopStudentSid);
+}
+
+/* ---------------- לוח הניקוד הכיתתי (מוצג רק במצב "כיתתי") ---------------- */
+function renderClassScore() {
+  const el = document.getElementById('classScore');
+  if (!el) return;
+  const cls = getActiveClass();
+  if (APP_MODE === 'student' || !cls || !isClassMode(cls)) { el.style.display = 'none'; return; }
+  const earned = classEarned(cls);
+  const spent = classSpentOf(cls);
+  const bal = classBalance(cls);
+  const rank = classRank(cls);
+  const top = [...cls.students].sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0))[0];
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="cs-wrap">
+      <div class="cs-main">
+        <div class="cs-label">🎯 הניקוד של ${escapeHtml(cls.name)}</div>
+        <div class="cs-big">${bal.toLocaleString('he-IL')}</div>
+        <div class="cs-sub">נקודות בקופה המשותפת</div>
+      </div>
+      <div class="cs-side">
+        <div class="cs-rank" style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</div>
+        <div class="cs-bar"><div class="cs-fill" style="width:${rank.progress}%"></div></div>
+        <div class="cs-stats">
+          <span>🏅 נצבר סה״כ <b>${earned.toLocaleString('he-IL')}</b></span>
+          <span>📅 השבוע <b>${classWeekly(cls).toLocaleString('he-IL')}</b></span>
+          ${spent ? `<span>🛍️ הוצאנו <b>${spent.toLocaleString('he-IL')}</b></span>` : ''}
+          ${top && (top.weeklyPoints || 0) > 0 ? `<span>⭐ תרם/ה הכי הרבה השבוע: <b>${escapeHtml(top.name)}</b></span>` : ''}
+        </div>
+      </div>
+    </div>`;
 }
 
 /* ---------------- מפת האיים: מה כבר נפתח ומה עוד לפנינו ----------------
@@ -3254,11 +3414,12 @@ function renderClassBar() {
   const cls = getActiveClass();
   if (APP_MODE === 'student' || !cls) { bar.style.display = 'none'; return; }
   const view = cls.viewMode === 'class' ? 'class' : 'columns';
+  const scoreClass = isClassMode(cls);
   const prev = document.getElementById('classBonusInput');
   const keep = prev && prev.value !== '' ? prev.value : '10'; // לא לאבד סכום שהמורה הקליד/ה
   bar.style.display = 'flex';
   bar.innerHTML = `
-    <div class="cb-title">👥 ניקוד כיתתי
+    <div class="cb-title">${scoreClass ? '🎯' : '👥'} נקודות לכל הכיתה
       <span class="cb-count">${cls.students.length} תלמידים</span>
     </div>
     <div class="cb-quick">
@@ -3278,6 +3439,10 @@ function renderClassBar() {
         ${[1,2,3,5,10,20].map(v => `<option value="${v}" ${econScale() === v ? 'selected' : ''}>×${v}</option>`).join('')}
       </select>
     </label>
+    <div class="cb-view" title="ניקוד אישי לכל תלמיד, או קופה אחת משותפת לכיתה">
+      <button class="${!scoreClass ? 'active' : ''}" onclick="setScoreMode('individual')">👤 ניקוד אישי</button>
+      <button class="${scoreClass ? 'active' : ''}" onclick="setScoreMode('class')">🎯 ניקוד כיתתי</button>
+    </div>
     <div class="cb-view">
       <button class="${view === 'columns' ? 'active' : ''}" onclick="setClassView('columns')">🧱 טורים</button>
       <button class="${view === 'class' ? 'active' : ''}" onclick="setClassView('class')">👥 כיתה אחת</button>
@@ -3294,7 +3459,8 @@ function openStudent(id) {
   const s = getActiveClass().students.find(s => s.id === id);
   if (!s) return;
   currentShopStudentSid = id;
-  const rank = getRank(s.points);
+  const klassMode = isClassMode();
+  const rank = klassMode ? classRank() : getRank(s.points);
   const m = document.getElementById('modalContent');
   m.innerHTML = `
     <div class="modal-hero">
@@ -3305,10 +3471,16 @@ function openStudent(id) {
           <button class="btn" onclick="renameStudent('${s.id}')" style="font-size:0.7em;padding:4px 10px">✏️</button>
         </div>
         <div class="modal-sub">
-          <span style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</span> ·
-          <span style="color:var(--neon-yellow)">${s.points} נקודות</span>
-          ${rank.next ? `<br><small>עוד ${rank.next.min - s.points} ל${rank.next.name} ${rank.next.icon}</small>` : '<br><small>🏆 דרגה מקסימלית!</small>'}
-          <br><small>השבוע: <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b></small>
+          ${klassMode ? `
+            <span style="color:${rank.current.color}">${rank.current.icon} הכיתה · ${rank.current.name}</span> ·
+            <span style="color:var(--neon-yellow)">🎯 ${classBalance().toLocaleString('he-IL')} בקופה המשותפת</span>
+            <br><small>התרומה של ${escapeHtml(s.name)}: <b style="color:var(--neon-cyan)">${s.points}</b> · השבוע <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b></small>
+          ` : `
+            <span style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</span> ·
+            <span style="color:var(--neon-yellow)">${s.points} נקודות</span>
+            ${rank.next ? `<br><small>עוד ${rank.next.min - s.points} ל${rank.next.name} ${rank.next.icon}</small>` : '<br><small>🏆 דרגה מקסימלית!</small>'}
+            <br><small>השבוע: <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b></small>
+          `}
         </div>
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-danger" onclick="deleteStudent('${s.id}')" style="font-size:0.8em">🗑️ מחק</button>
@@ -3385,7 +3557,7 @@ function renderModalBody(s) {
         <p style="color:var(--text-dim);margin-bottom:14px">פותחים ומקבלים פריט אקראי. אם כבר יש לך אותו — תקבל ${Math.round(P(MYSTERY_BOX_PRICE)/2)} נקודות בחזרה!</p>
         <button class="btn btn-warning" style="font-size:1.1em;padding:14px 32px"
                 onclick="openMysteryBox('${s.id}')"
-                ${s.points < P(MYSTERY_BOX_PRICE) ? 'disabled style="opacity:0.5"' : ''}>
+                ${spendableFor(s) < P(MYSTERY_BOX_PRICE) ? 'disabled style="opacity:0.5"' : ''}>
           🎲 פתח · ${P(MYSTERY_BOX_PRICE)} נקודות
         </button>
       </div>
@@ -3397,7 +3569,7 @@ function renderShopItem(s, item, slot, cat) {
   const owned = s.owned.includes(item.id);
   const equipped = s.equipped[slot] === item.id;
   const price = P(item.price);
-  const canAfford = s.points >= price;
+  const canAfford = spendableFor(s) >= price;
   const cls = equipped ? 'equipped' : owned ? 'owned' : (canAfford ? '' : 'locked');
   const action = equipped ? '' : owned
     ? `onclick="equipItem('${s.id}','${slot}','${item.id}')"`
@@ -3468,8 +3640,8 @@ function buyItem(sid, slot, itemId) {
   const s = getActiveClass().students.find(s => s.id === sid);
   const item = findItem(itemId);
   const price = P(item.price);
-  if (s.points < price) return;
-  s.points -= price;
+  if (spendableFor(s) < price) return;
+  chargePoints(s, price);
   s.owned.push(itemId);
   s.equipped[slot] = itemId;
   playSound('buy');
@@ -3486,12 +3658,12 @@ function equipItem(sid, slot, itemId) {
 function openMysteryBox(sid) {
   const s = getActiveClass().students.find(s => s.id === sid);
   const boxPrice = P(MYSTERY_BOX_PRICE);
-  if (s.points < boxPrice) return;
-  s.points -= boxPrice;
+  if (spendableFor(s) < boxPrice) return;
+  chargePoints(s, boxPrice);
   const allItems = [...SHOP.hats.slice(1), ...SHOP.glasses.slice(1), ...SHOP.pets.slice(1), ...SHOP.bodies.slice(1), ...SHOP.auras.slice(1)]; // characters not in mystery box
   const item = allItems[Math.floor(Math.random() * allItems.length)];
   const isDuplicate = s.owned.includes(item.id);
-  if (isDuplicate) s.points += Math.round(boxPrice / 2);
+  if (isDuplicate) refundPoints(s, Math.round(boxPrice / 2));
   else s.owned.push(item.id);
   save(); renderClassroom();
   playBoxCinematic(item, isDuplicate, () => { openStudent(sid); });
@@ -3833,6 +4005,7 @@ function playSound(type) {
 // ==================== LEADERBOARD ====================
 function openLeaderboard() {
   const cls = getActiveClass();
+  const klassMode = isClassMode(cls);
   const sorted = [...cls.students].sort((a,b) => (b.weeklyPoints||0) - (a.weeklyPoints||0)).slice(0, 10);
   const allTime = [...cls.students].sort((a,b) => b.points - a.points).slice(0, 10);
   const m = document.getElementById('modalContent');
@@ -3840,12 +4013,14 @@ function openLeaderboard() {
     <div class="modal-hero" style="padding-bottom:10px">
       <div style="font-size:60px">🏆</div>
       <div style="flex:1">
-        <div class="modal-title">לוח שיא — ${escapeHtml(cls.name)}</div>
-        <div class="modal-sub">הכוכבים של הכיתה</div>
+        <div class="modal-title">${klassMode ? 'התרומות לקופה' : 'לוח שיא'} — ${escapeHtml(cls.name)}</div>
+        <div class="modal-sub">${klassMode
+          ? `כולם ביחד: <b style="color:var(--neon-yellow)">${classEarned(cls).toLocaleString('he-IL')}</b> נקודות 🎯`
+          : 'הכוכבים של הכיתה'}</div>
       </div>
       <button class="btn" onclick="closeModal()">✕</button>
     </div>
-    <h3 style="color:var(--neon-yellow);margin:10px 0">🌟 השבוע</h3>
+    <h3 style="color:var(--neon-yellow);margin:10px 0">${klassMode ? '🌟 תרמו השבוע' : '🌟 השבוע'}</h3>
     <div>
       ${sorted.map((s,i) => `
         <div class="lb-row ${i<3?'top'+(i+1):''}">
@@ -3856,7 +4031,7 @@ function openLeaderboard() {
         </div>
       `).join('')}
     </div>
-    <h3 style="color:var(--neon-cyan);margin:18px 0 10px">💎 כל הזמנים</h3>
+    <h3 style="color:var(--neon-cyan);margin:18px 0 10px">${klassMode ? '💎 תרמו מתחילת השנה' : '💎 כל הזמנים'}</h3>
     <div>
       ${allTime.map((s,i) => `
         <div class="lb-row ${i<3?'top'+(i+1):''}">
@@ -4020,7 +4195,9 @@ function previewOwned(student) {
   return owned;
 }
 function previewPoints(student) {
-  let pts = student.points;
+  const found = findStudent(student.id);
+  const k = found ? (found.cls || found.klass) : null;
+  let pts = spendableFor(student, k);
   for (const p of pendingForStudent(student.id)) if (p.type === 'buy') pts -= (p.price || 0);
   return Math.max(0, pts);
 }
@@ -4095,7 +4272,7 @@ function approvePending(pid) {
   const stu = cls?.students.find(s => s.id === p.studentId);
   if (stu) {
     if (p.type === 'buy') {
-      stu.points = Math.max(0, stu.points - p.price);
+      chargePoints(stu, p.price, cls);
       if (!stu.owned.includes(p.itemId)) stu.owned.push(p.itemId);
     }
     if (p.slot) stu.equipped[p.slot] = p.itemId;
@@ -4125,6 +4302,8 @@ function renderStudentApp() {
   if (cbar) cbar.style.display = 'none';
   const imap = document.getElementById('islandMap');
   if (imap) imap.style.display = 'none';
+  const cscore = document.getElementById('classScore');
+  if (cscore) cscore.style.display = 'none';
   document.querySelector('header > .btn').style.display = 'none';
 
   if (!studentSelectedId) renderStudentPicker();
@@ -4212,9 +4391,10 @@ function renderStudentProfile() {
   const found = findStudent(studentSelectedId);
   if (!found) { studentSelectedId = null; renderStudentPicker(); return; }
   const { student: s, cls } = found;
+  const klassMode = isClassMode(cls);
   const previewEq = previewEquipped(s);
   const previewPts = previewPoints(s);
-  const realRank = getRank(s.points);
+  const realRank = klassMode ? classRank(cls) : getRank(s.points);
   const previewRank = getRank(previewPts);
   const pending = pendingForStudent(s.id);
 
@@ -4228,9 +4408,12 @@ function renderStudentProfile() {
         <canvas id="studentBigAvatar" width="320" height="320" style="width:180px;height:180px;border-radius:14px;background:radial-gradient(circle at 50% 30%, rgba(0,245,255,0.2), transparent 70%)"></canvas>
         <div style="flex:1">
           <div style="font-size:1.7em;font-weight:900">${escapeHtml(s.name)}</div>
-          <div style="font-size:1em;color:${realRank.current.color};margin-top:4px">${realRank.current.icon} ${realRank.current.name}</div>
+          <div style="font-size:1em;color:${realRank.current.color};margin-top:4px">${realRank.current.icon} ${klassMode ? 'הכיתה · ' : ''}${realRank.current.name}</div>
           <div style="font-size:1.1em;margin-top:8px">
-            <span style="color:var(--neon-yellow);font-weight:900">${s.points}</span> נקודות
+            ${klassMode
+              ? `🎯 <span style="color:var(--neon-yellow);font-weight:900">${classBalance(cls).toLocaleString('he-IL')}</span> בקופה של הכיתה
+                 <br><span style="font-size:0.85em;opacity:0.85">התרומה שלך: <b style="color:var(--neon-cyan)">${s.points}</b></span>`
+              : `<span style="color:var(--neon-yellow);font-weight:900">${s.points}</span> נקודות`}
             ${pending.length > 0 ? `<br><span style="color:var(--neon-cyan);font-size:0.85em">תצוגה מקדימה: ${previewPts} נק׳</span>` : ''}
           </div>
           ${pending.length > 0 ? `<div style="margin-top:10px;padding:10px;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.4);border-radius:10px;font-size:0.9em">
