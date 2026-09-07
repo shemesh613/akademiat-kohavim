@@ -476,20 +476,35 @@ header {
 }
 .class-score .cs-stats b { color: #ffd54a; }
 
-/* כרטיס במצב כיתתי — אותו מספר לכולם, והתרומה האישית קטנה מתחת */
-.student-points.shared {
-  background: linear-gradient(180deg, #bfe6ff, #6fc6ff) !important;
-  border-color: #2b7fb8 !important;
-  box-shadow: 0 3px 0 #2b7fb8, inset 0 2px 0 rgba(255,255,255,0.55) !important;
-  color: #06283d !important;
-}
-.my-share {
-  margin-top: 4px;
-  font-size: 0.85em;
+/* הניקוד הכיתתי על הכרטיס — שורה קטנה, לא שבב שדוחק את השם */
+.class-chip {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72em;
   font-weight: 800;
-  color: var(--ink-dim, #5b6688);
+  color: #075985;
+  background: rgba(56,189,248,0.18);
+  border: 1px solid rgba(2,132,199,0.35);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;   /* לעולם לא דוחף את הכרטיס ולא גונב רוחב מהשם */
 }
-.my-share b { color: #d97706; }
+.class-chip b { color: #0369a1; }
+
+/* קבוצות בסרגל: "לקופת הכיתה" מול "לכל תלמיד" */
+.cb-group {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.22);
+  border: 2px solid rgba(255,255,255,0.18);
+}
+.cb-gtitle { font-weight: 900; font-size: 0.95em; white-space: nowrap; opacity: 0.95; }
+.cb-btn.cb-sm { font-size: 0.95em; padding: 7px 12px; }
+.cb-note { font-size: 0.85em; font-weight: 800; opacity: 0.7; white-space: nowrap; }
 
 .name-inline {
   font-family: inherit;
@@ -1250,15 +1265,21 @@ function isClassMode(k) {
   k = k || getActiveClass();
   return !!(k && k.scoreMode === 'class');
 }
-function classEarned(k) {
+function classDirect(k) { k = k || getActiveClass(); return Math.max(0, (k && k.classPoints) || 0); }
+function classFromStudents(k) {
   k = k || getActiveClass();
   if (!k) return 0;
   return k.students.reduce((a, s) => a + (s.points || 0), 0);
 }
+function classEarned(k) {
+  k = k || getActiveClass();
+  if (!k) return 0;
+  return classDirect(k) + classFromStudents(k);
+}
 function classWeekly(k) {
   k = k || getActiveClass();
   if (!k) return 0;
-  return k.students.reduce((a, s) => a + (s.weeklyPoints || 0), 0);
+  return Math.max(0, (k.classWeeklyPoints || 0)) + k.students.reduce((a, s) => a + (s.weeklyPoints || 0), 0);
 }
 function classSpentOf(k) { k = k || getActiveClass(); return Math.max(0, (k && k.classSpent) || 0); }
 function classBalance(k) {
@@ -2977,8 +2998,7 @@ function renderClassroom() {
 
 function renderStudent(s) {
   const klassMode = isClassMode();
-  const rank = klassMode ? classRank() : getRank(s.points);
-  const bigNumber = klassMode ? classBalance() : s.points;
+  const rank = getRank(s.points);   // הדרגה נשארת אישית — לא דורסת את הכרטיס
   // Combo / fire mode badge (purely visual; recomputed each render so expiry is honored)
   const combo = s.combo || 0;
   const lastTime = s.lastComboTime || 0;
@@ -2999,14 +3019,14 @@ function renderStudent(s) {
           <span class="student-name" ondblclick="event.stopPropagation();startInlineRename('${s.id}')" title="לחיצה כפולה לשינוי שם">${escapeHtml(s.name)}</span>
           <button class="name-edit" onclick="event.stopPropagation();startInlineRename('${s.id}')" title="שנה שם">✏️</button>
         </div>
+        ${klassMode ? `<div class="class-chip" title="הניקוד המשותף של הכיתה">🎯 הכיתה: <b>${classBalance().toLocaleString('he-IL')}</b></div>` : ''}
         <div class="student-rank">
           <span>${rank.current.icon}</span>
-          <span style="color:${rank.current.color}">${klassMode ? 'הכיתה · ' : ''}${rank.current.name}</span>
+          <span style="color:${rank.current.color}">${rank.current.name}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${rank.progress}%"></div></div>
-        ${klassMode ? `<div class="my-share">תרם/ה <b>${s.points}</b></div>` : ''}
       </div>
-      <div class="student-points${klassMode ? ' shared' : ''}">${bigNumber.toLocaleString('he-IL')}</div>
+      <div class="student-points">${s.points.toLocaleString('he-IL')}</div>
     </div>
   `;
 }
@@ -3242,6 +3262,61 @@ function columnBonus(col) {
   awardToStudents(cls.students.filter(s => s.column === col), amount, { label: `טור ${col + 1}` });
 }
 
+/* ==================================================================================
+ * הוספה ישירה לקופת הכיתה — "נטו".
+ * כותבים 1000 ➜ הקופה עולה ב-1000. לא 1000 לכל תלמיד ולא כפול מספר התלמידים.
+ * נשמר ב-klass.classPoints, ומזין בדיוק את אותם צינורות של נקודות רגילות:
+ * אבני בנייה לאי (10:1) וקופת הזמן של משחק הצהריים.
+ * ================================================================================== */
+function applyClassPot(cls, amount) {
+  amount = parseInt(amount, 10) || 0;
+  if (!cls || !amount) return;
+  cls.classPoints = Math.max(0, classDirect(cls) + amount);
+  cls.classWeeklyPoints = Math.max(0, (cls.classWeeklyPoints || 0) + amount);
+
+  if (amount > 0) {
+    // אבני בנייה לאי — אותה נוסחה בדיוק כמו ב-addPoints
+    try {
+      if (window.AK && AK.ensureKlass) AK.ensureKlass(cls);
+      if (cls.island) {
+        cls.island._rem = (cls.island._rem || 0) + amount;
+        const stones = Math.floor(cls.island._rem / 10);
+        if (stones > 0) { cls.island._rem -= stones * 10; cls.island.coins += stones; }
+      }
+    } catch (e) {}
+    // קופת הזמן היומית (אין תלמיד ספציפי — נרשם על חשבון הכיתה)
+    if (window.ClassGames && typeof window.ClassGames.onPointsAdded === 'function') {
+      try { window.ClassGames.onPointsAdded({ id: '__class' }, amount); } catch (e) {}
+    }
+  }
+
+  save();
+  playSound(amount > 0 ? 'bonus' : 'minus');
+  burstConfetti(window.innerWidth / 2, window.innerHeight / 2, amount > 0 ? 70 : 20);
+  renderClassroom();
+  try {
+    if (window.AK && AK.toast) AK.toast(`🎯 ${amount > 0 ? '+' : ''}${amount.toLocaleString('he-IL')} לקופת ${cls.name} · סה״כ ${classEarned(cls).toLocaleString('he-IL')}`);
+  } catch (e) {}
+}
+
+function addClassPot(amount) {
+  if (APP_MODE === 'student') return;
+  const cls = getActiveClass();
+  if (!cls) return;
+  if (amount === undefined || amount === null) {
+    const input = document.getElementById('classPotInput');
+    amount = parseInt(input?.value, 10) || 0;
+  }
+  amount = parseInt(amount, 10) || 0;
+  if (!amount) return;
+  if (amount < 0) {
+    akConfirm(`להוריד ${Math.abs(amount).toLocaleString('he-IL')} נקודות מקופת ${cls.name}?`,
+      () => applyClassPot(cls, amount), '', 'כן, להוריד');
+    return;
+  }
+  applyClassPot(cls, amount);
+}
+
 /* ---------------- ניקוד כיתתי — כל הכיתה ביחד ---------------- */
 function classBonus(amount) {
   if (APP_MODE === 'student') return;
@@ -3322,6 +3397,8 @@ function renderClassScore() {
         <div class="cs-bar"><div class="cs-fill" style="width:${rank.progress}%"></div></div>
         <div class="cs-stats">
           <span>🏅 נצבר סה״כ <b>${earned.toLocaleString('he-IL')}</b></span>
+          ${classDirect(cls) ? `<span>🎯 ישיר לכיתה <b>${classDirect(cls).toLocaleString('he-IL')}</b></span>` : ''}
+          ${classFromStudents(cls) ? `<span>👤 מתלמידים <b>${classFromStudents(cls).toLocaleString('he-IL')}</b></span>` : ''}
           <span>📅 השבוע <b>${classWeekly(cls).toLocaleString('he-IL')}</b></span>
           ${spent ? `<span>🛍️ הוצאנו <b>${spent.toLocaleString('he-IL')}</b></span>` : ''}
           ${top && (top.weeklyPoints || 0) > 0 ? `<span>⭐ תרם/ה הכי הרבה השבוע: <b>${escapeHtml(top.name)}</b></span>` : ''}
@@ -3417,20 +3494,31 @@ function renderClassBar() {
   const scoreClass = isClassMode(cls);
   const prev = document.getElementById('classBonusInput');
   const keep = prev && prev.value !== '' ? prev.value : '10'; // לא לאבד סכום שהמורה הקליד/ה
+  const prevPot = document.getElementById('classPotInput');
+  const keepPot = prevPot && prevPot.value !== '' ? prevPot.value : '';
   bar.style.display = 'flex';
   bar.innerHTML = `
     <div class="cb-title">${scoreClass ? '🎯' : '👥'} נקודות לכל הכיתה
       <span class="cb-count">${cls.students.length} תלמידים</span>
     </div>
-    <div class="cb-quick">
-      <button class="cb-btn" onclick="classBonus(1)">+1</button>
-      <button class="cb-btn" onclick="classBonus(5)">+5</button>
-      <button class="cb-btn" onclick="classBonus(10)">+10</button>
+    <div class="cb-group" title="המספר שנכתב נוסף כמו שהוא לקופת הכיתה — בלי לכפול במספר התלמידים">
+      <span class="cb-gtitle">🎯 לקופת הכיתה</span>
+      <button class="cb-btn cb-sm" onclick="addClassPot(50)">+50</button>
+      <button class="cb-btn cb-sm" onclick="addClassPot(100)">+100</button>
+      <button class="cb-btn cb-sm" onclick="addClassPot(500)">+500</button>
+      <input type="number" class="cb-input" id="classPotInput" value="${escapeHtml(keepPot)}" placeholder="1000"
+             onkeydown="if(event.key==='Enter')addClassPot()" />
+      <button class="cb-btn cb-give" onclick="addClassPot()">➕ הוסף לכיתה</button>
+      <button class="cb-btn cb-take cb-sm" onclick="addClassPot(-Math.abs(parseInt(document.getElementById('classPotInput').value,10)||0))">➖</button>
     </div>
-    <input type="number" class="cb-input" id="classBonusInput" value="${escapeHtml(keep)}" placeholder="10"
-           onkeydown="if(event.key==='Enter')classBonus()" />
-    <button class="cb-btn cb-give" onclick="classBonus()">⭐ תן לכל הכיתה</button>
-    <button class="cb-btn cb-take" onclick="classBonus(-Math.abs(parseInt(document.getElementById('classBonusInput').value,10)||10))">➖ הורד לכולם</button>
+    <div class="cb-group" title="נותן את המספר הזה לכל תלמיד בנפרד — כלומר מוכפל במספר התלמידים">
+      <span class="cb-gtitle">👤 לכל תלמיד</span>
+      <input type="number" class="cb-input" id="classBonusInput" value="${escapeHtml(keep)}" placeholder="10"
+             onkeydown="if(event.key==='Enter')classBonus()" />
+      <button class="cb-btn cb-sm" onclick="classBonus()">⭐ תן</button>
+      <button class="cb-btn cb-take cb-sm" onclick="classBonus(-Math.abs(parseInt(document.getElementById('classBonusInput').value,10)||10))">➖</button>
+      <span class="cb-note">= ×${cls.students.length}</span>
+    </div>
     <button class="cb-btn" onclick="openNamesEditor()" title="עריכת כל השמות במסך אחד">✏️ שמות</button>
     <div class="cb-spacer"></div>
     <label class="cb-econ" title="מכפיל המחירים והספים של הכיתה — לכיתה שצוברת הרבה נקודות">
@@ -4055,7 +4143,9 @@ function openLeaderboard() {
 
 function resetWeek() {
   akConfirm('לאפס את הניקוד השבועי?', () => {
-    getActiveClass().students.forEach(s => s.weeklyPoints = 0);
+    const c = getActiveClass();
+    c.students.forEach(s => s.weeklyPoints = 0);
+    c.classWeeklyPoints = 0;
     save(); renderClassroom();
     try { if (window.AK && AK.toast) AK.toast('✅ הניקוד השבועי אופס'); } catch (e) {}
   }, 'הניקוד הכולל, האי והמדבקות לא יושפעו — רק המונה השבועי.', '🔄 כן, לאפס');
