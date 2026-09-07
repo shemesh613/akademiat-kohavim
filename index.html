@@ -240,6 +240,103 @@ header {
 .col-input::-webkit-outer-spin-button,
 .col-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
+/* ==================== ניקוד כיתתי — כל הכיתה ביחד ==================== */
+.class-bar {
+  max-width: 1700px;
+  margin: 14px auto 0;
+  padding: 14px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(0,245,255,0.14), rgba(184,41,255,0.14));
+  border: 2px solid rgba(0,245,255,0.35);
+  border-radius: 18px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+}
+.class-bar .cb-title {
+  font-weight: 900;
+  font-size: 1.25em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.class-bar .cb-count {
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.class-bar .cb-quick {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cb-btn {
+  font-family: inherit;
+  font-weight: 900;
+  font-size: 1.05em;
+  padding: 9px 16px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+  color: #001020;
+}
+.cb-btn:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 6px 22px rgba(0,245,255,0.4); }
+.cb-btn.cb-give { background: linear-gradient(135deg, var(--neon-yellow), var(--neon-orange)); color: #000; }
+.cb-btn.cb-take { background: linear-gradient(135deg, #ff6b6b, #c92a2a); color: #fff; }
+.cb-input {
+  background: rgba(0,0,0,0.45);
+  border: 2px solid rgba(255,255,255,0.25);
+  border-radius: 10px;
+  color: #fff;
+  padding: 8px 10px;
+  width: 84px;
+  font-family: inherit;
+  font-size: 1.1em;
+  font-weight: 900;
+  text-align: center;
+}
+.cb-input:focus { border-color: var(--neon-yellow); outline: none; }
+.cb-input::-webkit-outer-spin-button,
+.cb-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.class-bar .cb-spacer { flex: 1; }
+.cb-view {
+  display: flex;
+  gap: 0;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.cb-view button {
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.95em;
+  padding: 8px 14px;
+  border: none;
+  cursor: pointer;
+  background: rgba(0,0,0,0.35);
+  color: var(--text-dim);
+}
+.cb-view button.active { background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink)); color: #fff; }
+
+/* תצוגת "כיתה אחת" — כל התלמידים בלוח אחד, בלי טורים */
+.classroom.single-view { grid-template-columns: 1fr; }
+.column.all-wrap { padding: 16px; }
+.students-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.students-grid .student { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .class-bar { padding: 12px; }
+  .class-bar .cb-spacer { display: none; }
+}
+
 .student {
   background: #ffffff;
   
@@ -779,6 +876,8 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
   <button class="btn btn-primary" onclick="addClass()">➕ כיתה</button>
 </header>
 
+<div class="class-bar" id="classBar" style="display:none"></div>
+
 <div class="classroom" id="classroom"></div>
 
 <div class="footer-actions">
@@ -1110,7 +1209,15 @@ function createStudent(name, column) {
   };
 }
 
+// ---- השהיית שמירה זמנית: פעולות מרובות (ניקוד לטור/לכיתה) שומרות פעם אחת בסוף ----
+let _saveSuspended = 0, _savePending = false;
+function suspendSave() { _saveSuspended++; }
+function resumeSave() {
+  _saveSuspended = Math.max(0, _saveSuspended - 1);
+  if (_saveSuspended === 0 && _savePending) { _savePending = false; save(); }
+}
 function save() {
+  if (_saveSuspended > 0) { _savePending = true; return; }
   clearAvatarCache(); // invalidate so re-renders pick up changes
   const json = JSON.stringify(state);
   localStorage.setItem('cps_state_v2', json);
@@ -2530,25 +2637,46 @@ function renderClassroom() {
   const cls = getActiveClass();
   if (!cls) return;
   const root = document.getElementById('classroom');
-  const cols = [[],[],[],[]];
-  cls.students.forEach(s => { if (s.column < 0) s.column = 0; if (s.column > 3) s.column = 3; cols[s.column].push(s); });
+  const singleView = cls.viewMode === 'class';
+  root.className = 'classroom' + (singleView ? ' single-view' : '');
 
-  root.innerHTML = cols.map((studs, ci) => `
-    <div class="column" data-col="${ci}"
-         ondragover="event.preventDefault();this.classList.add('drag-over')"
-         ondragleave="this.classList.remove('drag-over')"
-         ondrop="dropStudent(event, ${ci})">
-      <div class="column-header">
-        <span>טור ${ci+1} · ${studs.length}</span>
-        <div style="display:flex;gap:4px;align-items:center">
-          <input type="number" class="col-input" id="colInput${ci}" placeholder="10" value="10" onkeydown="if(event.key==='Enter')columnBonus(${ci})" onclick="event.stopPropagation()" />
-          <button class="col-bonus" onclick="columnBonus(${ci})" title="תן לכל הטור">תן</button>
+  if (singleView) {
+    // ---- תצוגת "כיתה אחת": כל התלמידים בלוח אחד, בלי חלוקה לטורים ----
+    root.innerHTML = `
+      <div class="column all-wrap">
+        <div class="column-header">
+          <span>👥 ${escapeHtml(cls.name)} · ${cls.students.length} תלמידים</span>
+          <span style="font-size:0.8em;opacity:0.85">הניקוד לכולם נמצא בסרגל שלמעלה ⬆️</span>
         </div>
+        <div class="students-grid">
+          ${cls.students.map(renderStudent).join('')}
+        </div>
+        <button class="add-student-btn" style="margin-top:12px" onclick="addStudent(null)">➕ הוסף תלמיד</button>
       </div>
-      ${studs.map(renderStudent).join('')}
-      <button class="add-student-btn" onclick="addStudent(${ci})">➕ הוסף תלמיד</button>
-    </div>
-  `).join('');
+    `;
+  } else {
+    const cols = [[],[],[],[]];
+    cls.students.forEach(s => { if (s.column < 0) s.column = 0; if (s.column > 3) s.column = 3; cols[s.column].push(s); });
+
+    root.innerHTML = cols.map((studs, ci) => `
+      <div class="column" data-col="${ci}"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="dropStudent(event, ${ci})">
+        <div class="column-header">
+          <span>טור ${ci+1} · ${studs.length}</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="number" class="col-input" id="colInput${ci}" placeholder="10" value="10" onkeydown="if(event.key==='Enter')columnBonus(${ci})" onclick="event.stopPropagation()" />
+            <button class="col-bonus" onclick="columnBonus(${ci})" title="תן לכל הטור">תן</button>
+          </div>
+        </div>
+        ${studs.map(renderStudent).join('')}
+        <button class="add-student-btn" onclick="addStudent(${ci})">➕ הוסף תלמיד</button>
+      </div>
+    `).join('');
+  }
+
+  renderClassBar();
 
   // Render 3D for each student
   cls.students.forEach(s => {
@@ -2615,7 +2743,14 @@ function switchClass(id) { state.activeClassId = id; save(); renderAll(); }
 function addStudent(col) {
   const name = prompt('שם התלמיד החדש?');
   if (!name) return;
-  getActiveClass().students.push(createStudent(name, col));
+  const cls = getActiveClass();
+  if (col === null || col === undefined) {
+    // תצוגת "כיתה אחת": משבצים בטור הכי ריק, כדי שהמעבר חזרה לטורים יישאר מאוזן
+    const counts = [0,0,0,0];
+    cls.students.forEach(s => { counts[Math.min(3, Math.max(0, s.column || 0))]++; });
+    col = counts.indexOf(Math.min(...counts));
+  }
+  cls.students.push(createStudent(name, col));
   save(); renderClassroom();
 }
 
@@ -2715,29 +2850,151 @@ function celebrateStudent(sid, klass) {
   setTimeout(() => card.classList.remove(klass), 800);
 }
 
+/* ==================================================================================
+ * מנוע ניקוד קבוצתי משותף — משמש גם ל"טור" וגם ל"כל הכיתה".
+ * עובר בדיוק באותם צינורות של addPoints() כדי שכל שאר המערכות יתעדכנו:
+ *   • points + weeklyPoints
+ *   • אבני בנייה לאי הכיתתי (10 נק' = אבן, עם שארית)   [SPEC §3]
+ *   • ClassGames.onPointsAdded  → קופת הזמן היומית + הגרלת שחקן/ית היום
+ *   • IslandOwnership.onPointsAdded → מטבע אישי לחלקה
+ *   • מדבקות + הישגים
+ * קומבו (🔥) בכוונה לא מופעל כאן — הוא מתגמל רצף תשובות אישי, לא בונוס קבוצתי.
+ * ================================================================================== */
+function awardToStudents(students, amount, opts) {
+  opts = opts || {};
+  if (APP_MODE === 'student') return;
+  amount = parseInt(amount, 10) || 0;
+  if (!amount || !students || !students.length) return;
+
+  const cls = getActiveClass();
+  const ids = [];
+  const stickerAwards = [];
+  const achAwards = [];
+
+  suspendSave(); // שמירה אחת בסוף במקום אחת לכל תלמיד
+  try {
+    let islandGain = 0;
+    students.forEach(s => {
+      if (!s) return;
+      s.points = Math.max(0, s.points + amount);
+      s.weeklyPoints = (s.weeklyPoints || 0) + amount;
+      ids.push(s.id);
+
+      if (amount > 0) {
+        islandGain += amount;
+        // מדבקות
+        try { awardStickersForPoints(s, amount).forEach(a => stickerAwards.push(a)); } catch (e) {}
+        // מטבע אישי
+        if (window.IslandOwnership && typeof window.IslandOwnership.onPointsAdded === 'function') {
+          try { window.IslandOwnership.onPointsAdded(s, amount); } catch (e) {}
+        }
+      }
+      // קופת הזמן / שחקן היום — גם על נקודות שליליות (הפונקציה מתקנת לעצמה)
+      if (window.ClassGames && typeof window.ClassGames.onPointsAdded === 'function') {
+        try { window.ClassGames.onPointsAdded(s, amount); } catch (e) {}
+      }
+      // הישגים
+      try { checkAchievements(s).forEach(a => achAwards.push(a)); } catch (e) {}
+    });
+
+    // ---- אבני בנייה לאי הכיתתי — צבירה אחת מרוכזת (אותה נוסחה כמו ב-addPoints) ----
+    if (islandGain > 0) {
+      try {
+        if (window.AK && typeof window.AK.ensureKlass === 'function') window.AK.ensureKlass(cls);
+        if (cls && cls.island) {
+          cls.island._rem = (cls.island._rem || 0) + islandGain;
+          const stones = Math.floor(cls.island._rem / 10);
+          if (stones > 0) { cls.island._rem -= stones * 10; cls.island.coins += stones; }
+        }
+      } catch (e) {}
+    }
+  } finally {
+    resumeSave();
+  }
+
+  // ---- פידבק ויזואלי ----
+  playSound(amount > 0 ? 'bonus' : 'minus');
+  burstConfetti(window.innerWidth / 2, window.innerHeight / 2, amount > 0 ? Math.min(120, 20 + ids.length * 4) : 20);
+  if (opts.label) {
+    try { if (window.AK && window.AK.toast) window.AK.toast(`${opts.label} · ${amount > 0 ? '+' : ''}${amount} × ${ids.length}`); } catch (e) {}
+  }
+  renderClassroom();
+
+  // popups מוגבלים — 24 תלמידים לא יציפו את המקרן
+  stickerAwards.slice(0, 3).forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1200 + i * 1500));
+  achAwards.slice(0, 3).forEach((a, i) => setTimeout(() => showAchievement(a), 800 + i * 1500));
+
+  setTimeout(() => {
+    ids.forEach((sid, i) => setTimeout(() => celebrateStudent(sid, amount > 0 ? 'celebrating' : 'disappointed'), i * 45));
+  }, 50);
+
+  // אם מודל תלמיד פתוח — לרענן אותו כדי שהמספר יתעדכן
+  const modal = document.getElementById('studentModal');
+  if (modal && modal.classList.contains('show') && currentShopStudentSid && ids.indexOf(currentShopStudentSid) !== -1) {
+    openStudent(currentShopStudentSid);
+  }
+}
+
 function columnBonus(col) {
   if (APP_MODE === 'student') return;
   const input = document.getElementById('colInput' + col);
   const amount = parseInt(input?.value, 10) || 10;
-  if (amount === 0) return;
   const cls = getActiveClass();
-  const studentIds = [];
-  cls.students.filter(s => s.column === col).forEach(s => {
-    s.points = Math.max(0, s.points + amount);
-    s.weeklyPoints = (s.weeklyPoints || 0) + amount;
-    const colAwards = awardStickersForPoints(s, amount);
-    colAwards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1200 + i * 1800));
-    studentIds.push(s.id);
-    const newAchs = checkAchievements(s);
-    newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 800 + i * 1500));
-  });
-  playSound(amount > 0 ? 'bonus' : 'minus');
-  burstConfetti(window.innerWidth/2, window.innerHeight/2, amount > 0 ? 50 : 20);
-  save(); renderClassroom();
-  // celebrate every student in the column with a stagger
-  setTimeout(() => {
-    studentIds.forEach((sid, i) => setTimeout(() => celebrateStudent(sid, amount > 0 ? 'celebrating' : 'disappointed'), i * 60));
-  }, 50);
+  if (!cls) return;
+  awardToStudents(cls.students.filter(s => s.column === col), amount, { label: `טור ${col + 1}` });
+}
+
+/* ---------------- ניקוד כיתתי — כל הכיתה ביחד ---------------- */
+function classBonus(amount) {
+  if (APP_MODE === 'student') return;
+  const cls = getActiveClass();
+  if (!cls || !cls.students.length) return;
+  if (amount === undefined || amount === null) {
+    const input = document.getElementById('classBonusInput');
+    amount = parseInt(input?.value, 10) || 10;
+  }
+  amount = parseInt(amount, 10) || 0;
+  if (!amount) return;
+  if (amount < 0 && !confirm(`להוריד ${Math.abs(amount)} נקודות לכל ${cls.students.length} התלמידים?`)) return;
+  awardToStudents(cls.students, amount, { label: `🎉 כל הכיתה` });
+}
+
+function setClassView(mode) {
+  const cls = getActiveClass();
+  if (!cls) return;
+  cls.viewMode = (mode === 'class') ? 'class' : 'columns';
+  save();
+  renderClassroom();
+}
+
+function renderClassBar() {
+  const bar = document.getElementById('classBar');
+  if (!bar) return;
+  const cls = getActiveClass();
+  if (APP_MODE === 'student' || !cls) { bar.style.display = 'none'; return; }
+  const view = cls.viewMode === 'class' ? 'class' : 'columns';
+  const prev = document.getElementById('classBonusInput');
+  const keep = prev && prev.value !== '' ? prev.value : '10'; // לא לאבד סכום שהמורה הקליד/ה
+  bar.style.display = 'flex';
+  bar.innerHTML = `
+    <div class="cb-title">👥 ניקוד כיתתי
+      <span class="cb-count">${cls.students.length} תלמידים</span>
+    </div>
+    <div class="cb-quick">
+      <button class="cb-btn" onclick="classBonus(1)">+1</button>
+      <button class="cb-btn" onclick="classBonus(5)">+5</button>
+      <button class="cb-btn" onclick="classBonus(10)">+10</button>
+    </div>
+    <input type="number" class="cb-input" id="classBonusInput" value="${escapeHtml(keep)}" placeholder="10"
+           onkeydown="if(event.key==='Enter')classBonus()" />
+    <button class="cb-btn cb-give" onclick="classBonus()">⭐ תן לכל הכיתה</button>
+    <button class="cb-btn cb-take" onclick="classBonus(-Math.abs(parseInt(document.getElementById('classBonusInput').value,10)||10))">➖ הורד לכולם</button>
+    <div class="cb-spacer"></div>
+    <div class="cb-view">
+      <button class="${view === 'columns' ? 'active' : ''}" onclick="setClassView('columns')">🧱 טורים</button>
+      <button class="${view === 'class' ? 'active' : ''}" onclick="setClassView('class')">👥 כיתה אחת</button>
+    </div>
+  `;
 }
 
 // ==================== STUDENT MODAL ====================
@@ -3428,6 +3685,8 @@ function renderStudentApp() {
   const footer = document.querySelector('.footer-actions');
   if (tabs) tabs.style.display = 'none';
   if (footer) footer.style.display = 'none';
+  const cbar = document.getElementById('classBar');
+  if (cbar) cbar.style.display = 'none';
   document.querySelector('header > .btn').style.display = 'none';
 
   if (!studentSelectedId) renderStudentPicker();
