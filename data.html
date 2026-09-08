@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>נתוני אקדמיית כוכבים — צפייה בלבד</title>
+<style>
+  :root{
+    --bg:#fdf6e9; --surface:#fffdf8; --line:#e6d6bb;
+    --ink:#3b2f1c; --dim:#8a7a5c; --gold:#e0a800; --gold-deep:#a97b00;
+    --blue:#0369a1; --green:#15803d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#3b2f1c;
+       font-family:'Segoe UI',Arial,sans-serif;line-height:1.6;padding:18px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px}
+  .sub{color:#8a7a5c;margin-bottom:16px}
+  .badge{display:inline-block;background:#dcfce7;color:var(--green);
+         border:1px solid #86efac;border-radius:999px;padding:3px 12px;
+         font-weight:800;font-size:14px}
+  .card{background:var(--surface);border:2px solid var(--line);
+        border-radius:14px;padding:14px 16px;margin:14px 0}
+  .card h2{font-size:19px;margin:0 0 10px;color:var(--gold-deep)}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{padding:7px 8px;border-bottom:1px solid #f0e6d2;text-align:right}
+  th{color:#8a7a5c;font-size:13px;font-weight:800}
+  td.num{font-weight:900;color:var(--gold-deep);text-align:left;direction:ltr}
+  tr:first-child td{font-size:16px}
+  .rank{color:#b08a3c;font-weight:900;width:34px}
+  .status{font-size:14px;color:#8a7a5c;margin-top:8px}
+  details{margin-top:6px}
+  summary{cursor:pointer;font-weight:800;color:var(--blue)}
+  pre{background:#1e293b;color:#86efac;border-radius:10px;padding:12px;
+      overflow-x:auto;direction:ltr;text-align:left;font-size:12.5px}
+  code{background:#f3ead7;padding:2px 6px;border-radius:5px;direction:ltr;
+       display:inline-block;font-size:13px}
+  .warn{background:#fff7e0;border-color:#f0c96a}
+  button{font:inherit;font-weight:800;background:var(--gold);color:#3a2a00;
+         border:2px solid var(--gold-deep);border-radius:10px;padding:7px 14px;
+         cursor:pointer}
+  button:hover{background:#f0bc20}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>⭐ נתוני אקדמיית כוכבים</h1>
+  <div class="sub">
+    <span class="badge">🔒 צפייה בלבד</span>
+    הדף הזה רק <b>קורא</b> את הנתונים ומציג אותם. הוא לא שומר, לא משנה ולא מוחק כלום —
+    אי אפשר לקלקל מכאן שום דבר.
+  </div>
+
+  <div id="boards"></div>
+  <div class="status" id="status">טוען…</div>
+
+  <div class="card warn">
+    <h2>🧑‍💻 למפתח שרוצה להשתמש בנתונים באתר אחר</h2>
+    <div>כתובת המקור (קריאה בלבד — <b>GET</b> ותו לא):</div>
+    <pre id="ep">https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatabase.app/cps_v1.json</pre>
+    <button onclick="copyEp()">העתק כתובת</button>
+    <details>
+      <summary>קוד להעתקה + מבנה הנתונים</summary>
+      <pre>const AK_URL =
+  'https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatabase.app/cps_v1.json';
+
+async function loadAkademia() {
+  const res  = await fetch(AK_URL + '?_=' + Date.now());   // GET בלבד
+  const data = await res.json();
+  return (data.classes || []).map(c =&gt; ({
+    className: c.name,
+    students: (c.students || []).map(s =&gt; ({
+      id:     s.id,
+      name:   s.name,
+      points: s.points      || 0,   // הארנק הנוכחי (יורד בקניות בחנות)
+      total:  s.earnedTotal || s.points || 0,   // סה"כ שנצבר — לטבלת מובילים
+      week:   s.weeklyPoints || 0
+    })).sort((a,b) =&gt; b.total - a.total)
+  }));
+}
+
+loadAkademia().then(console.log);
+setInterval(() =&gt; loadAkademia().then(console.log), 10000);  // רענון כל 10 שנ'</pre>
+      <div>
+        ⚠️ <b>אף פעם לא לכתוב</b> לכתובת הזאת (PUT / PATCH / POST / DELETE) —
+        כתיבה אחת מוחקת את נתוני הכיתות. צריך לשמור נתונים משלך?
+        השתמש בענף אחר לגמרי, למשל <code>/my_app.json</code>.
+      </div>
+    </details>
+  </div>
+
+</div>
+
+<script>
+const AK_URL = 'https://nikud-7eb2e-default-rtdb.europe-west1.firebasedatabase.app/cps_v1.json';
+const boards = document.getElementById('boards');
+const statusEl = document.getElementById('status');
+
+function esc(t){ return String(t == null ? '' : t)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function copyEp(){
+  navigator.clipboard.writeText(document.getElementById('ep').textContent.trim())
+    .then(function(){ alert('הכתובת הועתקה'); })
+    .catch(function(){});
+}
+
+function render(classes){
+  boards.innerHTML = classes.map(function(c){
+    var rows = c.students.map(function(s,i){
+      return '<tr>'
+        + '<td class="rank">' + (i+1) + '</td>'
+        + '<td>' + esc(s.name) + '</td>'
+        + '<td class="num">' + (s.total).toLocaleString('he-IL') + '</td>'
+        + '<td class="num">' + (s.week).toLocaleString('he-IL') + '</td>'
+        + '</tr>';
+    }).join('');
+    var sum = c.students.reduce(function(a,s){ return a + s.total; }, 0);
+    return '<div class="card"><h2>' + esc(c.className)
+      + ' <span style="font-weight:400;font-size:15px;color:#8a7a5c">— '
+      + c.students.length + ' תלמידים · סה"כ '
+      + sum.toLocaleString('he-IL') + ' נקודות</span></h2>'
+      + '<table><tr><th></th><th>שם</th><th>סה"כ</th><th>השבוע</th></tr>'
+      + rows + '</table></div>';
+  }).join('');
+}
+
+async function load(){
+  try{
+    const res = await fetch(AK_URL + '?_=' + Date.now());
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const classes = (data.classes || []).map(function(c){
+      return {
+        className: c.name,
+        students: (c.students || []).map(function(s){
+          return {
+            name:  s.name,
+            total: s.earnedTotal || s.points || 0,
+            week:  s.weeklyPoints || 0
+          };
+        }).sort(function(a,b){ return b.total - a.total; })
+      };
+    });
+    render(classes);
+    statusEl.textContent = '✓ עודכן ' + new Date().toLocaleTimeString('he-IL')
+      + ' · מתרענן לבד כל 15 שניות';
+  }catch(e){
+    /* כשל רשת — משאירים על המסך את מה שכבר הוצג */
+    statusEl.textContent = '⚠️ לא הצלחתי לרענן כרגע (' + e.message + ') — מוצגים הנתונים האחרונים';
+  }
+}
+
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>
