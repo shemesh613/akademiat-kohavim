@@ -428,7 +428,12 @@
 
   var lastAutoBuildAt = 0;
 
+  /* בנייה אוטומטית של האי המשותף כבויה — המורה בונה ידנית, רק בקנייה.
+     שאר ה-API (טיזר, חלקה אישית, checkAutoBuild) נשאר לשם תאימות. */
+  var AUTO_BUILD_ENABLED = false;
+
   function checkAutoBuild(klass) {
+    if (!AUTO_BUILD_ENABLED) return false;
     try {
       klass = klass || activeClass();
       if (!klass) return false;
@@ -612,7 +617,7 @@
       container.appendChild(teaserEl);
     }
     var t = teaser(null);
-    var on = !t.done && t.pct >= TEASER_AT;
+    var on = AUTO_BUILD_ENABLED && !t.done && t.pct >= TEASER_AT;
     /* שקט על המסך: כשהאוצר כבר מלא (ready) הבאנר לא יושב קבוע — מופיע בפולס קצר
        של 6 שניות מתוך כל 30, ממש לפני שהבנאי האוטומטי חושף. באנר תמידי = רעש. */
     if (on && t.ready) on = ((Date.now() / 1000) % 30) < 6;

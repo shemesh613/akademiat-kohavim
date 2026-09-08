@@ -636,7 +636,7 @@ function buildRegionLocked(idx) {
   g.userData.sub = sub;
   g.userData.updateLock = function (isl) {
     var need = Math.max(0, regThreshold(def) - totalEarned(isl));
-    sub.userData.setText(need > 0 ? ('נפתח בעוד ' + need + ' 🪙') : 'נפתח עכשיו!');
+    sub.userData.setText(need > 0 ? ('נפתח בעוד ' + (need * 10) + ' ⭐') : 'נפתח עכשיו!');
   };
   return g;
 }
@@ -1323,7 +1323,7 @@ function placeAt(regionKey, itemId, x, z, studentId) {
   if (tileOccupied(isl, regionKey, x, z)) { akToast('המשבצת הזו כבר תפוסה'); akSound('error'); return false; }
   var cat = catalogItem(regionKey.indexOf('plot_') === 0 ? ISL.activeId : regionKey, itemId);
   var cost = itemCost(cat);
-  if (isl.coins < cost) { akToast('חסרות ' + (cost - isl.coins) + ' 🪙 אבני בנייה'); akSound('error'); return false; }
+  if (isl.coins < cost) { akToast('חסרות ' + ((cost - isl.coins) * 10) + ' ⭐ נקודות'); akSound('error'); return false; }
   isl.coins -= cost;
   isl.spent = (isl.spent || 0) + cost;
   var entry = { id: itemId, r: regionKey, x: x, z: z, rot: Math.floor(Math.random() * 4) * (Math.PI / 2), by: studentId || null, t: Date.now() };
@@ -1356,7 +1356,7 @@ function removeAt(regionKey, x, z) {
   refreshRegions();
   spawnPoofAt(poofPos);
   akSound('coin');
-  akToast('הוסר — חזרו ' + refund + ' 🪙');
+  akToast('הוסר — חזרו ' + (refund * 10) + ' ⭐ נקודות');
   akSave();
   return true;
 }
@@ -1521,7 +1521,7 @@ function buildHud(container) {
   hud.className = 'ak-isl-hud';
   hud.innerHTML =
     '<div class="ak-isl-top">' +
-    '  <div class="ak-isl-badge" data-role="coins">🪙 0</div>' +
+    '  <div class="ak-isl-badge" data-role="coins">⭐ 0</div>' +
     '  <div class="ak-isl-region" data-role="region">🏖️ חוף הכוכבים</div>' +
     '</div>' +
     '<div class="ak-isl-ambientflag" data-role="ambientflag">🌙 מצב אמביינט — סיור אוטומטי</div>' +
@@ -1656,9 +1656,9 @@ function renderShopPalette() {
     var isSel = ISL.buildSel && ISL.buildSel.itemId === it.id && ISL.buildSel.regionId === targetRegion;
     var cst = itemCost(it, klass);
     d.className = 'ak-isl-item' + (isSel ? ' sel' : '') + (isl.coins < cst ? ' cant' : '');
-    d.innerHTML = '<span class="em">' + (it.em || '❔') + '</span><div class="nm">' + akEsc(it.n || it.id) + '</div><div class="cs">🪙 ' + cst + '</div>';
+    d.innerHTML = '<span class="em">' + (it.em || '❔') + '</span><div class="nm">' + akEsc(it.n || it.id) + '</div><div class="cs">⭐ ' + (cst * 10) + '</div>';
     d.onclick = function () {
-      if (isl.coins < cst) { akToast('צריך עוד ' + (cst - isl.coins) + ' 🪙'); akSound('error'); return; }
+      if (isl.coins < cst) { akToast('צריך עוד ' + ((cst - isl.coins) * 10) + ' ⭐ נקודות'); akSound('error'); return; }
       ISL.delMode = false;
       ISL.buildSel = (isSel) ? null : { regionId: targetRegion, itemId: it.id };
       renderShopPalette();
@@ -1673,7 +1673,7 @@ function updateHud(now) {
   ISL.lastHudUpdate = now;
   var klass = activeClass();
   var isl = klass ? ensureIslandState(klass) : { coins: 0, spent: 0, regions: ['beach'] };
-  ISL.hud.coins.textContent = '🪙 ' + isl.coins;
+  ISL.hud.coins.textContent = '⭐ ' + (isl.coins * 10);
   var total = totalEarned(isl);
   var next = null;
   for (var i = 0; i < REGION_DEFS.length; i++) { if (isl.regions.indexOf(REGION_DEFS[i].id) < 0) { next = REGION_DEFS[i]; break; } }
@@ -1684,7 +1684,7 @@ function updateHud(now) {
     var span = Math.max(1, nextThreshold - prevThreshold);
     var pct = clamp(((total - prevThreshold) / span) * 100, 0, 100);
     ISL.hud.progfill.style.width = pct.toFixed(0) + '%';
-    ISL.hud.proglabel.textContent = 'עוד ' + Math.max(0, nextThreshold - total) + ' 🪙 עד ' + next.icon + ' ' + next.name;
+    ISL.hud.proglabel.textContent = 'עוד ' + (Math.max(0, nextThreshold - total) * 10) + ' ⭐ עד ' + next.icon + ' ' + next.name;
   } else {
     ISL.hud.progfill.style.width = '100%';
     ISL.hud.proglabel.textContent = '🌟 כל האי נפתח — כל הכבוד לכיתה!';
