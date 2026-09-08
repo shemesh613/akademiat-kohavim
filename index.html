@@ -1448,6 +1448,25 @@ async function cloudSave(data) {
      בלעדיה — דפדפן עם רשת איטית (טיימאאוט 4 שנ') היה מוחק את נתוני
      הכיתה האמיתיים עם ה-state ההתחלתי הריק שלו. */
   if (!cloudReady) { console.warn('cloudSave skipped — cloud not loaded yet'); return; }
+  /* הגנת "נתונים ישנים": מכשיר תלמיד שהיה סגור/ברקע מחזיק עותק ישן של המצב.
+     אם הוא היה כותב אותו במלואו — התיקונים שהמורה עשה בינתיים היו נמחקים
+     והנקודות היו "קופצות חזרה" למספר הישן. לכן במצב תלמיד בודקים רגע לפני
+     הכתיבה אם מישהו שינה בענן; אם כן — מאמצים את הענן ולא כותבים. */
+  if (APP_MODE === 'student') {
+    const fresh = await cloudLoad();
+    if (fresh && fresh.__ok && fresh.data && fresh.data.classes) {
+      const freshHash = JSON.stringify(fresh.data);
+      if (lastCloudHash && freshHash !== lastCloudHash) {
+        console.warn('cloudSave skipped — remote changed, adopting remote');
+        state = fresh.data;
+        lastCloudHash = freshHash;
+        localStorage.setItem('cps_state_v2', freshHash);
+        clearAvatarCache();
+        renderStudentApp();
+        return;
+      }
+    }
+  }
   try {
     await fetch(`${FIREBASE_DB}/${FIREBASE_PATH}.json`, {
       method: 'PUT',
@@ -4469,7 +4488,14 @@ function enterStudentMode(sid) {
   renderStudentProfile();
 }
 
+/* בונוס יומי — כבוי.
+   כל עוד זה היה דלוק, כל תלמיד שפתח את האפליקציה בבית וקליק על השם שלו
+   קיבל +20 עד +70 נקודות אוטומטית, וזה נדחף לענן: המורה ראה נקודות
+   שנוספות "לבד", דרגות שעולות ומובילים שמתחלפים בלי שנתן כלום.
+   נקודות ניתנות אך ורק מהמסך של המורה. */
+const DAILY_BONUS_ENABLED = false;
 function claimDailyBonus(sid) {
+  if (!DAILY_BONUS_ENABLED) return;
   const found = findStudent(sid);
   if (!found) return;
   const s = found.student;

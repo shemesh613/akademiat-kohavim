@@ -281,7 +281,7 @@ header {
 }
 
 .student-name {
-  font-size: 23px;
+  font-size: 18px;
   color: var(--ink);
   /* שם ארוך נשבר לשתי שורות במקום להצטמצם ל"נ..." — הכרטיס מתגבה, השם נשאר קריא */
   white-space: normal;
@@ -289,6 +289,14 @@ header {
   text-overflow: clip;
   overflow-wrap: break-word;
   line-height: 1.12;
+}
+.student-name-row { align-items: center; gap: 6px; }
+/* שם ארוך: עד שתי שורות, אחר כך "..." — הכרטיסים נשארים באותו גובה והלוח מסודר */
+.student-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .name-edit { background: var(--surface-alt); color: var(--ink-dim); border: 1px solid rgba(91,102,136,0.35); font-size: 15px; }
 .name-edit:hover { background: var(--gold); border-color: var(--gold-deep); color: #3a2a00; }
@@ -301,9 +309,9 @@ header {
   -webkit-background-clip: border-box;
   background-clip: border-box;
   color: #3a2a00;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
-  padding: 8px 14px;
+  padding: 6px 10px;
   border: 2px solid var(--gold-deep);
   border-radius: var(--r-pill);
   box-shadow: 0 3px 0 var(--gold-deep), inset 0 2px 0 rgba(255,255,255,0.5);
