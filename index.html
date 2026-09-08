@@ -475,6 +475,17 @@ header {
   display: flex; gap: 8px 20px; flex-wrap: wrap; font-size: 1.05em; font-weight: 700; opacity: 0.95;
 }
 .class-score .cs-stats b { color: #ffd54a; }
+.class-score .cs-thanks {
+  margin-top: 10px;
+  font-size: 1.05em;
+  font-weight: 800;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+.class-score .cs-thanks b { color: #86efac; }
+.class-score .cs-thanks span { color: #ffd54a; }
 
 /* הניקוד הכיתתי על הכרטיס — שורה קטנה, לא שבב שדוחק את השם */
 .class-chip {
@@ -1254,22 +1265,35 @@ const MYSTERY_BOX_PRICE = 75;
 /* מכפיל הכלכלה של הכיתה הפעילה (klass.econ.scale, ברירת מחדל 1).
    כל מחיר/סף באפליקציה עובר דרך P() כדי שכיתה "עשירה" תשלם מחירים אמיתיים. */
 /* ==================================================================================
- * מצב "ניקוד כיתתי" (klass.scoreMode === 'class')
+ * שני ניקודים, ספירה כפולה (dual ledger)
  * ----------------------------------------------------------------------------------
- * המודל: הנקודות של כל תלמיד הן ה‏תרומה שלו לקופה המשותפת. הקופה = סכום התרומות.
- * הוצאות (חנות/תיבה) יורדות מהקופה המשותפת (klass.classSpent) ולא מהתרומה של אף אחד —
- * כך שאף ילד לא "מפסיד" מה שהוא הביא, ובכל זאת כולם חולקים ארנק אחד.
- * שום שדה קיים לא משנה משמעות, ולכן אפשר לעבור בין המצבים הלוך ושוב בלי לאבד דבר.
+ * כל נקודה שתלמיד מקבל נספרת פעמיים: אצלו ואצל הכיתה. אף אחד לא מפסיד כלום.
+ *   • ניקוד אישי (student.points) → חנות אווטארים, תיבת הפתעה, מדבקות, החלקה באי.
+ *   • ניקוד כיתתי = סכום כל האישיים + klass.classPoints (מה שהמורה נותן ישירות לכיתה)
+ *     → אבני בנייה לאי הכיתתי + שניות משחק בהפסקה.
+ * קנייה אישית לעולם לא גורעת מהניקוד הכיתתי — זה מה שמונע "בגללו הפסדנו".
+ * מבוסס על ספרות ה-group contingencies: independent כבסיס + interdependent כשכבה
+ * נוספת נמצא יעיל והוגן יותר מאשר כיתתי-בלבד (שפוגע דווקא בתלמידים החלשים).
  * ================================================================================== */
-function isClassMode(k) {
-  k = k || getActiveClass();
-  return !!(k && k.scoreMode === 'class');
-}
+/* הניקוד הכיתתי תמיד פעיל — המנהל ביקש נקודות כיתתיות, והמחקר אומר
+   לשמור את האישי כבסיס ואת הכיתתי כשכבה נוספת, לא במקומו. */
+function isClassMode() { return true; }
 function classDirect(k) { k = k || getActiveClass(); return Math.max(0, (k && k.classPoints) || 0); }
+/* earnedTotal = כמה התלמיד הרוויח מאז ומעולם. קניות אישיות לא נוגעות בו,
+   ולכן הן גם לא מורידות את הניקוד הכיתתי. מיגרציה: מי שאין לו — מתחיל מהנקודות שלו. */
+function earnedOf(s) {
+  if (!s) return 0;
+  if (typeof s.earnedTotal !== 'number') s.earnedTotal = Math.max(0, s.points || 0);
+  return s.earnedTotal;
+}
+function addEarned(s, amount) {
+  if (!s) return;
+  s.earnedTotal = Math.max(0, earnedOf(s) + (Number(amount) || 0));
+}
 function classFromStudents(k) {
   k = k || getActiveClass();
   if (!k) return 0;
-  return k.students.reduce((a, s) => a + (s.points || 0), 0);
+  return k.students.reduce((a, s) => a + earnedOf(s), 0);
 }
 function classEarned(k) {
   k = k || getActiveClass();
@@ -1281,33 +1305,25 @@ function classWeekly(k) {
   if (!k) return 0;
   return Math.max(0, (k.classWeeklyPoints || 0)) + k.students.reduce((a, s) => a + (s.weeklyPoints || 0), 0);
 }
-function classSpentOf(k) { k = k || getActiveClass(); return Math.max(0, (k && k.classSpent) || 0); }
-function classBalance(k) {
-  k = k || getActiveClass();
-  return Math.max(0, classEarned(k) - classSpentOf(k));
-}
+/* קנייה אישית לא נוגעת בקופה הכיתתית — לכן היתרה = כל מה שנצבר.
+   (classSpent הוא שריד מגרסה קודמת ונשאר 0.) */
+function classBalance(k) { return classEarned(k); }
 /* דרגת הכיתה = הדרגה של הממוצע, אחרת כיתה של 24 מגיעה ל"אגדה" בשבועיים */
 function classRank(k) {
   k = k || getActiveClass();
   const n = Math.max(1, k && k.students ? k.students.length : 1);
   return getRank(Math.round(classEarned(k) / n));
 }
-/* כמה אפשר להוציא בשם התלמיד הזה — במצב כיתתי זו יתרת הכיתה */
-function spendableFor(student, k) {
-  k = k || getActiveClass();
-  return isClassMode(k) ? classBalance(k) : (student ? student.points : 0);
-}
-function chargePoints(student, amount, k) {
-  k = k || getActiveClass();
+/* ארנק אישי: חנות, תיבת הפתעה, מדבקות. הקופה הכיתתית לא משמשת לקניות אישיות
+   ולכן אף ילד לא "מוציא" מהכיס של החברים — זה בדיוק מה שמונע לחץ שלילי. */
+function spendableFor(student) { return student ? student.points : 0; }
+function chargePoints(student, amount) {
   amount = Math.max(0, Math.round(amount) || 0);
-  if (isClassMode(k)) k.classSpent = classSpentOf(k) + amount;
-  else if (student) student.points = Math.max(0, student.points - amount);
+  if (student) student.points = Math.max(0, student.points - amount);
 }
-function refundPoints(student, amount, k) {
-  k = k || getActiveClass();
+function refundPoints(student, amount) {
   amount = Math.max(0, Math.round(amount) || 0);
-  if (isClassMode(k)) k.classSpent = Math.max(0, classSpentOf(k) - amount);
-  else if (student) student.points += amount;
+  if (student) student.points += amount;
 }
 
 function econClass() {
@@ -2997,7 +3013,6 @@ function renderClassroom() {
 }
 
 function renderStudent(s) {
-  const klassMode = isClassMode();
   const rank = getRank(s.points);   // הדרגה נשארת אישית — לא דורסת את הכרטיס
   // Combo / fire mode badge (purely visual; recomputed each render so expiry is honored)
   const combo = s.combo || 0;
@@ -3019,7 +3034,7 @@ function renderStudent(s) {
           <span class="student-name" ondblclick="event.stopPropagation();startInlineRename('${s.id}')" title="לחיצה כפולה לשינוי שם">${escapeHtml(s.name)}</span>
           <button class="name-edit" onclick="event.stopPropagation();startInlineRename('${s.id}')" title="שנה שם">✏️</button>
         </div>
-        ${klassMode ? `<div class="class-chip" title="הניקוד המשותף של הכיתה">🎯 הכיתה: <b>${classBalance().toLocaleString('he-IL')}</b></div>` : ''}
+        <div class="class-chip" title="הנקודות של ${escapeHtml(s.name)} נספרות גם לניקוד הכיתתי — בלי לגרוע מאף אחד">🎯 הכיתה: <b>${classEarned().toLocaleString('he-IL')}</b></div>
         <div class="student-rank">
           <span>${rank.current.icon}</span>
           <span style="color:${rank.current.color}">${rank.current.name}</span>
@@ -3114,6 +3129,7 @@ function addPoints(studentId, amount, fromX, fromY) {
 
   s.points = Math.max(0, s.points + amount + comboBonus);
   s.weeklyPoints = (s.weeklyPoints || 0) + amount + comboBonus;
+  addEarned(s, amount + comboBonus);   // נספר גם לניקוד הכיתתי
 
   // ---- האי הכיתתי: 10 נקודות תלמיד = אבן בניין אחת לכיתה (SPEC §3, החלטה 1) ----
   // לא גורע מהתלמיד. שארית נשמרת כדי שאף נקודה לא תלך לאיבוד לאורך השנה.
@@ -3196,6 +3212,7 @@ function awardToStudents(students, amount, opts) {
       if (!s) return;
       s.points = Math.max(0, s.points + amount);
       s.weeklyPoints = (s.weeklyPoints || 0) + amount;
+      addEarned(s, amount);
       ids.push(s.id);
 
       if (amount > 0) {
@@ -3336,23 +3353,6 @@ function classBonus(amount) {
   awardToStudents(cls.students, amount, { label: `🎉 כל הכיתה` });
 }
 
-function setScoreMode(mode) {
-  if (APP_MODE === 'student') return;
-  const cls = getActiveClass();
-  if (!cls) return;
-  cls.scoreMode = (mode === 'class') ? 'class' : 'individual';
-  save();
-  renderClassroom();
-  if (document.getElementById('studentModal').classList.contains('show') && currentShopStudentSid) openStudent(currentShopStudentSid);
-  try {
-    if (window.AK && AK.toast) {
-      AK.toast(cls.scoreMode === 'class'
-        ? `🎯 ${cls.name} עברה לניקוד כיתתי — קופה אחת לכולם`
-        : `👤 ${cls.name} חזרה לניקוד אישי`);
-    }
-  } catch (e) {}
-}
-
 function setClassView(mode) {
   const cls = getActiveClass();
   if (!cls) return;
@@ -3380,29 +3380,28 @@ function renderClassScore() {
   const cls = getActiveClass();
   if (APP_MODE === 'student' || !cls || !isClassMode(cls)) { el.style.display = 'none'; return; }
   const earned = classEarned(cls);
-  const spent = classSpentOf(cls);
-  const bal = classBalance(cls);
   const rank = classRank(cls);
-  const top = [...cls.students].sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0))[0];
+  const top = [...cls.students]
+    .filter(s => (s.weeklyPoints || 0) > 0)
+    .sort((a, b) => (b.weeklyPoints || 0) - (a.weeklyPoints || 0))
+    .slice(0, 3);
   el.style.display = 'block';
   el.innerHTML = `
     <div class="cs-wrap">
       <div class="cs-main">
         <div class="cs-label">🎯 הניקוד של ${escapeHtml(cls.name)}</div>
-        <div class="cs-big">${bal.toLocaleString('he-IL')}</div>
-        <div class="cs-sub">נקודות בקופה המשותפת</div>
+        <div class="cs-big">${earned.toLocaleString('he-IL')}</div>
+        <div class="cs-sub">נקודות שצברנו ביחד</div>
       </div>
       <div class="cs-side">
         <div class="cs-rank" style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</div>
         <div class="cs-bar"><div class="cs-fill" style="width:${rank.progress}%"></div></div>
         <div class="cs-stats">
-          <span>🏅 נצבר סה״כ <b>${earned.toLocaleString('he-IL')}</b></span>
-          ${classDirect(cls) ? `<span>🎯 ישיר לכיתה <b>${classDirect(cls).toLocaleString('he-IL')}</b></span>` : ''}
-          ${classFromStudents(cls) ? `<span>👤 מתלמידים <b>${classFromStudents(cls).toLocaleString('he-IL')}</b></span>` : ''}
           <span>📅 השבוע <b>${classWeekly(cls).toLocaleString('he-IL')}</b></span>
-          ${spent ? `<span>🛍️ הוצאנו <b>${spent.toLocaleString('he-IL')}</b></span>` : ''}
-          ${top && (top.weeklyPoints || 0) > 0 ? `<span>⭐ תרם/ה הכי הרבה השבוע: <b>${escapeHtml(top.name)}</b></span>` : ''}
+          ${classFromStudents(cls) ? `<span>👤 מהתלמידים <b>${classFromStudents(cls).toLocaleString('he-IL')}</b></span>` : ''}
+          ${classDirect(cls) ? `<span>🎯 ישיר לכיתה <b>${classDirect(cls).toLocaleString('he-IL')}</b></span>` : ''}
         </div>
+        ${top.length ? `<div class="cs-thanks">💪 בזכותם השבוע: ${top.map(t => `<b>${escapeHtml(t.name)}</b> <span>${t.weeklyPoints}</span>`).join(' · ')}</div>` : ''}
       </div>
     </div>`;
 }
@@ -3491,14 +3490,13 @@ function renderClassBar() {
   const cls = getActiveClass();
   if (APP_MODE === 'student' || !cls) { bar.style.display = 'none'; return; }
   const view = cls.viewMode === 'class' ? 'class' : 'columns';
-  const scoreClass = isClassMode(cls);
   const prev = document.getElementById('classBonusInput');
   const keep = prev && prev.value !== '' ? prev.value : '10'; // לא לאבד סכום שהמורה הקליד/ה
   const prevPot = document.getElementById('classPotInput');
   const keepPot = prevPot && prevPot.value !== '' ? prevPot.value : '';
   bar.style.display = 'flex';
   bar.innerHTML = `
-    <div class="cb-title">${scoreClass ? '🎯' : '👥'} נקודות לכל הכיתה
+    <div class="cb-title">🎯 נקודות
       <span class="cb-count">${cls.students.length} תלמידים</span>
     </div>
     <div class="cb-group" title="המספר שנכתב נוסף כמו שהוא לקופת הכיתה — בלי לכפול במספר התלמידים">
@@ -3527,10 +3525,6 @@ function renderClassBar() {
         ${[1,2,3,5,10,20].map(v => `<option value="${v}" ${econScale() === v ? 'selected' : ''}>×${v}</option>`).join('')}
       </select>
     </label>
-    <div class="cb-view" title="ניקוד אישי לכל תלמיד, או קופה אחת משותפת לכיתה">
-      <button class="${!scoreClass ? 'active' : ''}" onclick="setScoreMode('individual')">👤 ניקוד אישי</button>
-      <button class="${scoreClass ? 'active' : ''}" onclick="setScoreMode('class')">🎯 ניקוד כיתתי</button>
-    </div>
     <div class="cb-view">
       <button class="${view === 'columns' ? 'active' : ''}" onclick="setClassView('columns')">🧱 טורים</button>
       <button class="${view === 'class' ? 'active' : ''}" onclick="setClassView('class')">👥 כיתה אחת</button>
@@ -3547,8 +3541,7 @@ function openStudent(id) {
   const s = getActiveClass().students.find(s => s.id === id);
   if (!s) return;
   currentShopStudentSid = id;
-  const klassMode = isClassMode();
-  const rank = klassMode ? classRank() : getRank(s.points);
+  const rank = getRank(s.points);
   const m = document.getElementById('modalContent');
   m.innerHTML = `
     <div class="modal-hero">
@@ -3559,16 +3552,10 @@ function openStudent(id) {
           <button class="btn" onclick="renameStudent('${s.id}')" style="font-size:0.7em;padding:4px 10px">✏️</button>
         </div>
         <div class="modal-sub">
-          ${klassMode ? `
-            <span style="color:${rank.current.color}">${rank.current.icon} הכיתה · ${rank.current.name}</span> ·
-            <span style="color:var(--neon-yellow)">🎯 ${classBalance().toLocaleString('he-IL')} בקופה המשותפת</span>
-            <br><small>התרומה של ${escapeHtml(s.name)}: <b style="color:var(--neon-cyan)">${s.points}</b> · השבוע <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b></small>
-          ` : `
-            <span style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</span> ·
-            <span style="color:var(--neon-yellow)">${s.points} נקודות</span>
-            ${rank.next ? `<br><small>עוד ${rank.next.min - s.points} ל${rank.next.name} ${rank.next.icon}</small>` : '<br><small>🏆 דרגה מקסימלית!</small>'}
-            <br><small>השבוע: <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b></small>
-          `}
+          <span style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</span> ·
+          <span style="color:var(--neon-yellow)">${s.points} נקודות שלו/ה</span>
+          ${rank.next ? `<br><small>עוד ${rank.next.min - s.points} ל${rank.next.name} ${rank.next.icon}</small>` : '<br><small>🏆 דרגה מקסימלית!</small>'}
+          <br><small>השבוע: <b style="color:var(--neon-cyan)">${s.weeklyPoints || 0}</b> · תרם/ה לכיתה <b style="color:var(--neon-green)">${earnedOf(s).toLocaleString('he-IL')}</b> מתוך ${classEarned().toLocaleString('he-IL')} 🎯</small>
         </div>
         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-danger" onclick="deleteStudent('${s.id}')" style="font-size:0.8em">🗑️ מחק</button>
@@ -4093,22 +4080,19 @@ function playSound(type) {
 // ==================== LEADERBOARD ====================
 function openLeaderboard() {
   const cls = getActiveClass();
-  const klassMode = isClassMode(cls);
   const sorted = [...cls.students].sort((a,b) => (b.weeklyPoints||0) - (a.weeklyPoints||0)).slice(0, 10);
-  const allTime = [...cls.students].sort((a,b) => b.points - a.points).slice(0, 10);
+  const allTime = [...cls.students].sort((a,b) => earnedOf(b) - earnedOf(a)).slice(0, 10);
   const m = document.getElementById('modalContent');
   m.innerHTML = `
     <div class="modal-hero" style="padding-bottom:10px">
       <div style="font-size:60px">🏆</div>
       <div style="flex:1">
-        <div class="modal-title">${klassMode ? 'התרומות לקופה' : 'לוח שיא'} — ${escapeHtml(cls.name)}</div>
-        <div class="modal-sub">${klassMode
-          ? `כולם ביחד: <b style="color:var(--neon-yellow)">${classEarned(cls).toLocaleString('he-IL')}</b> נקודות 🎯`
-          : 'הכוכבים של הכיתה'}</div>
+        <div class="modal-title">בזכות מי — ${escapeHtml(cls.name)}</div>
+        <div class="modal-sub">כולם ביחד: <b style="color:var(--neon-yellow)">${classEarned(cls).toLocaleString('he-IL')}</b> נקודות 🎯</div>
       </div>
       <button class="btn" onclick="closeModal()">✕</button>
     </div>
-    <h3 style="color:var(--neon-yellow);margin:10px 0">${klassMode ? '🌟 תרמו השבוע' : '🌟 השבוע'}</h3>
+    <h3 style="color:var(--neon-yellow);margin:10px 0">🌟 תרמו השבוע</h3>
     <div>
       ${sorted.map((s,i) => `
         <div class="lb-row ${i<3?'top'+(i+1):''}">
@@ -4119,14 +4103,14 @@ function openLeaderboard() {
         </div>
       `).join('')}
     </div>
-    <h3 style="color:var(--neon-cyan);margin:18px 0 10px">${klassMode ? '💎 תרמו מתחילת השנה' : '💎 כל הזמנים'}</h3>
+    <h3 style="color:var(--neon-cyan);margin:18px 0 10px">💎 תרמו מתחילת השנה</h3>
     <div>
       ${allTime.map((s,i) => `
         <div class="lb-row ${i<3?'top'+(i+1):''}">
           <div class="lb-rank">${['🥇','🥈','🥉'][i] || '#'+(i+1)}</div>
           <canvas class="lb-canvas" data-lb="${s.id}-all" width="100" height="100"></canvas>
           <div style="flex:1"><b>${escapeHtml(s.name)}</b></div>
-          <div style="color:var(--neon-cyan);font-weight:900">${s.points}</div>
+          <div style="color:var(--neon-cyan);font-weight:900">${earnedOf(s).toLocaleString('he-IL')}</div>
         </div>
       `).join('')}
     </div>
@@ -4481,10 +4465,9 @@ function renderStudentProfile() {
   const found = findStudent(studentSelectedId);
   if (!found) { studentSelectedId = null; renderStudentPicker(); return; }
   const { student: s, cls } = found;
-  const klassMode = isClassMode(cls);
   const previewEq = previewEquipped(s);
   const previewPts = previewPoints(s);
-  const realRank = klassMode ? classRank(cls) : getRank(s.points);
+  const realRank = getRank(s.points);
   const previewRank = getRank(previewPts);
   const pending = pendingForStudent(s.id);
 
@@ -4498,12 +4481,10 @@ function renderStudentProfile() {
         <canvas id="studentBigAvatar" width="320" height="320" style="width:180px;height:180px;border-radius:14px;background:radial-gradient(circle at 50% 30%, rgba(0,245,255,0.2), transparent 70%)"></canvas>
         <div style="flex:1">
           <div style="font-size:1.7em;font-weight:900">${escapeHtml(s.name)}</div>
-          <div style="font-size:1em;color:${realRank.current.color};margin-top:4px">${realRank.current.icon} ${klassMode ? 'הכיתה · ' : ''}${realRank.current.name}</div>
+          <div style="font-size:1em;color:${realRank.current.color};margin-top:4px">${realRank.current.icon} ${realRank.current.name}</div>
           <div style="font-size:1.1em;margin-top:8px">
-            ${klassMode
-              ? `🎯 <span style="color:var(--neon-yellow);font-weight:900">${classBalance(cls).toLocaleString('he-IL')}</span> בקופה של הכיתה
-                 <br><span style="font-size:0.85em;opacity:0.85">התרומה שלך: <b style="color:var(--neon-cyan)">${s.points}</b></span>`
-              : `<span style="color:var(--neon-yellow);font-weight:900">${s.points}</span> נקודות`}
+            <span style="color:var(--neon-yellow);font-weight:900">${s.points}</span> נקודות שלך
+            <br><span style="font-size:0.85em;opacity:0.9">🎯 תרמת <b style="color:var(--neon-green)">${earnedOf(s).toLocaleString('he-IL')}</b> לניקוד של הכיתה — <b>${classEarned(cls).toLocaleString('he-IL')}</b></span>
             ${pending.length > 0 ? `<br><span style="color:var(--neon-cyan);font-size:0.85em">תצוגה מקדימה: ${previewPts} נק׳</span>` : ''}
           </div>
           ${pending.length > 0 ? `<div style="margin-top:10px;padding:10px;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.4);border-radius:10px;font-size:0.9em">
