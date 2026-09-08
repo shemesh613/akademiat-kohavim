@@ -3386,34 +3386,39 @@ function setEconScale(v) {
  * מאפס את הכיתה הפעילה בלבד: ניקוד אישי של כל התלמידים, קופת הכיתה, והאי
  * (אבני בנייה + מבנים). דמויות/פריטים אישיים בחנות לא נמחקים. פעולה בלתי הפיכה. */
 const RESET_ADMIN_CODE = '1234';
+function doResetClass(cls) {
+  cls.students.forEach(s => {
+    s.points = 0;
+    s.weeklyPoints = 0;
+    s.earnedTotal = 0;
+    s.combo = 0;
+    s.lastComboTime = 0;
+    if (s.island) { s.island.personalCoins = 0; s.island.pointsRemainder = 0; s.island.spentCoins = 0; }
+  });
+  cls.classPoints = 0;
+  cls.classWeeklyPoints = 0;
+  cls.island = { coins: 0, spent: 0, regions: ['beach'], items: [], level: 1, history: [], _rem: 0 };
+  try { if (window.AK && AK.ensureKlass) AK.ensureKlass(cls); } catch (e) {}
+  try { if (window.Island && typeof Island.close === 'function') Island.close(); } catch (e) {}
+  save();
+  /* דחיפה מיידית לענן — שהאיפוס לא ייעלם ברגע שהסנכרון הבא מושך נתונים ישנים */
+  try { if (typeof cloudSave === 'function' && cloudReady) cloudSave(state); } catch (e) {}
+  if (typeof renderAll === 'function') renderAll(); else renderClassroom();
+  if (window.AK && AK.toast) AK.toast(`♻️ ${cls.name} אופסה — התחלה נקייה!`);
+}
 function resetClassEconomy() {
   if (APP_MODE === 'student') return;
   const cls = getActiveClass();
   if (!cls) return;
-  akPrompt('קוד מנהל לאיפוס הכיתה:', '', (code) => {
+  /* דיאלוג יחיד: הזנת הקוד היא האישור. אסור לקנן akConfirm בתוך akPrompt —
+     akDialog חוסם דיאלוג שני כל עוד הראשון פתוח, והאיפוס לא היה רץ. */
+  akPrompt(`⚠️ איפוס מלא של ${cls.name}`, '', (code) => {
     if (String(code).trim() !== RESET_ADMIN_CODE) {
       if (window.AK && AK.toast) AK.toast('❌ קוד שגוי — האיפוס בוטל');
       return;
     }
-    akConfirm(`לאפס לגמרי את ${escapeHtml(cls.name)}? כל הנקודות (אישי + קופה) והאי יימחקו. אי אפשר לבטל.`, () => {
-      cls.students.forEach(s => {
-        s.points = 0;
-        s.weeklyPoints = 0;
-        s.earnedTotal = 0;
-        s.combo = 0;
-        s.lastComboTime = 0;
-        if (s.island) { s.island.personalCoins = 0; s.island.pointsRemainder = 0; s.island.spentCoins = 0; }
-      });
-      cls.classPoints = 0;
-      cls.classWeeklyPoints = 0;
-      cls.island = { coins: 0, spent: 0, regions: ['beach'], items: [], level: 1, history: [], _rem: 0 };
-      try { if (window.AK && AK.ensureKlass) AK.ensureKlass(cls); } catch (e) {}
-      try { if (window.Island && typeof Island.close === 'function') Island.close(); } catch (e) {}
-      save();
-      if (typeof renderAll === 'function') renderAll(); else renderClassroom();
-      if (window.AK && AK.toast) AK.toast(`♻️ ${cls.name} אופסה — התחלה נקייה!`);
-    }, '', 'כן, אפס הכל');
-  }, 'הקוד ניתן על ידי המנהל');
+    doResetClass(cls);
+  }, 'כל הנקודות (אישי + קופה) והאי יימחקו — אי אפשר לבטל. הקלד/י קוד מנהל לאישור:');
 }
 
 /* ---------------- לוח הניקוד הכיתתי (מוצג רק במצב "כיתתי") ---------------- */
