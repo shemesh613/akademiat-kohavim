@@ -3499,8 +3499,16 @@ function renderClassBar() {
     <div class="cb-title">🎯 נקודות
       <span class="cb-count">${cls.students.length} תלמידים</span>
     </div>
-    <div class="cb-group" title="המספר שנכתב נוסף כמו שהוא לקופת הכיתה — בלי לכפול במספר התלמידים">
-      <span class="cb-gtitle">🎯 לקופת הכיתה</span>
+    <div class="cb-group" title="ניקוד אישי — נכנס לארנק של כל תלמיד בנפרד. רק עם הניקוד הזה קונים בחנות האווטארים. המספר ניתן לכל תלמיד (מוכפל במספר התלמידים).">
+      <span class="cb-gtitle">👤 ניקוד אישי · לחנות 🛍️</span>
+      <input type="number" class="cb-input" id="classBonusInput" value="${escapeHtml(keep)}" placeholder="10"
+             onkeydown="if(event.key==='Enter')classBonus()" />
+      <button class="cb-btn cb-give" onclick="classBonus()">⭐ תן לכולם</button>
+      <button class="cb-btn cb-take cb-sm" onclick="classBonus(-Math.abs(parseInt(document.getElementById('classBonusInput').value,10)||10))">➖</button>
+      <span class="cb-note">= ×${cls.students.length}</span>
+    </div>
+    <div class="cb-group" title="קופת הכיתה — נקודות משותפות לכל הכיתה. משמשות רק לאי הכיתתי ולמשחק ההפסקה. אי אפשר לקנות איתן בחנות! המספר נוסף כמו שהוא (בלי להכפיל במספר התלמידים).">
+      <span class="cb-gtitle">🏝️ קופת הכיתה · לא לחנות</span>
       <button class="cb-btn cb-sm" onclick="addClassPot(50)">+50</button>
       <button class="cb-btn cb-sm" onclick="addClassPot(100)">+100</button>
       <button class="cb-btn cb-sm" onclick="addClassPot(500)">+500</button>
@@ -3509,18 +3517,10 @@ function renderClassBar() {
       <button class="cb-btn cb-give" onclick="addClassPot()">➕ הוסף לכיתה</button>
       <button class="cb-btn cb-take cb-sm" onclick="addClassPot(-Math.abs(parseInt(document.getElementById('classPotInput').value,10)||0))">➖</button>
     </div>
-    <div class="cb-group" title="נותן את המספר הזה לכל תלמיד בנפרד — כלומר מוכפל במספר התלמידים">
-      <span class="cb-gtitle">👤 לכל תלמיד</span>
-      <input type="number" class="cb-input" id="classBonusInput" value="${escapeHtml(keep)}" placeholder="10"
-             onkeydown="if(event.key==='Enter')classBonus()" />
-      <button class="cb-btn cb-sm" onclick="classBonus()">⭐ תן</button>
-      <button class="cb-btn cb-take cb-sm" onclick="classBonus(-Math.abs(parseInt(document.getElementById('classBonusInput').value,10)||10))">➖</button>
-      <span class="cb-note">= ×${cls.students.length}</span>
-    </div>
     <button class="cb-btn" onclick="openNamesEditor()" title="עריכת כל השמות במסך אחד">✏️ שמות</button>
     <div class="cb-spacer"></div>
-    <label class="cb-econ" title="מכפיל המחירים והספים של הכיתה — לכיתה שצוברת הרבה נקודות">
-      ⚖️ מחירים
+    <label class="cb-econ" title="מייקר את המחירים בחנות. ×10 = כל פריט עולה פי 10, כדי שהנקודות יחזיקו הרבה זמן. שים לב: זה מייקר — לא נותן עוד נקודות! אם אי אפשר לקנות כלום, הורד ל-×1.">
+      ⚖️ יוקר החנות
       <select id="econSelect" onchange="setEconScale(this.value)">
         ${[1,2,3,5,10,20].map(v => `<option value="${v}" ${econScale() === v ? 'selected' : ''}>×${v}</option>`).join('')}
       </select>
