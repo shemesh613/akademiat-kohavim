@@ -3611,12 +3611,6 @@ function renderClassBar() {
     <button class="cb-btn" onclick="openNamesEditor()" title="עריכת כל השמות במסך אחד">✏️ שמות</button>
     <button class="cb-btn cb-take" onclick="resetClassEconomy()" title="איפוס מלא של הכיתה (ניקוד אישי + קופה + האי) — דורש קוד מנהל">🗑️ אפס</button>
     <div class="cb-spacer"></div>
-    <label class="cb-econ" title="מייקר את המחירים בחנות. ×10 = כל פריט עולה פי 10, כדי שהנקודות יחזיקו הרבה זמן. שים לב: זה מייקר — לא נותן עוד נקודות! אם אי אפשר לקנות כלום, הורד ל-×1.">
-      ⚖️ יוקר החנות
-      <select id="econSelect" onchange="setEconScale(this.value)">
-        ${[1,2,3,5,10,20].map(v => `<option value="${v}" ${econScale() === v ? 'selected' : ''}>×${v}</option>`).join('')}
-      </select>
-    </label>
   `;
 }
 
@@ -4368,8 +4362,40 @@ function autoWeeklyRollover() {
   } catch (e) { return false; }
 }
 
+/* ---------------- נעילת איים לפי המחיר העדכני ----------------
+ * ספי הפתיחה התייקרו (×5 קבוע), ולכן אי שנפתח פעם במחיר הישן כבר לא
+ * "מגיע" לכיתה. כאן מיישרים את הרשימה: אי נשאר פתוח רק אם סך הנקודות
+ * שהכיתה צברה אי־פעם מגיע לסף שלו היום. חוף הכוכבים תמיד פתוח.
+ *
+ * מה שנבנה לא נמחק — הפריטים נשארים ב-island.items ויחזרו להיראות
+ * ברגע שהאי ייפתח שוב. המנוע פותח לבד כשהסף נחצה, ולכן שתי הפעולות
+ * (פתיחה ונעילה) עובדות מאותה טבלת מחירים בדיוק. */
+function syncIslandRegions() {
+  try {
+    let changed = false;
+    const defs = islandRegionDefs();
+    (state.classes || []).forEach(c => {
+      if (!c) return;
+      try { if (window.AK && AK.ensureKlass) AK.ensureKlass(c); } catch (e) {}
+      const isl = c.island;
+      if (!isl || !Array.isArray(isl.regions)) return;
+      const total = (isl.coins || 0) + (isl.spent || 0);   // כל מה שנצבר אי־פעם
+      const keep = isl.regions.filter(rid => {
+        if (rid === 'beach') return true;
+        const def = defs.find(d => d.id === rid);
+        if (!def) return true;                              // אזור לא מוכר — לא נוגעים
+        return total >= islandUnlockCost(def.threshold);
+      });
+      if (keep.length !== isl.regions.length) { isl.regions = keep; changed = true; }
+    });
+    if (changed) save();
+    return changed;
+  } catch (e) { return false; }
+}
+
 function renderAll() {
   autoWeeklyRollover();
+  syncIslandRegions();
   renderModeBadge();
   if (APP_MODE === 'student') { renderStudentApp(); return; }
   renderTabs();
