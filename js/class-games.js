@@ -504,7 +504,7 @@ function renderAlreadyPlayed(klass, g) {
     '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
     '<div class="ak-cg-wrap">' +
       '<div class="ak-cg-h1">🎉 כבר שיחקנו היום!</div>' +
-      '<div class="ak-cg-h2">הרווחנו ' + earned + ' אבני בניין לאי</div>' +
+      '<div class="ak-cg-h2">הרווחנו ' + earned + ' נקודות לאי</div>' +
       '<div class="ak-cg-body">הקופה מתמלאת שוב מחר — כל נקודה היום נחסכת למשחק של מחר! ⏳</div>' +
       '<button class="ak-cg-btn" id="ak-cg-replay">▶️ עוד סבב קצר (' + REPLAY_SECONDS + ' שניות)</button>' +
     '</div>');
@@ -635,8 +635,10 @@ function renderPlay() {
 /* ===================================================================================
  * 11. מסך חגיגה — מכפיל x1/x1.5/x2, קונפטי, המרה ל-island.coins, ניסוח חיובי בלעדי
  * =================================================================================== */
-var BASE_BONUS = 4;
-/* פער מחודד: הצלחה שווה בבירור יותר. BASE_BONUS=4 → כישלון 2 / בינוני 6 / מעולה 12.
+/* מאז שיחידת הבנייה באי היא נקודה (ולא "אבן" של 10 נקודות) הפרס הוכפל ב-10,
+   כדי שמשחק הצהריים יישאר שווה בדיוק כמו קודם ביחס למחירי האי. */
+var BASE_BONUS = 40;
+/* פער מחודד: הצלחה שווה בבירור יותר. BASE_BONUS=40 → כישלון 20 / בינוני 60 / מעולה 120.
  * אף פעם לא 0 (עיקרון "לא מענישים"), אבל מצוינות מתגמלת פי 6 מכישלון. */
 function tierFor(perf) {
   if (perf >= 0.75) return { mult: 3, stars: '⭐⭐⭐', label: 'מעולה!' };
@@ -649,7 +651,7 @@ function renderCelebrate(perf) {
   var tier = tierFor(perf);
   var coins = Math.max(1, akPrice(BASE_BONUS * tier.mult, klass));
   ensureIslandDefaults(klass).coins += coins;
-  pushIslandHistory(klass, '🎮 קיבלנו ' + coins + ' אבני בניין ממשחק ה' + meta.name + '!');
+  pushIslandHistory(klass, '🎮 קיבלנו ' + coins + ' נקודות לאי ממשחק ה' + meta.name + '!');
   g.totalScore = (g.totalScore || 0) + coins;
   g.plays.push({ gameId: SESSION.game, studentId: SESSION.student ? SESSION.student.id : null, score: coins, t: Date.now() });
   if (g.plays.length > 100) g.plays = g.plays.slice(-100);
@@ -667,7 +669,7 @@ function renderCelebrate(perf) {
     '<div class="ak-cg-wrap">' +
       '<div class="ak-cg-h1">🎉 ' + tier.label + '</div>' +
       extra +
-      '<div class="ak-cg-h2">קיבלנו <span id="ak-cg-coinsnum">0</span> אבני בניין לאי!</div>' +
+      '<div class="ak-cg-h2">קיבלנו <span id="ak-cg-coinsnum">0</span> נקודות לאי!</div>' +
       multChip +
       '<div class="ak-cg-body">הכיתה בנתה עוד קצת ⭐</div>' +
       (cashierLine ? '<div class="ak-cg-role">' + cashierLine + '</div>' : '') +
@@ -771,9 +773,9 @@ function cycleNames(container, students, totalMs) {
 }
 function renderConfettiCelebrate() {
   var klass = SESSION.klass, g = SESSION.gState;
-  var bonus = Math.max(1, akPrice(5, klass));
+  var bonus = Math.max(1, akPrice(50, klass));
   ensureIslandDefaults(klass).coins += bonus;
-  pushIslandHistory(klass, '🎉 מתנת מסיבת סיום השבוע: ' + bonus + ' אבני בניין!');
+  pushIslandHistory(klass, '🎉 מתנת מסיבת סיום השבוע: ' + bonus + ' נקודות לאי!');
   g.totalScore = (g.totalScore || 0) + bonus;
   g.plays.push({ gameId: 'confetti', studentId: null, score: bonus, t: Date.now() });
   if (g.plays.length > 100) g.plays = g.plays.slice(-100);
@@ -784,7 +786,7 @@ function renderConfettiCelebrate() {
     '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
     '<div class="ak-cg-wrap">' +
       '<div class="ak-cg-h1">🎊 איזה שבוע מדהים! 🎊</div>' +
-      '<div class="ak-cg-h2">+' + bonus + ' אבני בניין מתנה!</div>' +
+      '<div class="ak-cg-h2">+' + bonus + ' נקודות לאי מתנה!</div>' +
       '<div class="ak-cg-body">כל הכבוד לכל הכיתה! 👏</div>' +
     '</div>');
   akSound('rankup');

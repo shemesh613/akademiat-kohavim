@@ -778,6 +778,7 @@ function refreshPetObj(stage, fineFrac, hatched) {
   buildGrowthRuler('pet', LIFE.petObj, 0, 8, home.x + 0.9, home.z - 0.4);
 }
 function tickPetGrowth() {
+  if (!islDecorOn('pet')) return;      /* חיית הכיתה כבויה — ראו ISLAND_DECOR */
   var isl = activeIslState(); if (!isl) return;
   var total = totalEarned(isl);
   var pet = isl.pet;
@@ -921,6 +922,7 @@ function refreshTreeObj(regionId, majorStage, fineFrac) {
   buildGrowthRuler('tree_' + regionId, LIFE.trees[regionId], 0, 5, spot.x + 0.7, spot.z + 0.5, sp.name);
 }
 function tickTreeGrowth() {
+  if (!islDecorOn('trees')) return;    /* עצי האזורים כבויים — ראו ISLAND_DECOR */
   var isl = activeIslState(); if (!isl) return;
   var full = fullRegionIds();
   for (var i = 0; i < full.length; i++) {
@@ -971,6 +973,7 @@ function spawnGrowthBurst(pos) {
 
 /* --- סרגל מדידה — עמוד עם סימוני שלב + "כאן היינו לפני חודש" (SPEC §5.2: קריא מ-8מ') --- */
 function buildGrowthRuler(key, obj, minStage, maxStage, x, z, speciesName) {
+  if (!islDecorOn('rulers')) return;   /* עמודי הגדילה ("סרגלים") כבויים — ראו ISLAND_DECOR */
   var sc = scene(); if (!sc) return;
   if (obj.ruler) { sc.remove(obj.ruler); disposeObj(obj.ruler); }
   var g = new THREE.Group();

@@ -416,7 +416,9 @@ header {
   background: rgba(255,255,255,0.5);
   position: relative;
 }
-.im-chip .im-ico { font-size: 30px; line-height: 1.1; }
+.im-chip .im-ico { font-size: 30px; line-height: 1.1; position: relative; display: inline-block; }
+/* אי נעול מציג את האי עצמו (מעומעם) עם מנעול קטן בפינה — לא מנעול במקום האי */
+.im-chip .im-lock { position: absolute; bottom: -2px; left: -6px; font-size: 15px; filter: none; }
 .im-chip .im-name { font-weight: 900; font-size: 0.95em; margin-top: 2px; }
 .im-chip .im-need { font-size: 0.85em; font-weight: 800; opacity: 0.75; margin-top: 2px; }
 .im-chip.done { background: linear-gradient(180deg, #d1fae5, #a7f3d0); border-color: #34d399; }
@@ -3579,7 +3581,7 @@ function renderIslandMap() {
         return `
           <div class="im-chip ${done ? 'done' : isNext ? 'next' : 'locked'}" title="${escapeHtml(d.name)}">
             <div class="im-step">${i + 1}</div>
-            <div class="im-ico">${done ? d.icon : '🔒'}</div>
+            <div class="im-ico">${d.icon}${done ? '' : '<span class="im-lock">🔒</span>'}</div>
             <div class="im-name">${escapeHtml(d.name)}</div>
             <div class="im-need">${done ? '✓ נפתח' : (isNext && total >= need) ? '🎉 מוכן!' : need.toLocaleString('he-IL') + ' ⭐'}</div>
           </div>`;
@@ -5528,7 +5530,11 @@ window.ISLAND_DECOR = {
   boats:     false,  // סירות המפרש על הים
   pollen:    false,  // חלקיקים מרחפים באוויר
   birds:     true,   // ציפורים בשמיים (רחוק, לא מסתיר כלום)
-  clouds:    true    // עננים
+  clouds:    true,   // עננים
+  pet:       false,  // "חיית הכיתה" — מסקוט שבוקע מביצה וגדל בכל אי שנפתח
+  trees:     false,  // עץ הכיתה בכל אזור (גדל לפי ההתקדמות)
+  rulers:    false,  // עמודי הגדילה — הסרגלים עם השלבים ודגלון "לפני חודש"
+  plots:     false   // החלקות האישיות של התלמידים (שלטים + משבצות)
 };
 function islDecor(key) {
   try { var d = window.ISLAND_DECOR; return !d || d[key] !== false; } catch (e) { return true; }

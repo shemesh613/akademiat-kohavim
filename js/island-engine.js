@@ -626,7 +626,8 @@ function updateDayNight(t, scene) {
 /* אזור נעול — מציגים את האי עצמו כרוח רפאים שקופה, לא ערפל אטום.
  * הילדים צריכים לראות לאן הם שואפים: את הצורה, את הצבע ואת השם של כל אי
  * שעוד לפניהם. בנייה שם עדיין חסומה (placeAt בודק שהאזור פתוח). */
-var GHOST_OPACITY = 0.34;
+/* מספיק שקוף כדי לומר "עוד לא שלכם", מספיק אטום כדי שבאמת יראו את האי */
+var GHOST_OPACITY = 0.75;
 function ghostify(obj, opacity) {
   obj.traverse(function (o) {
     if (!o.material) return;
@@ -637,8 +638,9 @@ function ghostify(obj, opacity) {
       var c = m.clone();
       c.transparent = true;
       c.opacity = (m.opacity == null ? 1 : m.opacity) * opacity;
-      c.depthWrite = false;
-      if (c.color) c.color.lerp(new THREE.Color(0x8fa6c4), 0.45);
+      /* depthWrite נשאר דלוק — בלעדיו הצד הרחוק של האי נראה דרך הקרוב
+         והכל מתמסמס לכתם. עדיף אי מוצק וקצת חיוור. */
+      if (c.color) c.color.lerp(new THREE.Color(0x9fb4cc), 0.16);
       return c;
     });
     if (!Array.isArray(o.material)) o.material = o.material[0];
@@ -997,6 +999,10 @@ function placeholderMesh(itemId, regionId) {
  * המשותף של ה-14x14. הפריטים עליה נשמרים באותו klass.island.items עם r='plot_<sid>'. */
 function studentPlotItems(isl, sid) { return isl.items.filter(function (it) { return it.r === 'plot_' + sid; }); }
 function buildPersonalPlots(idx, isl) {
+  /* החלקות האישיות (שלט עם שם לכל תלמיד + משבצת משלו) כבויות דרך
+     ISLAND_DECOR.plots — הן פיזרו עשרות שלטים על האי. הנתונים לא נמחקים:
+     פריטים שנבנו בחלקה נשארים ב-island.items ויחזרו אם יחזירו את הפיצ'ר. */
+  if (!islDecorOn('plots')) return new THREE.Group();
   var grp = new THREE.Group();
   var klass = activeClass();
   if (!klass || !klass.students || !klass.students.length) return grp;
