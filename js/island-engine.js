@@ -88,8 +88,13 @@ function akScale(k) {
   return 1;
 }
 function akPrice(n, k) { return Math.round((Number(n) || 0) * akScale(k)); }
-function regThreshold(def, k) { return akPrice(def ? def.threshold : 0, k); }
-function itemCost(it, k) { return akPrice(it ? it.cost : 10, k); }
+/* ספי פתיחת האיים — קבועים לכל הכיתות, בנקודות, בלי מכפיל הכלכלה.
+   ×10 כי הקבועים בקטלוג נכתבו פעם ב"אבנים", ×UNLOCK_MULT לפי בקשת המורה. */
+var STONE_TO_POINTS = 10;
+var UNLOCK_MULT = 5;
+function regThreshold(def) { return Math.round((def ? def.threshold : 0) * STONE_TO_POINTS * UNLOCK_MULT); }
+/* מחיר פריט — בנקודות (×10 מהקטלוג), וכן מושפע ממכפיל הכלכלה של הכיתה */
+function itemCost(it, k) { return akPrice((it ? it.cost : 10) * STONE_TO_POINTS, k); }
 function contentRef() { return window.IslandContent || null; }
 function contentRegion(id) {
   var c = contentRef();
@@ -433,7 +438,11 @@ function updateSea(t) {
   ISL.seaFrame = (ISL.seaFrame | 0) + 1;
   if (ISL.seaFrame % 2 === 0) ISL.seaGeo.computeVertexNormals();
 }
+function islDecorOn(key) {
+  try { var d = window.ISLAND_DECOR; return !d || d[key] !== false; } catch (e) { return true; }
+}
 function buildClouds(scene) {
+  if (!islDecorOn('clouds')) return;
   /* עננים "פחזניים" מאשכולות כדורים — סגנון פיקסאר, לא קופסאות */
   ISL.clouds = [];
   var span = RING_R0 + REGION_DEFS.length * RING_STEP + 30;
@@ -477,6 +486,7 @@ function updateClouds(dt) {
   });
 }
 function buildBirds(scene) {
+  if (!islDecorOn('birds')) return;
   ISL.birds = [];
   for (var i = 0; i < 6; i++) {
     var g = new THREE.Group();
@@ -515,6 +525,7 @@ function seaWaveAt(x, z, t) {
   return Math.sin(x * 0.12 + t * 1.1) * 0.22 + Math.sin(z * 0.09 - t * 0.8) * 0.18 + Math.sin((x + z) * 0.05 + t * 0.55) * 0.1;
 }
 function buildBoats(scene) {
+  if (!islDecorOn('boats')) return;
   /* מפרשיות קטנות שמפליגות לאט סביב הארכיפלג — עולם שחי גם כשלא נוגעים בו */
   ISL.boats = [];
   var hullMat = new THREE.MeshLambertMaterial({ color: 0x9a6a3f });
@@ -563,6 +574,7 @@ function updateBoats(t) {
   });
 }
 function buildPollen(scene) {
+  if (!islDecorOn('pollen')) return;
   /* "אבקת אור" זהובה מרחפת סביב האזור הפעיל — עומק אטמוספרי בזיל הזול */
   var COUNT = 70;
   var positions = new Float32Array(COUNT * 3);
@@ -636,7 +648,7 @@ function buildRegionLocked(idx) {
   g.userData.sub = sub;
   g.userData.updateLock = function (isl) {
     var need = Math.max(0, regThreshold(def) - totalEarned(isl));
-    sub.userData.setText(need > 0 ? ('נפתח בעוד ' + (need * 10) + ' ⭐') : 'נפתח עכשיו!');
+    sub.userData.setText(need > 0 ? ('נפתח בעוד ' + need + ' ⭐') : 'נפתח עכשיו!');
   };
   return g;
 }
@@ -785,10 +797,14 @@ function buildRegionBase(idx, detailed) {
     /* עיטור ביומה — דשא/סלעים/קרח/חול מפוזרים ב-InstancedMesh (זול לביצועים), יושבים
      * על גובה הקרקע המקומי כדי לא לרחף/לשקוע כשיש גבעה */
     var rnd = seedRand(idx * 977 + 13);
-    var deco = biomeDecoMesh(idx, def, rnd);
-    if (deco) g.add(deco);
-    var flora = duneFloraMesh(idx, def);
-    if (flora) g.add(flora);
+    if (islDecorOn('biomeDeco')) {
+      var deco = biomeDecoMesh(idx, def, rnd);
+      if (deco) g.add(deco);
+    }
+    if (islDecorOn('flora')) {
+      var flora = duneFloraMesh(idx, def);
+      if (flora) g.add(flora);
+    }
     var foam = buildCoastFoam(idx, def);
     if (foam) g.add(foam);
     var islet = buildIslet(idx, def);
@@ -1323,7 +1339,7 @@ function placeAt(regionKey, itemId, x, z, studentId) {
   if (tileOccupied(isl, regionKey, x, z)) { akToast('המשבצת הזו כבר תפוסה'); akSound('error'); return false; }
   var cat = catalogItem(regionKey.indexOf('plot_') === 0 ? ISL.activeId : regionKey, itemId);
   var cost = itemCost(cat);
-  if (isl.coins < cost) { akToast('חסרות ' + ((cost - isl.coins) * 10) + ' ⭐ נקודות'); akSound('error'); return false; }
+  if (isl.coins < cost) { akToast('חסרות ' + (cost - isl.coins) + ' ⭐ נקודות'); akSound('error'); return false; }
   isl.coins -= cost;
   isl.spent = (isl.spent || 0) + cost;
   var entry = { id: itemId, r: regionKey, x: x, z: z, rot: Math.floor(Math.random() * 4) * (Math.PI / 2), by: studentId || null, t: Date.now() };
@@ -1356,7 +1372,7 @@ function removeAt(regionKey, x, z) {
   refreshRegions();
   spawnPoofAt(poofPos);
   akSound('coin');
-  akToast('הוסר — חזרו ' + (refund * 10) + ' ⭐ נקודות');
+  akToast('הוסר — חזרו ' + refund + ' ⭐ נקודות');
   akSave();
   return true;
 }
@@ -1459,7 +1475,7 @@ function checkAutoUnlocks(klass, isl) {
   var total = totalEarned(isl);
   for (var i = 0; i < REGION_DEFS.length; i++) {
     var def = REGION_DEFS[i];
-    if (isl.regions.indexOf(def.id) < 0 && total >= regThreshold(def, klass)) {
+    if (isl.regions.indexOf(def.id) < 0 && total >= regThreshold(def)) {
       doUnlock(klass, isl, def.id, true);
     }
   }
@@ -1507,7 +1523,7 @@ function ensureHudCss() {
     + '.ak-isl-cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #a9713f;background:rgba(255,250,238,0.94);color:#3d2a17;font-size:30px;font-weight:900;cursor:pointer;box-shadow:0 5px 14px rgba(60,40,20,.28);display:flex;align-items:center;justify-content:center;line-height:1;transition:transform .1s;}'
     + '.ak-isl-cbtn:hover{transform:scale(1.08);}'
     + '.ak-isl-cbtn:active{transform:scale(0.94);}'
-    + '.ak-isl-regions{position:absolute;top:96px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(255,250,238,0.94);border:3px solid #a9713f;border-radius:16px;padding:6px 10px;pointer-events:auto;max-width:94vw;overflow-x:auto;}.ak-isl-rchip{white-space:nowrap;font-size:20px;font-weight:900;color:#3d2a17;background:rgba(169,113,63,0.14);border-radius:12px;padding:5px 14px;cursor:pointer;border:2px solid transparent;}.ak-isl-rchip.on{border-color:#c8891f;background:#ffd54a;}.ak-isl-rchip.lock{opacity:.45;cursor:not-allowed;}.ak-isl-plots{position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(255,250,238,0.94);border:3px solid #a9713f;border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}'
+    + '.ak-isl-regions{position:absolute;top:96px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(255,250,238,0.94);border:3px solid #a9713f;border-radius:16px;padding:6px 10px;pointer-events:auto;max-width:94vw;overflow-x:auto;}.ak-isl-rchip{white-space:nowrap;font-size:20px;font-weight:900;color:#3d2a17;background:rgba(169,113,63,0.14);border-radius:12px;padding:5px 14px;cursor:pointer;border:2px solid transparent;}.ak-isl-rchip.on{border-color:#c8891f;background:#ffd54a;}.ak-isl-rchip.lock{opacity:.45;cursor:not-allowed;}.ak-isl-plots{display:none;position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:8px;background:rgba(255,250,238,0.94);border:3px solid #a9713f;border-radius:20px;padding:8px 14px;pointer-events:auto;max-width:90vw;overflow-x:auto;}.ak-isl-plots.on{display:flex;}'
     + '.ak-isl-plot-chip{white-space:nowrap;font-size:18px;font-weight:900;color:#3d2a17;background:rgba(169,113,63,0.14);border-radius:12px;padding:4px 12px;cursor:pointer;border:2px solid transparent;}'
     + '.ak-isl-plot-chip.sel{border-color:#7dffa8;background:rgba(125,255,168,0.25);}';
   var style = document.createElement('style');
@@ -1536,6 +1552,7 @@ function buildHud(container) {
     '<div class="ak-isl-ctrl">' +
     '  <button class="ak-isl-cbtn" data-role="home" title="חזרה לכיתה">🏠</button>' +
     '  <button class="ak-isl-cbtn" data-role="mute" title="השתקת סאונד">🔊</button>' +
+    '  <button class="ak-isl-cbtn" data-role="plotstoggle" title="חלקות אישיות">👥</button>' +
     '</div>';
   /* ויניטה קולנועית עדינה — ממקדת את העין למרכז, בלי לגעת בקריאות ה-HUD */
   var vin = document.createElement('div');
@@ -1560,6 +1577,16 @@ function buildHud(container) {
      בשום מנגנון קיים — "חזרה" סוגר את שכבת האי, "סאונד" מפעיל את ההשתקה הראשית. */
   var homeBtn = hud.querySelector('[data-role=home]');
   var muteBtn = hud.querySelector('[data-role=mute]');
+  /* רצועת החלקות האישיות פרושה על רוחב המסך והסתירה את האי — לכן היא סגורה
+     כברירת מחדל ונפתחת רק בלחיצה על 👥, ורק כשיש בכלל מה להציג. */
+  var plotsBtn = hud.querySelector('[data-role=plotstoggle]');
+  if (plotsBtn) plotsBtn.addEventListener('click', function () {
+    var strip = ISL.hud && ISL.hud.plots;
+    if (!strip) return;
+    var open = strip.classList.toggle('on');
+    plotsBtn.textContent = open ? '✖️' : '👥';
+    if (open) renderPlotPicker();
+  });
   function syncMuteIcon() {
     if (muteBtn) muteBtn.textContent = (window.isMuted && window.isMuted()) ? '🔇' : '🔊';
   }
@@ -1589,8 +1616,9 @@ function renderPlotPicker() {
   var klass = activeClass();
   var students = (klass && klass.students) || [];
   el.innerHTML = '';
-  if (!students.length) { el.style.display = 'none'; return; }
-  el.style.display = 'flex';
+  /* הפתיחה/סגירה נעשית ע"י המחלקה .on (כפתור 👥) — בלי display אינליין,
+     אחרת הרצועה הייתה נפתחת לבד בכל מעבר אזור ומסתירה את האי. */
+  if (!students.length) { el.classList.remove('on'); return; }
   var shared = document.createElement('div');
   shared.className = 'ak-isl-plot-chip' + (!ISL.plotTarget ? ' sel' : '');
   shared.textContent = '🏗️ בונים במשותף';
@@ -1628,9 +1656,9 @@ function renderRegionNav() {
       d.className = 'ak-isl-rchip' + (def.id === ISL.activeId ? ' on' : '') + (unlocked ? '' : ' lock');
       d.innerHTML = unlocked
         ? (def.icon + ' ' + def.name)
-        : ('🔒 ' + def.icon + ' ' + regThreshold(def, klass));
+        : ('🔒 ' + def.icon + ' ' + regThreshold(def));
       d.onclick = function () {
-        if (!unlocked) { akToast('האזור נפתח ב-' + regThreshold(def, klass) + ' אבני בנייה 🔒'); akSound('error'); return; }
+        if (!unlocked) { akToast('האי הזה נפתח ב-' + regThreshold(def) + ' נקודות 🔒'); akSound('error'); return; }
         focusRegionInternal(def.id, false);
         renderRegionNav();
       };
@@ -1656,9 +1684,9 @@ function renderShopPalette() {
     var isSel = ISL.buildSel && ISL.buildSel.itemId === it.id && ISL.buildSel.regionId === targetRegion;
     var cst = itemCost(it, klass);
     d.className = 'ak-isl-item' + (isSel ? ' sel' : '') + (isl.coins < cst ? ' cant' : '');
-    d.innerHTML = '<span class="em">' + (it.em || '❔') + '</span><div class="nm">' + akEsc(it.n || it.id) + '</div><div class="cs">⭐ ' + (cst * 10) + '</div>';
+    d.innerHTML = '<span class="em">' + (it.em || '❔') + '</span><div class="nm">' + akEsc(it.n || it.id) + '</div><div class="cs">⭐ ' + cst + '</div>';
     d.onclick = function () {
-      if (isl.coins < cst) { akToast('צריך עוד ' + ((cst - isl.coins) * 10) + ' ⭐ נקודות'); akSound('error'); return; }
+      if (isl.coins < cst) { akToast('צריך עוד ' + (cst - isl.coins) + ' ⭐ נקודות'); akSound('error'); return; }
       ISL.delMode = false;
       ISL.buildSel = (isSel) ? null : { regionId: targetRegion, itemId: it.id };
       renderShopPalette();
@@ -1673,18 +1701,21 @@ function updateHud(now) {
   ISL.lastHudUpdate = now;
   var klass = activeClass();
   var isl = klass ? ensureIslandState(klass) : { coins: 0, spent: 0, regions: ['beach'] };
-  ISL.hud.coins.textContent = '⭐ ' + (isl.coins * 10);
+  /* ספירה מקבילה: הניקוד הכיתתי על הלוח לא יורד מבנייה, ולכן כאן — ובכאן בלבד —
+     מראים לילדים כמה מהנקודות כבר הפכו למבנים וכמה עוד נשארו. */
+  ISL.hud.coins.textContent = '✨ נשאר ' + (isl.coins || 0)
+    + ' · 🏗️ בנינו ' + (isl.spent || 0);
   var total = totalEarned(isl);
   var next = null;
   for (var i = 0; i < REGION_DEFS.length; i++) { if (isl.regions.indexOf(REGION_DEFS[i].id) < 0) { next = REGION_DEFS[i]; break; } }
   if (next) {
     var prevThreshold = 0;
-    for (var j = REGION_DEFS.length - 1; j >= 0; j--) { if (isl.regions.indexOf(REGION_DEFS[j].id) >= 0) { prevThreshold = regThreshold(REGION_DEFS[j], klass); } }
-    var nextThreshold = regThreshold(next, klass);
+    for (var j = REGION_DEFS.length - 1; j >= 0; j--) { if (isl.regions.indexOf(REGION_DEFS[j].id) >= 0) { prevThreshold = regThreshold(REGION_DEFS[j]); } }
+    var nextThreshold = regThreshold(next);
     var span = Math.max(1, nextThreshold - prevThreshold);
     var pct = clamp(((total - prevThreshold) / span) * 100, 0, 100);
     ISL.hud.progfill.style.width = pct.toFixed(0) + '%';
-    ISL.hud.proglabel.textContent = 'עוד ' + (Math.max(0, nextThreshold - total) * 10) + ' ⭐ עד ' + next.icon + ' ' + next.name;
+    ISL.hud.proglabel.textContent = 'עוד ' + Math.max(0, nextThreshold - total) + ' ⭐ עד ' + next.icon + ' ' + next.name;
   } else {
     ISL.hud.progfill.style.width = '100%';
     ISL.hud.proglabel.textContent = '🌟 כל האי נפתח — כל הכבוד לכיתה!';

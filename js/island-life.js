@@ -405,7 +405,13 @@ function plotHomeOf(student, students, activeId) {
   return { x: c.x + Math.cos(angle) * plotR, z: c.z + Math.sin(angle) * plotR };
 }
 
+/* התושבים שמסתובבים באי — כבויים דרך window.ISLAND_DECOR.villagers (index.html).
+   כשזה כבוי לא נוצרים rigs בכלל: אין דמויות, אין צללים, ואין עלות רינדור. */
+function islDecorOn(key) {
+  try { var d = window.ISLAND_DECOR; return !d || d[key] !== false; } catch (e) { return true; }
+}
 function syncVillagerRoster() {
+  if (!islDecorOn('villagers')) return;
   var klass = activeClass();
   var students = (klass && klass.students) || [];
   var seen = {};
@@ -623,6 +629,7 @@ function applyVillagerTransform(v, t) {
 
 var _lodTimer = 0, _dailyCheckTimer = 0;
 function tickVillagers(t, dt) {
+  if (!islDecorOn('villagers')) return;
   syncVillagerRosterThrottled(dt);
   /* בעיית סדר אתחול: attach() רץ בסוף initScene, לפני ש-refreshRegions() מילא את
      ISL.regionTier. לכן ב-assignHomes הראשון אין אף אזור ב-'full' והוא יוצא מיד —

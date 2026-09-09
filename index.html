@@ -1270,7 +1270,7 @@ const MYSTERY_BOX_PRICE = 75;
  * כל נקודה שתלמיד מקבל נספרת פעמיים: אצלו ואצל הכיתה. אף אחד לא מפסיד כלום.
  *   • ניקוד אישי (student.points) → חנות אווטארים, תיבת הפתעה, מדבקות, החלקה באי.
  *   • ניקוד כיתתי = סכום כל האישיים + klass.classPoints (מה שהמורה נותן ישירות לכיתה)
- *     → אבני בנייה לאי הכיתתי + שניות משחק בהפסקה.
+ *     → יחידות בנייה לאי הכיתתי (נקודה = יחידה) + שניות משחק בהפסקה.
  * קנייה אישית לעולם לא גורעת מהניקוד הכיתתי — זה מה שמונע "בגללו הפסדנו".
  * מבוסס על ספרות ה-group contingencies: independent כבסיס + interdependent כשכבה
  * נוספת נמצא יעיל והוגן יותר מאשר כיתתי-בלבד (שפוגע דווקא בתלמידים החלשים).
@@ -1305,14 +1305,16 @@ function classWeekly(k) {
   if (!k) return 0;
   return Math.max(0, (k.classWeeklyPoints || 0)) + k.students.reduce((a, s) => a + (s.weeklyPoints || 0), 0);
 }
-/* נקודות שהכיתה הוציאה על בנייה באי (מסונכרן: כל בנייה גורעת מניקוד הכיתה).
-   klass.island.spent נשמר ב"אבני בנייה" (אבן = 10 נק'), לכן ×10 להמרה לנקודות. */
+/* נקודות שהכיתה כבר השקיעה בבנייה באי. מאז המעבר ל"נקודה = יחידת בנייה"
+   klass.island.spent שמור כבר בנקודות — אין יותר המרה. */
 function islandSpentPoints(k) {
   k = k || getActiveClass();
-  return Math.max(0, ((k && k.island && k.island.spent) || 0) * 10);
+  return Math.max(0, (k && k.island && k.island.spent) || 0);
 }
-/* היתרה הזמינה של הכיתה = כל מה שנצבר פחות מה שהוצא על בנייה באי.
-   זה המספר האחד המשותף: המורה נותן נקודות → עולה, בונים באי → יורד. */
+/* היתרה שנשארה לבנייה = כל מה שנצבר פחות מה שכבר הושקע באי.
+   שים לב: הניקוד הכיתתי שמוצג על הלוח הוא תמיד classEarned והוא לא יורד
+   לעולם מבנייה. היתרה הזאת מוצגת רק בתוך האי / במפת האיים, כספירה מקבילה:
+   "כמה כבר השתמשנו" מול "כמה עוד נשאר". */
 function classBalance(k) {
   k = k || getActiveClass();
   return Math.max(0, classEarned(k) - islandSpentPoints(k));
@@ -1346,6 +1348,14 @@ function econClass() {
 }
 function econScale(k) { try { return (window.AK && AK.scale) ? (AK.scale(k || econClass()) || 1) : 1; } catch (e) { return 1; } }
 function P(n, k) { return Math.round((Number(n) || 0) * econScale(k)); }
+/* ---- כמה נקודות עולה לפתוח אי ----
+ * הספים בקטלוג נכתבו פעם ב"אבני בנייה" (אבן = 10 נקודות). היום הכל בנקודות,
+ * ולכן ×10. ×ISLAND_UNLOCK_MULT הוא הכפל שהמורה ביקש כדי שהאיים לא ייפתחו מהר.
+ * הסף הזה קבוע לכל הכיתות — הוא לא מושפע ממכפיל הכלכלה של הכיתה. */
+const ISLAND_UNLOCK_MULT = 5;
+function islandUnlockCost(rawThreshold) {
+  return Math.round((Number(rawThreshold) || 0) * 10 * ISLAND_UNLOCK_MULT);
+}
 
 // ==================== COMBO / FIRE MODE ====================
 // Combo never modifies the teacher's input amount — it only ADDS a bonus on top.
@@ -3040,6 +3050,28 @@ function renderClassroom() {
   });
 }
 
+/* ---------------- סולם הדרגות ----------------
+ * "להבה" לבד לא אומר לילד כלום. כאן הוא רואה את כל הסולם בחלש, את הדרגה
+ * שהוא בה מודגשת, ואת זו שלפני ואחרי — כך הוא יודע מאיפה בא ולאן ממשיך. */
+function renderRankLadder(s) {
+  const pts = s.points || 0;
+  const curIdx = RANKS.reduce((acc, r, i) => (pts >= r.min ? i : acc), 0);
+  const chips = RANKS.map((r, i) => {
+    const state = i < curIdx ? 'past' : i === curIdx ? 'now' : 'next';
+    const need = i > curIdx ? `<div class="rl-need">${(r.min - pts).toLocaleString('he-IL')}+</div>` : '';
+    return `<div class="rl-chip ${state}" style="--rl:${r.color}" title="${escapeHtml(r.name)} · ${r.min.toLocaleString('he-IL')} נקודות">
+      <div class="rl-ico">${i < curIdx ? '✓' : r.icon}</div>
+      <div class="rl-name">${escapeHtml(r.name)}</div>
+      ${need}
+    </div>`;
+  }).join('<div class="rl-sep"></div>');
+  const nxt = RANKS[curIdx + 1];
+  const foot = nxt
+    ? `עוד <b>${(nxt.min - pts).toLocaleString('he-IL')}</b> נקודות ל${nxt.icon} ${escapeHtml(nxt.name)}`
+    : '🏆 הדרגה הגבוהה ביותר!';
+  return `<div class="rank-ladder"><div class="rl-row">${chips}</div><div class="rl-foot">${foot}</div></div>`;
+}
+
 function renderStudent(s) {
   const rank = getRank(s.points);   // הדרגה נשארת אישית — לא דורסת את הכרטיס
   // Combo / fire mode badge (purely visual; recomputed each render so expiry is honored)
@@ -3062,7 +3094,6 @@ function renderStudent(s) {
           <span class="student-name" ondblclick="event.stopPropagation();startInlineRename('${s.id}')" title="לחיצה כפולה לשינוי שם">${escapeHtml(s.name)}</span>
           <button class="name-edit" onclick="event.stopPropagation();startInlineRename('${s.id}')" title="שנה שם">✏️</button>
         </div>
-        <div class="class-chip" title="הנקודות של ${escapeHtml(s.name)} נספרות גם לניקוד הכיתתי — בלי לגרוע מאף אחד">🎯 הכיתה: <b>${classEarned().toLocaleString('he-IL')}</b></div>
         <div class="student-rank">
           <span>${rank.current.icon}</span>
           <span style="color:${rank.current.color}">${rank.current.name}</span>
@@ -3159,21 +3190,14 @@ function addPoints(studentId, amount, fromX, fromY) {
   s.weeklyPoints = (s.weeklyPoints || 0) + amount + comboBonus;
   addEarned(s, amount + comboBonus);   // נספר גם לניקוד הכיתתי
 
-  // ---- האי הכיתתי: 10 נקודות תלמיד = אבן בניין אחת לכיתה (SPEC §3, החלטה 1) ----
-  // לא גורע מהתלמיד. שארית נשמרת כדי שאף נקודה לא תלך לאיבוד לאורך השנה.
+  // ---- האי הכיתתי: נקודה אחת = יחידת בנייה אחת. אין "אבנים" ואין המרות ----
+  // לא גורע מהתלמיד — אותן נקודות נספרות גם לו וגם לאי.
   try {
     const gained = amount + comboBonus;
     if (gained > 0) {
       const k = getActiveClass();
       if (window.AK) window.AK.ensureKlass(k);
-      if (k && k.island) {
-        k.island._rem = (k.island._rem || 0) + gained;
-        const stones = Math.floor(k.island._rem / 10);
-        if (stones > 0) {
-          k.island._rem -= stones * 10;
-          k.island.coins += stones;
-        }
-      }
+      if (k && k.island) k.island.coins += gained;
     }
   } catch (e) {}
 
@@ -3216,7 +3240,7 @@ function celebrateStudent(sid, klass) {
  * מנוע ניקוד קבוצתי משותף — משמש גם ל"טור" וגם ל"כל הכיתה".
  * עובר בדיוק באותם צינורות של addPoints() כדי שכל שאר המערכות יתעדכנו:
  *   • points + weeklyPoints
- *   • אבני בנייה לאי הכיתתי (10 נק' = אבן, עם שארית)   [SPEC §3]
+ *   • יחידות בנייה לאי הכיתתי (נקודה = יחידה, 1:1)      [SPEC §3]
  *   • ClassGames.onPointsAdded  → קופת הזמן היומית + הגרלת שחקן/ית היום
  *   • IslandOwnership.onPointsAdded → מטבע אישי לחלקה
  *   • מדבקות + הישגים
@@ -3260,15 +3284,11 @@ function awardToStudents(students, amount, opts) {
       try { checkAchievements(s).forEach(a => achAwards.push(a)); } catch (e) {}
     });
 
-    // ---- אבני בנייה לאי הכיתתי — צבירה אחת מרוכזת (אותה נוסחה כמו ב-addPoints) ----
+    // ---- יחידות בנייה לאי — צבירה אחת מרוכזת (אותה נוסחה כמו ב-addPoints) ----
     if (islandGain > 0) {
       try {
         if (window.AK && typeof window.AK.ensureKlass === 'function') window.AK.ensureKlass(cls);
-        if (cls && cls.island) {
-          cls.island._rem = (cls.island._rem || 0) + islandGain;
-          const stones = Math.floor(cls.island._rem / 10);
-          if (stones > 0) { cls.island._rem -= stones * 10; cls.island.coins += stones; }
-        }
+        if (cls && cls.island) cls.island.coins += islandGain;
       } catch (e) {}
     }
   } finally {
@@ -3311,7 +3331,7 @@ function columnBonus(col) {
  * הוספה ישירה לקופת הכיתה — "נטו".
  * כותבים 1000 ➜ הקופה עולה ב-1000. לא 1000 לכל תלמיד ולא כפול מספר התלמידים.
  * נשמר ב-klass.classPoints, ומזין בדיוק את אותם צינורות של נקודות רגילות:
- * אבני בנייה לאי (10:1) וקופת הזמן של משחק הצהריים.
+ * יחידות בנייה לאי (1:1) וקופת הזמן של משחק הצהריים.
  * ================================================================================== */
 function applyClassPot(cls, amount) {
   amount = parseInt(amount, 10) || 0;
@@ -3320,14 +3340,10 @@ function applyClassPot(cls, amount) {
   cls.classWeeklyPoints = Math.max(0, (cls.classWeeklyPoints || 0) + amount);
 
   if (amount > 0) {
-    // אבני בנייה לאי — אותה נוסחה בדיוק כמו ב-addPoints
+    // יחידות בנייה לאי — אותה נוסחה בדיוק כמו ב-addPoints
     try {
       if (window.AK && AK.ensureKlass) AK.ensureKlass(cls);
-      if (cls.island) {
-        cls.island._rem = (cls.island._rem || 0) + amount;
-        const stones = Math.floor(cls.island._rem / 10);
-        if (stones > 0) { cls.island._rem -= stones * 10; cls.island.coins += stones; }
-      }
+      if (cls.island) cls.island.coins += amount;
     } catch (e) {}
     // קופת הזמן היומית (אין תלמיד ספציפי — נרשם על חשבון הכיתה)
     if (window.ClassGames && typeof window.ClassGames.onPointsAdded === 'function') {
@@ -3403,7 +3419,7 @@ function setEconScale(v) {
 
 /* ---------------- איפוס כיתה מלא — דורש קוד מנהל (1234) ----------------
  * מאפס את הכיתה הפעילה בלבד: ניקוד אישי של כל התלמידים, קופת הכיתה, והאי
- * (אבני בנייה + מבנים). דמויות/פריטים אישיים בחנות לא נמחקים. פעולה בלתי הפיכה. */
+ * (יחידות בנייה + מבנים). דמויות/פריטים אישיים בחנות לא נמחקים. פעולה בלתי הפיכה. */
 const RESET_ADMIN_CODE = '1234';
 function doResetClass(cls) {
   cls.students.forEach(s => {
@@ -3416,7 +3432,7 @@ function doResetClass(cls) {
   });
   cls.classPoints = 0;
   cls.classWeeklyPoints = 0;
-  cls.island = { coins: 0, spent: 0, regions: ['beach'], items: [], level: 1, history: [], _rem: 0 };
+  cls.island = { coins: 0, spent: 0, regions: ['beach'], items: [], level: 1, history: [], _rem: 0, u: 'p' };
   try { if (window.AK && AK.ensureKlass) AK.ensureKlass(cls); } catch (e) {}
   try { if (window.Island && typeof Island.close === 'function') Island.close(); } catch (e) {}
   save();
@@ -3457,8 +3473,8 @@ function renderClassScore() {
     <div class="cs-wrap">
       <div class="cs-main">
         <div class="cs-label">🎯 הניקוד של ${escapeHtml(cls.name)}</div>
-        <div class="cs-big">${classBalance(cls).toLocaleString('he-IL')}</div>
-        <div class="cs-sub">נקודות זמינות לבנייה באי · מתוך ${earned.toLocaleString('he-IL')} שנצברו</div>
+        <div class="cs-big">${earned.toLocaleString('he-IL')}</div>
+        <div class="cs-sub">נקודות שצברנו ביחד — הבנייה באי לא מורידה מהן</div>
       </div>
       <div class="cs-side">
         <div class="cs-rank" style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</div>
@@ -3503,9 +3519,10 @@ function renderIslandMap() {
   try { if (window.AK && AK.ensureKlass) AK.ensureKlass(cls); } catch (e) {}
   const isl = cls.island || { coins: 0, spent: 0, regions: ['beach'] };
   const owned = Array.isArray(isl.regions) ? isl.regions : ['beach'];
-  const total = (isl.coins || 0) + (isl.spent || 0);   // אבני בנייה שנצברו אי־פעם (יחידות פנימיות)
-  const S2P = 10;                                       // אבן בנייה = 10 נקודות → מציגים הכל בנקודות
-  const availPts = classBalance(cls);                  // המספר המשותף עם לוח הניקוד
+  const total = (isl.coins || 0) + (isl.spent || 0);   // נקודות שנצברו אי־פעם
+  /* מקור אמת אחד — בדיוק המספרים שה-HUD בתוך האי מציג */
+  const availPts = Math.max(0, isl.coins || 0);        // מה שנשאר לבנייה
+  const usedPts  = Math.max(0, isl.spent || 0);        // מה שכבר הושקע באי
   const earnedPts = classEarned(cls);
   const defs = islandRegionDefs();
 
@@ -3517,14 +3534,14 @@ function renderIslandMap() {
     headRight = `<span class="im-next">🌟 כל 8 האיים נפתחו — כל הכבוד!</span>`;
   } else {
     const next = defs[nextIdx];
-    const nextNeed = P(next.threshold);
+    const nextNeed = islandUnlockCost(next.threshold);
     let prev = 0;
-    for (let j = 0; j < nextIdx; j++) prev = P(defs[j].threshold);
+    for (let j = 0; j < nextIdx; j++) prev = islandUnlockCost(defs[j].threshold);
     const span = Math.max(1, nextNeed - prev);
     pct = Math.max(0, Math.min(100, ((total - prev) / span) * 100));
     const left = nextNeed - total;
     headRight = left > 0
-      ? `<span class="im-next">עוד ${(left * S2P).toLocaleString('he-IL')} ⭐ עד ${next.icon} ${escapeHtml(next.name)}</span>`
+      ? `<span class="im-next">עוד ${left.toLocaleString('he-IL')} ⭐ עד ${next.icon} ${escapeHtml(next.name)}</span>`
       : `<span class="im-next">🎉 ${next.icon} ${escapeHtml(next.name)} מוכן להיפתח — היכנסו לאי!</span>`;
   }
 
@@ -3532,7 +3549,7 @@ function renderIslandMap() {
   el.innerHTML = `
     <div class="im-head">
       <span>🗺️ מסע האיים · ${owned.length}/${defs.length} נפתחו</span>
-      <span style="font-size:0.85em;opacity:0.8">⭐ ${availPts.toLocaleString('he-IL')} נקודות זמינות · ${earnedPts.toLocaleString('he-IL')} נצברו מתחילת הדרך</span>
+      <span style="font-size:0.85em;opacity:0.85">🏗️ השקענו באי <b>${usedPts.toLocaleString('he-IL')}</b> · ✨ נשאר לבנייה <b>${availPts.toLocaleString('he-IL')}</b> · מתוך ${earnedPts.toLocaleString('he-IL')} שצברנו</span>
       <span class="cb-spacer" style="flex:1"></span>
       ${headRight}
     </div>
@@ -3541,13 +3558,13 @@ function renderIslandMap() {
       ${defs.map((d, i) => {
         const done = owned.indexOf(d.id) >= 0;
         const isNext = i === nextIdx;
-        const need = P(d.threshold);
+        const need = islandUnlockCost(d.threshold);
         return `
           <div class="im-chip ${done ? 'done' : isNext ? 'next' : 'locked'}" title="${escapeHtml(d.name)}">
             <div class="im-step">${i + 1}</div>
             <div class="im-ico">${done ? d.icon : '🔒'}</div>
             <div class="im-name">${escapeHtml(d.name)}</div>
-            <div class="im-need">${done ? '✓ נפתח' : (isNext && total >= need) ? '🎉 מוכן!' : (need * S2P).toLocaleString('he-IL') + ' ⭐'}</div>
+            <div class="im-need">${done ? '✓ נפתח' : (isNext && total >= need) ? '🎉 מוכן!' : need.toLocaleString('he-IL') + ' ⭐'}</div>
           </div>`;
       }).join('')}
     </div>
@@ -3679,6 +3696,7 @@ function renderModalBody(s) {
         <button class="point-btn add-100" onclick="addPoints('${s.id}', 100, event.clientX, event.clientY)">+100</button>
         <button class="point-btn minus-10" onclick="addPoints('${s.id}', -10, event.clientX, event.clientY)">-10</button>
       </div>
+      ${renderRankLadder(s)}
     `;
   } else if (modalTab === 'shop') {
     body.innerHTML = ['characters','bodies','hats','glasses','pets','auras'].map(cat => {
@@ -4571,7 +4589,9 @@ function renderStudentProfile() {
         </div>
       </div>
 
-      <div class="modal-tabs" style="border:none;padding:0">
+      ${renderRankLadder(s)}
+
+      <div class="modal-tabs" style="border:none;padding:0;margin-top:14px">
         <button class="modal-tab active" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
         <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
         <button class="modal-tab" id="stTabStickers" onclick="setStudentTab('stickers')">🧩 מדבקות</button>
@@ -5422,6 +5442,24 @@ function openClassGame() {
 </script>
 
 <!-- ===== מודולים חדשים: האי הכיתתי + משחקי הצהריים + שדרוג ויזואלי ===== -->
+<script>
+/* ===== מה מוצג באי חוץ ממה שהילדים בנו =====
+   האי מתחיל ריק בכוונה: רק הקרקע, הים והשמיים — וכל מה שנבנה.
+   שום דבר כאן לא נוגע בפריטים שנבנו, זה רק קישוט של המנוע.
+   רוצה להחזיר משהו? שנה ל-true. */
+window.ISLAND_DECOR = {
+  villagers: false,  // הדמויות שמסתובבות באי
+  biomeDeco: false,  // עצים/סלעים/קרח מפוזרים על הקרקע
+  flora:     false,  // עשב, פרחים ושיחים
+  boats:     false,  // סירות המפרש על הים
+  pollen:    false,  // חלקיקים מרחפים באוויר
+  birds:     true,   // ציפורים בשמיים (רחוק, לא מסתיר כלום)
+  clouds:    true    // עננים
+};
+function islDecor(key) {
+  try { var d = window.ISLAND_DECOR; return !d || d[key] !== false; } catch (e) { return true; }
+}
+</script>
 <script src="js/ak-bridge.js"></script>
 <script src="js/island-content.js"></script>
 <script src="js/island-engine.js"></script>

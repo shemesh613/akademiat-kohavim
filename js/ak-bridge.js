@@ -45,7 +45,7 @@
 
   /* ---------- ברירות מחדל בטוחות ל-state חדש ---------- */
   function defaultIsland() {
-    return { coins: 0, spent: 0, regions: ['beach'], items: [], level: 1, history: [] };
+    return { coins: 0, spent: 0, regions: ['beach'], items: [], level: 1, history: [], u: 'p' };
   }
   function defaultGames() {
     return { lastPlayed: 0, totalScore: 0, plays: [], dailyDone: false };
@@ -82,6 +82,15 @@
       if (!Array.isArray(i.items)) i.items = [];
       if (!Array.isArray(i.history)) i.history = [];
       if (typeof i.level !== 'number') i.level = 1;
+      /* מעבר ל"נקודה אחת = יחידת בנייה אחת": עד כאן coins/spent נשמרו ב"אבנים"
+         (אבן = 10 נקודות). ממירים פעם אחת בלבד ומסמנים, כדי שכיתה קיימת לא
+         תאבד את מה שצברה ולא תוכפל שוב בטעינה הבאה. */
+      if (i.u !== 'p') {
+        i.coins = Math.max(0, Math.round((i.coins || 0) * 10));
+        i.spent = Math.max(0, Math.round((i.spent || 0) * 10));
+        i._rem = 0;
+        i.u = 'p';
+      }
     }
     if (!k.games) k.games = defaultGames();
     else {

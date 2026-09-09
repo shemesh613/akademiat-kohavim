@@ -239,7 +239,9 @@
   /* מחיר במטבעות אישיים — נגזר ממחיר האבנים. הפריט הראשון בכל אזור עולה 1 מטבע
      (= 10 נקודות בלבד) כדי שכמעט כל תלמיד יגיע לפריט ראשון תוך שבוע-שבועיים. */
   /* מקבל עלות-אבנים כבר מוכפלת ב-scale (ראו akPrice) */
-  function personalCostOf(scaledStoneCost) { return Math.max(1, Math.ceil(scaledStoneCost / 10)); }
+  /* מקבל את מחיר הפריט בנקודות (כבר מוכפל ב-scale) ומחזיר מחיר במטבעות אישיים.
+     מטבע אישי = 10 נקודות, והחלקה האישית זולה פי 10 מהשטח המשותף — בדיוק כמו קודם. */
+  function personalCostOf(scaledPointCost) { return Math.max(1, Math.ceil(scaledPointCost / 100)); }
 
   function hasSharedItem(isl, regionId, itemId) {
     for (var i = 0; i < isl.items.length; i++) {
@@ -304,7 +306,9 @@
 
   /* ספי פתיחת האזורים — מקור אמת: SPEC.md פרק 3 (זהה לקבוע הפנימי במנוע).
      דרושים כאן רק כדי לוודא שהפקדה זמנית לא תגרום לפתיחת אזור מוקדמת. */
-  var REGION_THRESHOLDS = { beach: 0, forest: 120, farm: 300, village: 520, mountain: 780, desert: 1050, volcano: 1350, sky: 1700 };
+  /* אותם ספים כמו במנוע — בנקודות, קבועים, ×10 (המרה מאבנים) ×5 (בקשת המורה) */
+  var UNLOCK_MULT = 50;
+  var REGION_THRESHOLDS = { beach: 0, forest: 120 * UNLOCK_MULT, farm: 300 * UNLOCK_MULT, village: 520 * UNLOCK_MULT, mountain: 780 * UNLOCK_MULT, desert: 1050 * UNLOCK_MULT, volcano: 1350 * UNLOCK_MULT, sky: 1700 * UNLOCK_MULT };
   function nextLockedGap(isl) {
     var total = (isl.coins || 0) + (isl.spent || 0);
     var gap = Infinity;
@@ -318,7 +322,7 @@
   }
   function recalcLevelLocal(isl) {
     var total = (isl.coins || 0) + (isl.spent || 0);
-    isl.level = Math.max(1, Math.min(40, 1 + Math.floor(total / 45)));
+    isl.level = Math.max(1, Math.min(40, 1 + Math.floor(total / 450)));
   }
 
   /* בנייה בחלקה אישית: התשלום הוא במטבעות אישיים של בעל החלקה בלבד.
@@ -339,8 +343,8 @@
     var isl = ensureIsl(klass);
     if (!isl) return false;
     var info = findItemInfo(itemId);
-    var stones = akPrice(info.cost, klass);
-    var pcost = personalCostOf(stones);
+    var pointCost = akPrice(info.cost * 10, klass);   /* בנקודות, כמו itemCost במנוע */
+    var pcost = personalCostOf(pointCost);
     var si = ensureStudentIsland(found.student);
     if (si.personalCoins < pcost) {
       akToast('עוד ' + (pcost - si.personalCoins) + ' 🪙 מטבעות אישיים וזה שלך! כל תשובה טובה מקרבת אותך 💪');
@@ -350,7 +354,7 @@
     var coins0 = isl.coins, spent0 = isl.spent;
     /* המנוע יחייב את עלות הפריט לפי הקטלוג של האזור הפעיל, או 10 כברירת מחדל
        אם הפריט לא בקטלוג הפעיל — מפקידים מספיק לשני המקרים, אבל רק את החוסר. */
-    var engineNeed = Math.max(stones, 10);
+    var engineNeed = Math.max(pointCost, 10);
     var deposit = Math.max(0, engineNeed - coins0);
     if (deposit > 0) {
       var gap = nextLockedGap(isl);
@@ -472,7 +476,7 @@
       var isl = ensureIsl(klass);
       var nx = nextPlanned(isl);
       if (!nx) return { pct: 1, ready: false, done: true };
-      var cost = akPrice(findItemInfo(nx.entry.id).cost, klass);
+      var cost = akPrice(findItemInfo(nx.entry.id).cost * 10, klass);   /* נקודות */
       var pct = cost > 0 ? Math.min(1, (isl.coins || 0) / cost) : 1;
       return { pct: Math.round(pct * 100) / 100, ready: pct >= 1, done: false };
     } catch (e) { return { pct: 0, ready: false, done: false }; }
@@ -531,7 +535,7 @@
             var it = reg.items[j];
             if (!it || seen[it.id] || builtIds[it.id]) continue;
             seen[it.id] = true;
-            var rawCost = akPrice(typeof it.cost === 'number' ? it.cost : 10);
+            var rawCost = akPrice((typeof it.cost === 'number' ? it.cost : 10) * 10);  /* נקודות */
             pool.push({ id: it.id, em: it.em || '🎁', n: it.n || it.id, cost: rawCost, pcost: personalCostOf(rawCost) });
           }
         }
