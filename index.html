@@ -3000,7 +3000,9 @@ function renderClassroom() {
   const cls = getActiveClass();
   if (!cls) return;
   const root = document.getElementById('classroom');
-  const singleView = cls.viewMode === 'class';
+  /* מתג התצוגה ("טורים"/"כיתה אחת") הוסר — הלוח תמיד בתצוגת הטורים הרגילה. */
+  if (cls.viewMode === 'class') cls.viewMode = 'columns';
+  const singleView = false;
   root.className = 'classroom' + (singleView ? ' single-view' : '');
 
   if (singleView) {
@@ -3576,7 +3578,6 @@ function renderClassBar() {
   if (!bar) return;
   const cls = getActiveClass();
   if (APP_MODE === 'student' || !cls) { bar.style.display = 'none'; return; }
-  const view = cls.viewMode === 'class' ? 'class' : 'columns';
   const prev = document.getElementById('classBonusInput');
   const keep = prev && prev.value !== '' ? prev.value : '10'; // לא לאבד סכום שהמורה הקליד/ה
   const prevPot = document.getElementById('classPotInput');
@@ -3613,10 +3614,6 @@ function renderClassBar() {
         ${[1,2,3,5,10,20].map(v => `<option value="${v}" ${econScale() === v ? 'selected' : ''}>×${v}</option>`).join('')}
       </select>
     </label>
-    <div class="cb-view">
-      <button class="${view === 'columns' ? 'active' : ''}" onclick="setClassView('columns')">🧱 טורים</button>
-      <button class="${view === 'class' ? 'active' : ''}" onclick="setClassView('class')">👥 כיתה אחת</button>
-    </div>
   `;
 }
 
