@@ -3058,9 +3058,9 @@ function renderClassroom() {
 
 /* שמונה הדרגות כשורת אייקונים זעירה על הכרטיס — כולן בחלש, זו שהילד
    נמצא בה מוארת. כך רואים במבט אחד איפה הוא בסולם, בלי להגביה את הכרטיס. */
+function rankIndexOf(pts) { return RANKS.reduce((acc, r, i) => ((pts || 0) >= r.min ? i : acc), 0); }
 function miniRankLadder(s) {
-  const pts = s.points || 0;
-  const curIdx = RANKS.reduce((acc, r, i) => (pts >= r.min ? i : acc), 0);
+  const curIdx = rankIndexOf(s.points);
   return '<span class="mini-ladder">' + RANKS.map((r, i) =>
     `<i class="${i === curIdx ? 'on' : i < curIdx ? 'was' : ''}" title="${escapeHtml(r.name)} · ${r.min.toLocaleString('he-IL')}">${r.icon}</i>`
   ).join('') + '</span>';
@@ -3074,17 +3074,22 @@ function renderRankLadder(s) {
   const curIdx = RANKS.reduce((acc, r, i) => (pts >= r.min ? i : acc), 0);
   const chips = RANKS.map((r, i) => {
     const state = i < curIdx ? 'past' : i === curIdx ? 'now' : 'next';
-    const need = i > curIdx ? `<div class="rl-need">${(r.min - pts).toLocaleString('he-IL')}+</div>` : '';
-    return `<div class="rl-chip ${state}" style="--rl:${r.color}" title="${escapeHtml(r.name)} · ${r.min.toLocaleString('he-IL')} נקודות">
+    /* מספר הדרגה (1..8) ומחיר הכניסה אליה — בלעדיהם "להבה" הוא סתם שם */
+    return `<div class="rl-chip ${state}" style="--rl:${r.color}" title="דרגה ${i + 1} מתוך ${RANKS.length} · ${escapeHtml(r.name)} · מ-${r.min.toLocaleString('he-IL')} נקודות">
+      <div class="rl-num">${i + 1}</div>
       <div class="rl-ico">${i < curIdx ? '✓' : r.icon}</div>
       <div class="rl-name">${escapeHtml(r.name)}</div>
-      ${need}
+      <div class="rl-need">${r.min.toLocaleString('he-IL')}+</div>
     </div>`;
   }).join('<div class="rl-sep"></div>');
-  const nxt = RANKS[curIdx + 1];
-  const foot = nxt
-    ? `עוד <b>${(nxt.min - pts).toLocaleString('he-IL')}</b> נקודות ל${nxt.icon} ${escapeHtml(nxt.name)}`
-    : '🏆 הדרגה הגבוהה ביותר!';
+  const cur = RANKS[curIdx], nxt = RANKS[curIdx + 1];
+  const range = nxt
+    ? `${cur.min.toLocaleString('he-IL')}–${(nxt.min - 1).toLocaleString('he-IL')} נקודות`
+    : `מ-${cur.min.toLocaleString('he-IL')} נקודות ומעלה`;
+  const foot = `אתה ב<b style="color:${cur.color}">${cur.icon} ${escapeHtml(cur.name)}</b> — <b>דרגה ${curIdx + 1} מתוך ${RANKS.length}</b> <span class="rl-range">(${range})</span>`
+    + (nxt
+        ? `<br>יש לך <b>${pts.toLocaleString('he-IL')}</b> נקודות · עוד <b>${(nxt.min - pts).toLocaleString('he-IL')}</b> לדרגה ${curIdx + 2}: ${nxt.icon} ${escapeHtml(nxt.name)}`
+        : `<br>יש לך <b>${pts.toLocaleString('he-IL')}</b> נקודות · 🏆 הגעת לדרגה הגבוהה ביותר!`);
   return `<div class="rank-ladder"><div class="rl-row">${chips}</div><div class="rl-foot">${foot}</div></div>`;
 }
 
@@ -3113,6 +3118,7 @@ function renderStudent(s) {
         <div class="student-rank">
           ${miniRankLadder(s)}
           <span style="color:${rank.current.color}">${rank.current.name}</span>
+          <span class="rank-pos">דרגה ${rankIndexOf(s.points) + 1} מתוך ${RANKS.length}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${rank.progress}%"></div></div>
       </div>
