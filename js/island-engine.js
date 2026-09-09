@@ -623,43 +623,19 @@ function updateDayNight(t, scene) {
 /* ===================================================================================
  * 8. בניית אזור — שלוש רמות פירוט: locked / lod / full
  * =================================================================================== */
-/* אזור נעול — מציגים את האי עצמו כרוח רפאים שקופה, לא ערפל אטום.
- * הילדים צריכים לראות לאן הם שואפים: את הצורה, את הצבע ואת השם של כל אי
- * שעוד לפניהם. בנייה שם עדיין חסומה (placeAt בודק שהאזור פתוח). */
-/* מספיק שקוף כדי לומר "עוד לא שלכם", מספיק אטום כדי שבאמת יראו את האי */
-var GHOST_OPACITY = 0.75;
-function ghostify(obj, opacity) {
-  obj.traverse(function (o) {
-    if (!o.material) return;
-    /* משכפלים את החומר — אחרת הצללה של אי נעול הייתה מחווירה גם אזור פתוח
-       שמשתמש באותו חומר בדיוק. */
-    var mats = Array.isArray(o.material) ? o.material : [o.material];
-    o.material = mats.map(function (m) {
-      var c = m.clone();
-      c.transparent = true;
-      c.opacity = (m.opacity == null ? 1 : m.opacity) * opacity;
-      /* depthWrite נשאר דלוק — בלעדיו הצד הרחוק של האי נראה דרך הקרוב
-         והכל מתמסמס לכתם. עדיף אי מוצק וקצת חיוור. */
-      if (c.color) c.color.lerp(new THREE.Color(0x9fb4cc), 0.16);
-      return c;
-    });
-    if (!Array.isArray(o.material)) o.material = o.material[0];
-    o.castShadow = false;
-    o.receiveShadow = false;
-  });
-}
+/* אזור נעול — מציגים אותו במלואו, בדיוק כמו אי פתוח. הילדים צריכים לראות
+ * לאן הם שואפים: את הצורה, הצבע והתוכן האמיתיים של כל אי שעוד לפניהם.
+ * ההבדל היחיד הוא השלט 🔒 עם המחיר — והחסימה בפועל, שנעשית ב-placeAt. */
 function buildRegionLocked(idx) {
   var def = REGION_DEFS[idx], c = regionCenter(idx);
   /* הקבוצה נשארת בראשית: buildRegionBase כבר ממקם את עצמו ב-regionCenter,
      והשלטים ממוקמים ידנית — כך אין הזזה כפולה. */
   var g = new THREE.Group();
-  var base = buildRegionBase(idx, false);
-  ghostify(base, GHOST_OPACITY);
-  g.add(base);
-  /* טבעת אור עדינה סביב — "עוד לא שלכם", בלי להסתיר את האי */
-  var fogColor = new THREE.Color(def.theme.fog).lerp(new THREE.Color(0x44526a), 0.35);
-  var halo = new THREE.Mesh(new THREE.RingGeometry(GRID * 0.42, GRID * 0.56, 24),
-    new THREE.MeshBasicMaterial({ color: fogColor, transparent: true, opacity: 0.20, fog: false, side: THREE.DoubleSide }));
+  g.add(buildRegionBase(idx, true));
+  /* טבעת אור עדינה סביב — "עוד לא שלכם", בלי להסתיר כלום */
+  var halo = new THREE.Mesh(new THREE.RingGeometry(GRID * 0.44, GRID * 0.56, 24),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(def.theme.fog).lerp(new THREE.Color(0x44526a), 0.35),
+      transparent: true, opacity: 0.22, fog: false, side: THREE.DoubleSide }));
   halo.rotation.x = -Math.PI / 2;
   halo.position.set(c.x, 0.06, c.z);
   g.add(halo);

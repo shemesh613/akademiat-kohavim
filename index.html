@@ -1324,11 +1324,14 @@ function classBalance(k) {
   return Math.max(0, classEarned(k) - islandSpentPoints(k));
 }
 /* דרגת הכיתה = הדרגה של הממוצע, אחרת כיתה של 24 מגיעה ל"אגדה" בשבועיים */
-function classRank(k) {
+/* דרגת הכיתה נגזרת מהממוצע לתלמיד ולא מהסכום — אחרת כיתה של 24 ילדים
+   מגיעה ל"אגדה" בשבועיים רק בגלל שהיא גדולה. */
+function classAvg(k) {
   k = k || getActiveClass();
   const n = Math.max(1, k && k.students ? k.students.length : 1);
-  return getRank(Math.round(classEarned(k) / n));
+  return Math.round(classEarned(k) / n);
 }
+function classRank(k) { return getRank(classAvg(k)); }
 /* ארנק אישי: חנות, תיבת הפתעה, מדבקות. הקופה הכיתתית לא משמשת לקניות אישיות
    ולכן אף ילד לא "מוציא" מהכיס של החברים — זה בדיוק מה שמונע לחץ שלילי. */
 function spendableFor(student) { return student ? student.points : 0; }
@@ -3116,9 +3119,8 @@ function renderStudent(s) {
           <button class="name-edit" onclick="event.stopPropagation();startInlineRename('${s.id}')" title="שנה שם">✏️</button>
         </div>
         <div class="student-rank">
-          ${miniRankLadder(s)}
+          <span>${rank.current.icon}</span>
           <span style="color:${rank.current.color}">${rank.current.name}</span>
-          <span class="rank-pos">דרגה ${rankIndexOf(s.points) + 1} מתוך ${RANKS.length}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${rank.progress}%"></div></div>
       </div>
@@ -3503,7 +3505,14 @@ function renderClassScore() {
       </div>
       <div class="cs-side">
         <div class="cs-rank" style="color:${rank.current.color}">${rank.current.icon} ${rank.current.name}</div>
+        <div class="cs-rankpos">דרגת הכיתה · <b>דרגה ${rankIndexOf(classAvg(cls)) + 1} מתוך ${RANKS.length}</b>
+          <span class="cs-rankwhy">לפי ממוצע של ${classAvg(cls).toLocaleString('he-IL')} נקודות לתלמיד</span>
+        </div>
+        <div class="cs-ladder">${miniRankLadder({ points: classAvg(cls) })}</div>
         <div class="cs-bar"><div class="cs-fill" style="width:${rank.progress}%"></div></div>
+        <div class="cs-rankwhy">${rank.next
+          ? `עוד <b>${(rank.next.min - classAvg(cls)).toLocaleString('he-IL')}</b> נקודות לתלמיד בממוצע (= ${((rank.next.min - classAvg(cls)) * Math.max(1, cls.students.length)).toLocaleString('he-IL')} לכיתה) עד ${rank.next.icon} ${escapeHtml(rank.next.name)} — דרגה ${rankIndexOf(classAvg(cls)) + 2}`
+          : '🏆 הכיתה בדרגה הגבוהה ביותר!'}</div>
         <div class="cs-stats">
           <span>📅 השבוע <b>${classWeekly(cls).toLocaleString('he-IL')}</b></span>
           ${classFromStudents(cls) ? `<span>👤 מהתלמידים <b>${classFromStudents(cls).toLocaleString('he-IL')}</b></span>` : ''}
@@ -5537,8 +5546,8 @@ window.ISLAND_DECOR = {
   pollen:    false,  // חלקיקים מרחפים באוויר
   birds:     true,   // ציפורים בשמיים (רחוק, לא מסתיר כלום)
   clouds:    true,   // עננים
-  pet:       false,  // "חיית הכיתה" — מסקוט שבוקע מביצה וגדל בכל אי שנפתח
-  trees:     false,  // עץ הכיתה בכל אזור (גדל לפי ההתקדמות)
+  pet:       true,   // "חיית הכיתה" — בוקעת מביצה, גדלה לפי נקודות + כל אי שנפתח
+  trees:     true,   // עץ הכיתה בכל אזור — גדל לפי הנקודות מאז שהאזור נפתח
   rulers:    false,  // עמודי הגדילה — הסרגלים עם השלבים ודגלון "לפני חודש"
   plots:     false   // החלקות האישיות של התלמידים (שלטים + משבצות)
 };

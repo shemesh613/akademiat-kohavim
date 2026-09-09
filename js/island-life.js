@@ -27,7 +27,8 @@ var RING_R0 = 30, RING_STEP = 7.5;
 var ANGLE_STEP = (Math.PI * 2) / 8;
 var REGION_IDS = ['beach', 'forest', 'farm', 'village', 'mountain', 'desert', 'volcano', 'sky'];
 var REGION_NAME = { beach: 'חוף הכוכבים', forest: 'יער הלחישות', farm: 'חוות האלופים', village: 'כפר הידע', mountain: 'הר הקרח', desert: 'מדבר הזהב', volcano: 'הר האש', sky: 'איי השמיים' };
-var REGION_THRESHOLDS = [0, 120, 300, 520, 780, 1050, 1350, 1700];
+/* ספי פתיחת האיים — בנקודות, זהים למנוע (×10 המרה מ"אבנים" ×5 בקשת המורה) */
+var REGION_THRESHOLDS = [0, 6000, 15000, 26000, 39000, 52500, 67500, 85000];
 function regionIndex(id) { return REGION_IDS.indexOf(id); }
 function regionCenter(idx) { var a = idx * ANGLE_STEP, r = RING_R0 + idx * RING_STEP; return { x: Math.cos(a) * r, z: Math.sin(a) * r }; }
 
@@ -691,14 +692,31 @@ function spawnHeart(v) {
 /* ===================================================================================
  * 6. חיית הכיתה (המסקוט) — מלווה שנתי אחד, קופץ שלב בכל פתיחת אזור (8 אבני-דרך גדולות)
  * =================================================================================== */
-var PET_HATCH_TOTAL = 15; /* אבני בניין ראשונות שהכיתה צריכה כדי שהביצה תבקע */
-function petBigStage(isl) { return clamp(isl.regions.length, 1, 8); } /* 1..8 = מס' אזורים פתוחים */
-function petEraProgress(isl) {
-  var big = petBigStage(isl);
-  var cur = REGION_THRESHOLDS[big - 1];
-  var next = big < 8 ? REGION_THRESHOLDS[big] : (cur + 350);
-  return clamp((totalEarned(isl) - cur) / Math.max(1, next - cur), 0, 1);
+/* ---- קצב הגדילה של חיית הכיתה ----
+ * גדלה בעיקר מנקודות (כל PET_POINTS_PER_STAGE), ובנוסף מקבלת שלב מתנה על כל
+ * אי שנפתח — כך שני המסלולים עובדים יחד. כשהיא מגיעה לגודל המלא היא מפסיקה
+ * לגדול ומתחילה לאסוף פריטים (כוכבים שמקיפים אותה), אחד לכל PET_EXTRA_STEP. */
+var PET_HATCH_TOTAL = 150;          /* נקודות ראשונות עד שהביצה בוקעת */
+var PET_POINTS_PER_STAGE = 2500;   /* 8 שלבים ≈ 17,500 נק' — מסע של שנה */
+var PET_MAX_STAGE = 8;
+var PET_EXTRA_STEP = 2500;
+var PET_EXTRA_MAX = 6;
+function petStageInfo(isl) {
+  var total = totalEarned(isl);
+  var islandBonus = Math.max(0, ((isl.regions && isl.regions.length) || 1) - 1);
+  var raw = 1 + Math.floor(total / PET_POINTS_PER_STAGE) + islandBonus;
+  if (raw <= PET_MAX_STAGE) {
+    return { stage: clamp(raw, 1, PET_MAX_STAGE), extras: 0,
+             frac: (total % PET_POINTS_PER_STAGE) / PET_POINTS_PER_STAGE };
+  }
+  /* בוגרת — כמה נקודות "נשארו" מעבר לגודל המלא */
+  var ptsAtMax = Math.max(0, (PET_MAX_STAGE - 1 - islandBonus)) * PET_POINTS_PER_STAGE;
+  var over = Math.max(0, total - ptsAtMax);
+  return { stage: PET_MAX_STAGE, frac: 1,
+           extras: clamp(Math.floor(over / PET_EXTRA_STEP), 0, PET_EXTRA_MAX) };
 }
+function petBigStage(isl) { return petStageInfo(isl).stage; }
+function petEraProgress(isl) { return petStageInfo(isl).frac; }
 function buildPetMesh(stage, fineFrac) {
   var g = new THREE.Group();
   var scaleBase = 0.62 + stage * 0.05;
@@ -755,13 +773,27 @@ function petHomePos() {
   var c = regionCenter(idx);
   return { x: c.x - 2.2, z: c.z - 2.2 };
 }
-function refreshPetObj(stage, fineFrac, hatched) {
+function refreshPetObj(stage, fineFrac, hatched, extras) {
   var sc = scene(); if (!sc) return;
   if (LIFE.petObj) {
     sc.remove(LIFE.petObj.group); disposeObj(LIFE.petObj.group);
     if (LIFE.petObj.ruler) { sc.remove(LIFE.petObj.ruler); disposeObj(LIFE.petObj.ruler); }
   }
   var g = hatched ? buildPetMesh(stage, fineFrac) : buildEggMesh();
+  /* אחרי הגודל המלא החיה לא גדלה יותר — במקום זה נאספים סביבה כוכבים,
+     אחד לכל אבן דרך. זה ההמשך של המסע כשאין לאן להתגבה. */
+  if (hatched && (extras || 0) > 0) {
+    var ring = new THREE.Group();
+    for (var e = 0; e < extras; e++) {
+      var ang = (e / extras) * Math.PI * 2;
+      var star = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0),
+        new THREE.MeshLambertMaterial({ color: 0xffd54a, emissive: 0x6b4a00 }));
+      star.position.set(Math.cos(ang) * 0.62, 0.72 + 0.1 * Math.sin(ang * 2), Math.sin(ang) * 0.62);
+      ring.add(star);
+    }
+    g.add(ring);
+    g.userData.sparkles = ring;   /* ה-animate הקיים כבר מסובב sparkles */
+  }
   var home = petHomePos();
   g.position.set(home.x, 0, home.z);
   g.userData.animate = function (t, dt) {
@@ -774,7 +806,7 @@ function refreshPetObj(stage, fineFrac, hatched) {
     if (g.userData.sparkles) g.userData.sparkles.rotation.y = t * 0.6;
   };
   sc.add(g);
-  LIFE.petObj = { group: g, stage: stage, fine: fineFrac, hatched: hatched, home: home };
+  LIFE.petObj = { group: g, stage: stage, fine: fineFrac, hatched: hatched, home: home, extras: extras || 0 };
   buildGrowthRuler('pet', LIFE.petObj, 0, 8, home.x + 0.9, home.z - 0.4);
 }
 function tickPetGrowth() {
@@ -783,25 +815,32 @@ function tickPetGrowth() {
   var total = totalEarned(isl);
   var pet = isl.pet;
   var hatched = total >= PET_HATCH_TOTAL || pet.stage > 0;
-  var bigStage = petBigStage(isl);
-  var fineFrac = petEraProgress(isl);
+  var petInfo = petStageInfo(isl);
+  var bigStage = petInfo.stage;
+  var fineFrac = petInfo.frac;
   var fineTick = Math.floor(fineFrac * 8);
+  if (typeof pet.extras !== 'number') pet.extras = 0;
   var grew = false;
   if (hatched && pet.stage === 0) { pet.stage = 1; pet.born = pet.born || Date.now(); grew = true; queueGrowth('🐣 הביצה בקעה! ברוכים הבאים, יצור האי!'); }
   else if (hatched && bigStage > pet.stage) {
     pet.stage = bigStage; grew = true;
-    queueGrowth('🐣 חיית הכיתה גדלה שלב גדול! (אזור חדש נפתח)');
+    queueGrowth('🐣 חיית הכיתה גדלה שלב! ' + (petInfo.stage >= PET_MAX_STAGE ? '(הגיעה לגודל המלא)' : ''));
     rollMonthMark(pet, bigStage);
+  } else if (hatched && petInfo.extras > pet.extras) {
+    /* בוגרת — כבר לא גדלה, אבל אוספת כוכב על כל אבן דרך נוספת */
+    grew = true;
+    queueGrowth('⭐ חיית הכיתה אספה כוכב נוסף!');
   } else if (hatched && fineTick !== pet.fine) { pet.fine = fineTick; grew = true; }
+  pet.extras = petInfo.extras;
   if (!hatched && pet.stage === 0) { /* עדיין ביצה — כלום */ }
   if (grew) {
     pet.lastGrow = Date.now();
     rollMonthMarkMaybe(pet, hatched ? pet.stage : 0);
     akSave();
-    refreshPetObj(pet.stage, fineFrac, hatched);
+    refreshPetObj(pet.stage, fineFrac, hatched, petInfo.extras);
     if (bigStage === pet.stage && hatched) { spawnGrowthBurst(petHomePos()); akSound('rankup'); }
   } else if (!LIFE.petObj) {
-    refreshPetObj(pet.stage, fineFrac, hatched);
+    refreshPetObj(pet.stage, fineFrac, hatched, petInfo.extras);
   } else {
     LIFE.petObj.fine = fineFrac;
     /* אין גדילה כרגע, אבל ייתכן שהמצלמה/HUD עברו לאזור אחר — היצור "מלווה את הכיתה"
@@ -833,17 +872,27 @@ function rollMonthMarkMaybe(obj, curStage) {
  * 7. עץ הכיתה — מסלול גדילה נפרד לכל אזור (~חודש), לפי % התקדמות באזור, לא תאריך.
  *    אזור שכבר לא ה"נוכחי" (נפתח אזור מתקדם ממנו) → נשאר קפוא בשלב הבשל/פורח לתמיד.
  * =================================================================================== */
-function treeProgressForRegion(isl, regionId) {
-  var rank = regionIndex(regionId); if (rank < 0) return 0;
-  var unlockedCount = isl.regions.length;
-  if (rank > unlockedCount - 1) return -1; /* לא פתוח בכלל */
-  if (rank < unlockedCount - 1) return 1;  /* אזור קודם — עבר את הכל, קפוא בשל */
-  var total = totalEarned(isl);
-  var cur = REGION_THRESHOLDS[rank];
-  var next = rank < 7 ? REGION_THRESHOLDS[rank + 1] : (cur + 350);
-  return clamp((total - cur) / Math.max(1, next - cur), 0, 1);
+/* ---- קצב הגדילה של עץ האזור ----
+ * העץ מתחיל לגדול ברגע שהאזור נפתח, וגדל לפי הנקודות שנצברו מאז — לא לפי
+ * "כמה אזורים פתוחים". כשהוא מגיע לגובה המלא הוא מפסיק לגדול ומתחיל להוציא
+ * פירות, אחד לכל TREE_EXTRA_STEP נקודות. */
+var TREE_POINTS_PER_STAGE = 1200;  /* 5 שלבים = 6,000 — בדיוק המרחק לאי הבא */
+var TREE_MAX_STAGE = 5;
+var TREE_EXTRA_STEP = 1200;
+var TREE_EXTRA_MAX = 10;
+function treeStageInfo(isl, regionId) {
+  var rank = regionIndex(regionId);
+  if (rank < 0 || !isl.regions || isl.regions.indexOf(regionId) < 0) return null; /* עוד נעול */
+  var since = Math.max(0, totalEarned(isl) - (REGION_THRESHOLDS[rank] || 0));
+  var raw = Math.floor(since / TREE_POINTS_PER_STAGE);
+  if (raw < TREE_MAX_STAGE) {
+    return { stage: raw, extras: 0, frac: (since % TREE_POINTS_PER_STAGE) / TREE_POINTS_PER_STAGE };
+  }
+  var over = since - TREE_MAX_STAGE * TREE_POINTS_PER_STAGE;
+  return { stage: TREE_MAX_STAGE, frac: 1,
+           extras: clamp(Math.floor(over / TREE_EXTRA_STEP), 0, TREE_EXTRA_MAX) };
 }
-function buildTreeMesh(regionId, majorStage, fineFrac) {
+function buildTreeMesh(regionId, majorStage, fineFrac, extras) {
   var sp = TREE_SPECIES[regionId] || TREE_SPECIES.beach;
   var g = new THREE.Group();
   var rnd = seedRand(hash01(regionId + 'tree') * 99999 + 3);
@@ -882,8 +931,10 @@ function buildTreeMesh(regionId, majorStage, fineFrac) {
     im.setMatrixAt(i, dummy.matrix);
   }
   im.instanceMatrix.needsUpdate = true; im.castShadow = true; g.add(im); g.userData.canopy = im;
-  if (majorStage >= 5 && sp.fruit) {
-    var fruitCount = Math.max(2, Math.round(6 * fineFrac) + 2);
+  /* פירות: מופיעים כשהעץ הגיע לגובה המלא, ומספרם גדל עם כל אבן דרך נוספת —
+     זה מה שממשיך לתגמל את הכיתה אחרי שהעץ כבר לא מתגבה. */
+  if (majorStage >= TREE_MAX_STAGE && sp.fruit && (extras || 0) > 0) {
+    var fruitCount = Math.max(1, extras || 0);
     var fruitGeo = new THREE.SphereGeometry(0.035, 6, 5);
     var fim = new THREE.InstancedMesh(fruitGeo, mat(sp.fruit), fruitCount);
     for (var f = 0; f < fruitCount; f++) {
@@ -901,14 +952,14 @@ function treeSpot(regionId) {
   var idx = regionIndex(regionId); var c = regionCenter(idx);
   return { x: c.x - 2.2, z: c.z + 1.4 };
 }
-function refreshTreeObj(regionId, majorStage, fineFrac) {
+function refreshTreeObj(regionId, majorStage, fineFrac, extras) {
   var sc = scene(); if (!sc) return;
   var existing = LIFE.trees[regionId];
   if (existing) {
     sc.remove(existing.group); disposeObj(existing.group);
     if (existing.ruler) { sc.remove(existing.ruler); disposeObj(existing.ruler); }
   }
-  var g = buildTreeMesh(regionId, majorStage, fineFrac);
+  var g = buildTreeMesh(regionId, majorStage, fineFrac, extras || 0);
   var spot = treeSpot(regionId);
   g.position.set(spot.x, 0, spot.z);
   g.userData.animate = function (t) {
@@ -917,7 +968,7 @@ function refreshTreeObj(regionId, majorStage, fineFrac) {
     g.rotation.z = sway;
   };
   sc.add(g);
-  LIFE.trees[regionId] = { group: g, stage: majorStage, fine: fineFrac, spot: spot };
+  LIFE.trees[regionId] = { group: g, stage: majorStage, fine: fineFrac, spot: spot, extras: extras || 0 };
   var sp = TREE_SPECIES[regionId] || TREE_SPECIES.beach;
   buildGrowthRuler('tree_' + regionId, LIFE.trees[regionId], 0, 5, spot.x + 0.7, spot.z + 0.5, sp.name);
 }
@@ -927,22 +978,31 @@ function tickTreeGrowth() {
   var full = fullRegionIds();
   for (var i = 0; i < full.length; i++) {
     var regionId = full[i];
-    var frac = treeProgressForRegion(isl, regionId);
-    if (frac < 0) continue;
+    var info = treeStageInfo(isl, regionId);
+    if (!info) continue;
+    var frac = info.frac;
     var entry = ensureTreeEntry(isl, regionId);
-    var majorStage = clamp(Math.floor(frac * 6), 0, 5);
+    if (typeof entry.extras !== 'number') entry.extras = 0;
     var fineTick = Math.floor(frac * 30);
     var grew = false;
-    if (majorStage > entry.stage) { entry.stage = majorStage; grew = true; queueGrowth('🌱 העץ ב' + (REGION_NAME[regionId] || regionId) + ' גדל שלב!'); rollMonthMark(entry, majorStage); }
-    else if (fineTick !== entry.fine) { entry.fine = fineTick; grew = grew || false; }
+    if (info.stage > entry.stage) {
+      entry.stage = info.stage; grew = true;
+      queueGrowth('🌱 העץ ב' + (REGION_NAME[regionId] || regionId) + ' גדל שלב!');
+      rollMonthMark(entry, info.stage);
+    } else if (info.extras > entry.extras) {
+      /* העץ בגובה מלא — מכאן והלאה כל התקדמות מוסיפה פרי */
+      entry.extras = info.extras; grew = true;
+      queueGrowth('🍎 פרי חדש על העץ ב' + (REGION_NAME[regionId] || regionId) + '!');
+    }
     entry.fine = fineTick;
+    entry.extras = info.extras;
     rollMonthMarkMaybe(entry, entry.stage);
     var existing = LIFE.trees[regionId];
     if (grew || !existing) {
       if (grew) { entry.lastGrow = Date.now(); akSave(); }
-      refreshTreeObj(regionId, entry.stage, frac);
+      refreshTreeObj(regionId, entry.stage, frac, info.extras);
       if (grew) spawnGrowthBurst(treeSpot(regionId));
-    } else if (existing.stage !== entry.stage || Math.abs(existing.fine - frac) > 0.05) {
+    } else if (existing.stage !== entry.stage || existing.extras !== info.extras || Math.abs(existing.fine - frac) > 0.05) {
       existing.fine = frac;
       updateGrowthRuler('tree_' + regionId, existing, entry.stage, 5, (TREE_SPECIES[regionId] || {}).name);
     }
