@@ -623,27 +623,49 @@ function updateDayNight(t, scene) {
 /* ===================================================================================
  * 8. בניית אזור — שלוש רמות פירוט: locked / lod / full
  * =================================================================================== */
+/* אזור נעול — מציגים את האי עצמו כרוח רפאים שקופה, לא ערפל אטום.
+ * הילדים צריכים לראות לאן הם שואפים: את הצורה, את הצבע ואת השם של כל אי
+ * שעוד לפניהם. בנייה שם עדיין חסומה (placeAt בודק שהאזור פתוח). */
+var GHOST_OPACITY = 0.34;
+function ghostify(obj, opacity) {
+  obj.traverse(function (o) {
+    if (!o.material) return;
+    /* משכפלים את החומר — אחרת הצללה של אי נעול הייתה מחווירה גם אזור פתוח
+       שמשתמש באותו חומר בדיוק. */
+    var mats = Array.isArray(o.material) ? o.material : [o.material];
+    o.material = mats.map(function (m) {
+      var c = m.clone();
+      c.transparent = true;
+      c.opacity = (m.opacity == null ? 1 : m.opacity) * opacity;
+      c.depthWrite = false;
+      if (c.color) c.color.lerp(new THREE.Color(0x8fa6c4), 0.45);
+      return c;
+    });
+    if (!Array.isArray(o.material)) o.material = o.material[0];
+    o.castShadow = false;
+    o.receiveShadow = false;
+  });
+}
 function buildRegionLocked(idx) {
-  /* אזור נעול נראה כמו "אי בערפל" — גבעת-צל שטוחה-רכה + הילה, לא קופסה אפורה */
   var def = REGION_DEFS[idx], c = regionCenter(idx);
+  /* הקבוצה נשארת בראשית: buildRegionBase כבר ממקם את עצמו ב-regionCenter,
+     והשלטים ממוקמים ידנית — כך אין הזזה כפולה. */
   var g = new THREE.Group();
-  g.position.set(c.x, 0, c.z);
-  var fogColor = new THREE.Color(def.theme.fog).lerp(new THREE.Color(0x44526a), 0.55);
-  var moundR = GRID * 0.42;
-  var mound = new THREE.Mesh(new THREE.SphereGeometry(moundR, 12, 8),
-    new THREE.MeshBasicMaterial({ color: fogColor, transparent: true, opacity: 0.5, fog: false, side: THREE.DoubleSide }));
-  mound.scale.set(1, 0.5, 1);
-  mound.position.y = -(moundR * 0.5) + 0.4;
-  g.add(mound);
-  var halo = new THREE.Mesh(new THREE.RingGeometry(moundR * 0.9, moundR * 1.3, 20),
-    new THREE.MeshBasicMaterial({ color: fogColor, transparent: true, opacity: 0.22, fog: false, side: THREE.DoubleSide }));
-  halo.rotation.x = -Math.PI / 2; halo.position.y = -0.28;
+  var base = buildRegionBase(idx, false);
+  ghostify(base, GHOST_OPACITY);
+  g.add(base);
+  /* טבעת אור עדינה סביב — "עוד לא שלכם", בלי להסתיר את האי */
+  var fogColor = new THREE.Color(def.theme.fog).lerp(new THREE.Color(0x44526a), 0.35);
+  var halo = new THREE.Mesh(new THREE.RingGeometry(GRID * 0.42, GRID * 0.56, 24),
+    new THREE.MeshBasicMaterial({ color: fogColor, transparent: true, opacity: 0.20, fog: false, side: THREE.DoubleSide }));
+  halo.rotation.x = -Math.PI / 2;
+  halo.position.set(c.x, 0.06, c.z);
   g.add(halo);
   var sign = makeLabel(def.icon + ' ' + def.name + '  🔒', { worldHeight: 1.5, fontSize: 46 });
-  sign.position.set(0, 3.6, 0);
+  sign.position.set(c.x, 3.6, c.z);
   g.add(sign);
-  var sub = makeLabel('נפתח ב־… אבנים', { worldHeight: 1.0, fontSize: 34, bg: 'rgba(255,250,238,0.94)', color: '#3d2a17' });
-  sub.position.set(0, 2.2, 0);
+  var sub = makeLabel('נפתח ב־…', { worldHeight: 1.0, fontSize: 34, bg: 'rgba(255,250,238,0.94)', color: '#3d2a17' });
+  sub.position.set(c.x, 2.2, c.z);
   g.add(sub);
   g.userData.sub = sub;
   g.userData.updateLock = function (isl) {
@@ -1547,12 +1569,10 @@ function buildHud(container) {
     '</div>' +
     '<div class="ak-isl-hint" data-role="hint" style="display:none">🏗️ בחרו פריט למטה ואז הקישו על הדשא</div>' +
     '<div class="ak-isl-regions" data-role="regions"></div>' +
-    '<div class="ak-isl-plots" data-role="plots"></div>' +
     '<div class="ak-isl-shop" data-role="shop"></div>' +
     '<div class="ak-isl-ctrl">' +
     '  <button class="ak-isl-cbtn" data-role="home" title="חזרה לכיתה">🏠</button>' +
     '  <button class="ak-isl-cbtn" data-role="mute" title="השתקת סאונד">🔊</button>' +
-    '  <button class="ak-isl-cbtn" data-role="plotstoggle" title="חלקות אישיות">👥</button>' +
     '</div>';
   /* ויניטה קולנועית עדינה — ממקדת את העין למרכז, בלי לגעת בקריאות ה-HUD */
   var vin = document.createElement('div');
@@ -1577,16 +1597,6 @@ function buildHud(container) {
      בשום מנגנון קיים — "חזרה" סוגר את שכבת האי, "סאונד" מפעיל את ההשתקה הראשית. */
   var homeBtn = hud.querySelector('[data-role=home]');
   var muteBtn = hud.querySelector('[data-role=mute]');
-  /* רצועת החלקות האישיות פרושה על רוחב המסך והסתירה את האי — לכן היא סגורה
-     כברירת מחדל ונפתחת רק בלחיצה על 👥, ורק כשיש בכלל מה להציג. */
-  var plotsBtn = hud.querySelector('[data-role=plotstoggle]');
-  if (plotsBtn) plotsBtn.addEventListener('click', function () {
-    var strip = ISL.hud && ISL.hud.plots;
-    if (!strip) return;
-    var open = strip.classList.toggle('on');
-    plotsBtn.textContent = open ? '✖️' : '👥';
-    if (open) renderPlotPicker();
-  });
   function syncMuteIcon() {
     if (muteBtn) muteBtn.textContent = (window.isMuted && window.isMuted()) ? '🔇' : '🔊';
   }
@@ -1610,9 +1620,12 @@ function closeIslandToHome() {
 }
 /* פס בחירה: "בונים במשותף" מול "בחלקה האישית של תלמיד/ה פלוני" — זה מה שהופך את
  * מנגנון החלקות האישיות (סעיף 6 ב-SPEC) לזמין בפועל דרך קלט יחיד על המקרן */
+/* רצועת שמות החלקות הוסרה מה-HUD — היא ישבה לרוחב תחתית המסך והסתירה את האי.
+   הפונקציה נשארת כדי שכל הקוראים הקיימים ימשיכו לעבוד, ופשוט לא מציירת כלום. */
 function renderPlotPicker() {
   if (!ISL.hud) return;
   var el = ISL.hud.plots;
+  if (!el) return;
   var klass = activeClass();
   var students = (klass && klass.students) || [];
   el.innerHTML = '';
@@ -1658,7 +1671,14 @@ function renderRegionNav() {
         ? (def.icon + ' ' + def.name)
         : ('🔒 ' + def.icon + ' ' + regThreshold(def));
       d.onclick = function () {
-        if (!unlocked) { akToast('האי הזה נפתח ב-' + regThreshold(def) + ' נקודות 🔒'); akSound('error'); return; }
+        if (!unlocked) {
+          /* מותר להסתכל! עפים לאי הנעול כדי לראות איך הוא נראה — הבנייה שם
+             עדיין חסומה ב-placeAt, אז אין מה להתקלקל. */
+          akToast('👀 מציצים ב' + def.name + ' — נפתח ב-' + regThreshold(def) + ' נקודות');
+          focusRegionInternal(def.id, false);
+          renderRegionNav();
+          return;
+        }
         focusRegionInternal(def.id, false);
         renderRegionNav();
       };
@@ -1673,6 +1693,18 @@ function renderShopPalette() {
   var targetRegion = ISL.plotTarget ? ('plot_' + ISL.plotTarget) : ISL.activeId;
   var el = ISL.hud.shop;
   el.innerHTML = '';
+  /* מסתכלים על אי שעוד נעול — פלטת הבנייה לא רלוונטית, רק "עוד כמה" */
+  if (!ISL.plotTarget && isl.regions && isl.regions.indexOf(ISL.activeId) < 0) {
+    var defL = regionDef(ISL.activeId);
+    var need = Math.max(0, regThreshold(defL) - ((isl.coins || 0) + (isl.spent || 0)));
+    var note = document.createElement('div');
+    note.className = 'ak-isl-item';
+    note.style.cssText = 'width:auto;padding:6px 16px;cursor:default;';
+    note.innerHTML = '<div class="nm">👀 האי הזה עוד נעול — יש לכם לאן לשאוף!</div>'
+      + '<div class="cs">עוד ' + need + ' ⭐</div>';
+    el.appendChild(note);
+    return;
+  }
   var del = document.createElement('div');
   del.className = 'ak-isl-item del' + (ISL.delMode ? ' sel' : '');
   del.innerHTML = '<span class="em">🗑️</span><div class="nm">להסיר</div><div class="cs">+חצי מחיר</div>';

@@ -594,3 +594,9 @@ input[type=text]:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(2
 .rank-ladder .rl-chip.now .rl-name { color: var(--rl); }
 .rank-ladder .rl-sep  { flex: 0 0 1px; align-self: center; height: 22px; background: rgba(0,0,0,0.10); }
 .rank-ladder .rl-foot { text-align: center; font-size: 14px; font-weight: 800; color: var(--ink-dim, #8a7a5c); margin-top: 6px; }
+
+/* שורת הדרגות הזעירה על כרטיס התלמיד — כולן בחלש, הנוכחית מוארת */
+.mini-ladder { display: inline-flex; align-items: center; gap: 1px; margin-inline-end: 5px; }
+.mini-ladder i { font-style: normal; font-size: 12px; line-height: 1; opacity: 0.22; filter: grayscale(1); }
+.mini-ladder i.was { opacity: 0.4; }
+.mini-ladder i.on { opacity: 1; filter: none; font-size: 17px; transform: translateY(-1px); }

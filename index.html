@@ -1138,6 +1138,8 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
   <button class="btn btn-danger" onclick="exportData()">💾 גיבוי לקובץ</button>
   <button class="btn" onclick="importData()">📂 שחזור מקובץ</button>
   <button class="btn" onclick="openBackupHistory()">📜 היסטוריה</button>
+  <button class="btn" onclick="openNamesEditor()" title="עריכת כל השמות במסך אחד">✏️ שמות</button>
+  <button class="btn btn-danger" onclick="resetClassEconomy()" title="איפוס מלא של הכיתה (ניקוד אישי + קופה + האי) — דורש קוד מנהל">🗑️ אפס</button>
 </div>
 
 <div class="modal-bg" id="studentModal" onclick="if(event.target===this)closeModal()">
@@ -3052,6 +3054,16 @@ function renderClassroom() {
   });
 }
 
+/* שמונה הדרגות כשורת אייקונים זעירה על הכרטיס — כולן בחלש, זו שהילד
+   נמצא בה מוארת. כך רואים במבט אחד איפה הוא בסולם, בלי להגביה את הכרטיס. */
+function miniRankLadder(s) {
+  const pts = s.points || 0;
+  const curIdx = RANKS.reduce((acc, r, i) => (pts >= r.min ? i : acc), 0);
+  return '<span class="mini-ladder">' + RANKS.map((r, i) =>
+    `<i class="${i === curIdx ? 'on' : i < curIdx ? 'was' : ''}" title="${escapeHtml(r.name)} · ${r.min.toLocaleString('he-IL')}">${r.icon}</i>`
+  ).join('') + '</span>';
+}
+
 /* ---------------- סולם הדרגות ----------------
  * "להבה" לבד לא אומר לילד כלום. כאן הוא רואה את כל הסולם בחלש, את הדרגה
  * שהוא בה מודגשת, ואת זו שלפני ואחרי — כך הוא יודע מאיפה בא ולאן ממשיך. */
@@ -3097,7 +3109,7 @@ function renderStudent(s) {
           <button class="name-edit" onclick="event.stopPropagation();startInlineRename('${s.id}')" title="שנה שם">✏️</button>
         </div>
         <div class="student-rank">
-          <span>${rank.current.icon}</span>
+          ${miniRankLadder(s)}
           <span style="color:${rank.current.color}">${rank.current.name}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${rank.progress}%"></div></div>
@@ -3608,8 +3620,6 @@ function renderClassBar() {
       <button class="cb-btn cb-give" onclick="addClassPot()">➕ הוסף לכיתה</button>
       <button class="cb-btn cb-take cb-sm" onclick="addClassPot(-Math.abs(parseInt(document.getElementById('classPotInput').value,10)||0))">➖</button>
     </div>
-    <button class="cb-btn" onclick="openNamesEditor()" title="עריכת כל השמות במסך אחד">✏️ שמות</button>
-    <button class="cb-btn cb-take" onclick="resetClassEconomy()" title="איפוס מלא של הכיתה (ניקוד אישי + קופה + האי) — דורש קוד מנהל">🗑️ אפס</button>
     <div class="cb-spacer"></div>
   `;
 }
