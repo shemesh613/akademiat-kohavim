@@ -3399,6 +3399,9 @@ function classBonus(amount) {
   awardToStudents(cls.students, amount, { label: `🎉 כל הכיתה` });
 }
 
+/* האפליקציה נשארת פתוחה בכיתה ימים שלמים — בדיקה עדינה כל 10 דקות */
+setInterval(function () { if (autoWeeklyRollover() && typeof renderAll === 'function') renderAll(); }, 600000);
+
 function setClassView(mode) {
   const cls = getActiveClass();
   if (!cls) return;
@@ -4216,6 +4219,7 @@ function resetWeek() {
     const c = getActiveClass();
     c.students.forEach(s => s.weeklyPoints = 0);
     c.classWeeklyPoints = 0;
+    c.weekKey = currentWeekKey();
     save(); renderClassroom();
     try { if (window.AK && AK.toast) AK.toast('✅ הניקוד השבועי אופס'); } catch (e) {}
   }, 'הניקוד הכולל, האי והמדבקות לא יושפעו — רק המונה השבועי.', '🔄 כן, לאפס');
@@ -4328,7 +4332,44 @@ function renderModeBadge() {
     b.textContent = '🧑‍🏫 מצב מורה';
   }
 }
+/* ---------------- מעבר שבוע אוטומטי ----------------
+ * עד כאן המונה השבועי התאפס רק בלחיצה ידנית על "איפוס שבועי", ולכן
+ * "בזכותם השבוע" יכול היה להציג את אותם ילדים חודשים. עכשיו השבוע נסגר
+ * לבד בכל מוצ"ש בחצות (שבוע הלימודים מתחיל בראשון).
+ *
+ * הזיהוי הוא לפי מפתח שבוע ולא לפי טיימר: שומרים על הכיתה את התאריך של
+ * יום ראשון האחרון, וכל טעינה משווה אליו. כך זה עובד גם אם האפליקציה
+ * הייתה סגורה שבועיים, וכל המכשירים מגיעים לאותה תוצאה בדיוק.
+ * המונה הכולל, האי, המדבקות והדרגות לא מושפעים — רק המונה השבועי. */
+function currentWeekKey(d) {
+  d = d || new Date();
+  const sunday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+  /* בונים את המחרוזת מהתאריך המקומי ולא דרך toISOString — שם ההמרה ל-UTC
+     מזיזה את ישראל יום אחורה וכל מכשיר באזור זמן אחר היה מקבל מפתח אחר. */
+  const mm = String(sunday.getMonth() + 1).padStart(2, '0');
+  const dd = String(sunday.getDate()).padStart(2, '0');
+  return sunday.getFullYear() + '-' + mm + '-' + dd;
+}
+function autoWeeklyRollover() {
+  try {
+    const key = currentWeekKey();
+    let changed = false;
+    (state.classes || []).forEach(c => {
+      if (!c) return;
+      if (!c.weekKey) { c.weekKey = key; changed = true; return; }  /* כיתה קיימת: מתחילים למנות מעכשיו */
+      if (c.weekKey === key) return;
+      (c.students || []).forEach(s => { s.weeklyPoints = 0; });
+      c.classWeeklyPoints = 0;
+      c.weekKey = key;
+      changed = true;
+    });
+    if (changed) save();
+    return changed;
+  } catch (e) { return false; }
+}
+
 function renderAll() {
+  autoWeeklyRollover();
   renderModeBadge();
   if (APP_MODE === 'student') { renderStudentApp(); return; }
   renderTabs();
