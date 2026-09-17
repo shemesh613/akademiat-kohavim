@@ -1136,6 +1136,7 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
   <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassIsland()">🏝️ האי של הכיתה</button>
   <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassGame()">🎮 משחק הצהריים</button>
   <button class="btn btn-warning" onclick="openLeaderboard()">🏆 לוח שיא</button>
+  <button class="btn" onclick="openRubricEditor()">📋 רובריקת בית</button>
   <button class="btn" onclick="resetWeek()">🔄 איפוס שבועי</button>
   <button class="btn btn-danger" onclick="exportData()">💾 גיבוי לקובץ</button>
   <button class="btn" onclick="importData()">📂 שחזור מקובץ</button>
@@ -1532,6 +1533,7 @@ if (!state.activeClassId || !state.classes.find(c => c.id === state.activeClassI
   state.activeClassId = state.classes[0].id;
 }
 if (!state.pending) state.pending = [];
+if (!Array.isArray(state.rubric) || !state.rubric.length) state.rubric = defaultRubric();
 // migrate old states
 state.classes.forEach(c => {
   if (!c.students) c.students = [];
@@ -1577,6 +1579,22 @@ function createStudent(name, column) {
     stickers: {},
     stickerProgress: 0,
   };
+}
+
+// רובריקת "מהבית" — פעולות שתלמיד יכול לסמן שעשה בבית. כל בקשה נכנסת לתור
+// האישורים והנקודות מתווספות רק אחרי אישור המורה. המורה עורך את הרשימה
+// דרך "📋 רובריקת בית". ניקוד לכל פעולה ניתן לשינוי (ברירת מחדל 10).
+function defaultRubric() {
+  return [
+    { id: 'rub_homework', icon: '📖', label: 'הכנתי שיעורי בית', points: 10 },
+    { id: 'rub_read',     icon: '📚', label: 'קראתי ספר / קריאה יומית', points: 10 },
+    { id: 'rub_room',     icon: '🛏️', label: 'סידרתי את החדר', points: 10 },
+    { id: 'rub_help',     icon: '🍽️', label: 'עזרתי בבית (שולחן / מטבח)', points: 10 },
+    { id: 'rub_teeth',    icon: '🦷', label: 'צחצחתי שיניים בוקר וערב', points: 10 },
+    { id: 'rub_kind',     icon: '🙏', label: 'מעשה טוב / עזרתי למישהו', points: 10 },
+    { id: 'rub_sport',    icon: '💪', label: 'פעילות ספורט / תנועה', points: 10 },
+    { id: 'rub_tidy',     icon: '🧹', label: 'עזרתי בניקיון הבית', points: 10 },
+  ];
 }
 
 // ---- השהיית שמירה זמנית: פעולות מרובות (ניקוד לטור/לכיתה) שומרות פעם אחת בסוף ----
@@ -4468,7 +4486,7 @@ function renderApprovalBanner() {
   const count = (state.pending || []).length;
   if (count > 0) {
     banner.style.display = 'block';
-    banner.innerHTML = `🔔 ${count} קניות ממתינות לאישור — לחץ לאישור`;
+    banner.innerHTML = `🔔 ${count} בקשות ממתינות לאישור — לחץ לאישור`;
   } else {
     banner.style.display = 'none';
   }
@@ -4482,7 +4500,7 @@ function openApprovalModal() {
       <div style="font-size:60px">🔔</div>
       <div style="flex:1">
         <div class="modal-title">תור אישורים (${list.length})</div>
-        <div class="modal-sub">קניות שתלמידים ביצעו מהבית</div>
+        <div class="modal-sub">בקשות שתלמידים שלחו מהבית — נקודות וקניות</div>
       </div>
       <button class="btn" onclick="closeModal()">✕</button>
     </div>
@@ -4492,6 +4510,18 @@ function openApprovalModal() {
         const cls = state.classes.find(c => c.id === p.classId);
         const stu = cls?.students.find(s => s.id === p.studentId);
         if (!stu) return '';
+        if (p.type === 'points') {
+          return `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border-radius:12px;margin-bottom:8px;border-right:4px solid var(--neon-green)">
+              <div style="font-size:38px;width:60px;text-align:center">${p.icon || '⭐'}</div>
+              <div style="flex:1">
+                <div style="font-weight:900">${escapeHtml(stu.name)} <span style="font-size:0.8em;color:var(--text-dim)">· 🏠 מהבית</span></div>
+                <div style="font-size:0.9em;color:var(--text-dim)">${escapeHtml(p.label || 'משימת בית')} <span style="color:var(--neon-green);font-weight:900">· +${p.points} נק׳</span></div>
+              </div>
+              <button class="btn btn-primary" onclick="approvePending('${p.id}')" style="font-size:1.2em">✓</button>
+              <button class="btn btn-danger" onclick="rejectPending('${p.id}')" style="font-size:1.2em">✗</button>
+            </div>`;
+        }
         const item = findItem(p.itemId);
         const slotIcon = ({body:'🎨',hat:'🎩',glasses:'👓',pet:'🐾',aura:'✨'})[p.slot] || '';
         return `
@@ -4525,6 +4555,9 @@ function approvePending(pid) {
   const cls = state.classes.find(c => c.id === p.classId);
   const stu = cls?.students.find(s => s.id === p.studentId);
   if (stu) {
+    if (p.type === 'points') {
+      awardApprovedPoints(stu, cls, p.points || 0);
+    }
     if (p.type === 'buy') {
       chargePoints(stu, p.price, cls);
       if (!stu.owned.includes(p.itemId)) stu.owned.push(p.itemId);
@@ -4534,13 +4567,102 @@ function approvePending(pid) {
     newAchs.forEach((a, i) => setTimeout(() => showAchievement(a), 500 + i * 1500));
   }
   state.pending = state.pending.filter(x => x.id !== pid);
-  playSound('buy');
+  playSound(p.type === 'points' ? 'point' : 'buy');
   save(); renderAll(); openApprovalModal();
+}
+
+// הוספת נקודות מאושרות לתלמיד ספציפי בכיתה שלו — משכפל את ליבת addPoints
+// (נקודות אישיות + שבועיות + ניקוד כיתתי + המרה לאבני בנייה של האי), בלי
+// אפקטי הקומבו/פופ-אפ של מסך הכיתה, כדי שיעבוד גם כשהמורה בטאב אחר.
+function awardApprovedPoints(stu, cls, amount) {
+  amount = Math.max(0, Math.round(Number(amount) || 0));
+  if (!stu || !cls || amount === 0) return;
+  stu.points = Math.max(0, stu.points + amount);
+  stu.weeklyPoints = (stu.weeklyPoints || 0) + amount;
+  addEarned(stu, amount); // נספר גם לניקוד הכיתתי
+  // האי הכיתתי: כל 10 נקודות = אבן בנייה אחת (SPEC §3). לא גורע מהתלמיד.
+  try {
+    if (window.AK) window.AK.ensureKlass(cls);
+    if (cls.island) {
+      cls.island._rem = (cls.island._rem || 0) + amount;
+      const stones = Math.floor(cls.island._rem / 10);
+      if (stones > 0) { cls.island._rem -= stones * 10; cls.island.coins += stones; }
+    }
+  } catch (e) {}
+  // מטבע אישי לחלקה (island-ownership) — ערוץ מקביל, פועל על התלמיד שהועבר
+  if (window.IslandOwnership && typeof window.IslandOwnership.onPointsAdded === 'function') {
+    try { window.IslandOwnership.onPointsAdded(stu, amount); } catch (e) {}
+  }
+  // קופת הזמן היומית (class-games) פועלת על הכיתה הפעילה — רק אם זו אותה כיתה
+  if (cls.id === state.activeClassId && window.ClassGames && typeof window.ClassGames.onPointsAdded === 'function') {
+    try { window.ClassGames.onPointsAdded(stu, amount); } catch (e) {}
+  }
+  try {
+    const awards = awardStickersForPoints(stu, amount);
+    awards.forEach((a, i) => setTimeout(() => showStickerPopup(a, false), 1000 + i * 1800));
+  } catch (e) {}
 }
 function rejectPending(pid) {
   state.pending = state.pending.filter(x => x.id !== pid);
   playSound('minus');
   save(); renderAll(); openApprovalModal();
+}
+
+// ==================== רובריקת בית (עריכה — מורה בלבד) ====================
+function openRubricEditor() {
+  if (APP_MODE === 'student') return;
+  if (!Array.isArray(state.rubric) || !state.rubric.length) state.rubric = defaultRubric();
+  const inp = 'padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#fff';
+  const list = state.rubric;
+  const m = document.getElementById('modalContent');
+  m.innerHTML = `
+    <div class="modal-hero" style="padding-bottom:10px">
+      <div style="font-size:60px">📋</div>
+      <div style="flex:1">
+        <div class="modal-title">רובריקת בית</div>
+        <div class="modal-sub">מה שתלמידים יכולים לסמן מהבית — כל בקשה מגיעה לאישור שלך</div>
+      </div>
+      <button class="btn" onclick="closeModal()">✕</button>
+    </div>
+    <div id="rubricList">
+      ${list.map(item => `
+        <div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--card);border-radius:12px;margin-bottom:8px">
+          <input value="${escapeHtml(item.icon || '⭐')}" onchange="updateRubricField('${item.id}','icon',this.value)" style="${inp};width:54px;text-align:center;font-size:1.4em">
+          <input value="${escapeHtml(item.label)}" onchange="updateRubricField('${item.id}','label',this.value)" style="${inp};flex:1;font-size:1em">
+          <input type="number" min="0" value="${item.points}" onchange="updateRubricField('${item.id}','points',this.value)" style="${inp};width:74px;text-align:center;font-weight:900">
+          <span style="color:var(--text-dim)">נק׳</span>
+          <button class="btn btn-danger" onclick="deleteRubricItem('${item.id}')" style="font-size:1em">🗑️</button>
+        </div>`).join('')}
+      ${list.length === 0 ? '<div style="text-align:center;padding:30px;color:var(--text-dim)">הרשימה ריקה — הוסף פעולה 👇</div>' : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="addRubricItem()">➕ הוסף פעולה</button>
+      <button class="btn" onclick="resetRubricDefaults()">↩️ ברירת מחדל</button>
+    </div>
+  `;
+  document.getElementById('studentModal').classList.add('show');
+}
+function updateRubricField(id, field, value) {
+  const item = (state.rubric || []).find(r => r.id === id);
+  if (!item) return;
+  if (field === 'points') { let n = Math.round(Number(value) || 0); item.points = n < 0 ? 0 : n; }
+  else if (field === 'icon') item.icon = String(value).trim().slice(0, 8) || '⭐';
+  else item.label = String(value).slice(0, 60);
+  save();
+}
+function addRubricItem() {
+  state.rubric = state.rubric || [];
+  state.rubric.push({ id: 'rub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), icon: '⭐', label: 'פעולה חדשה', points: 10 });
+  save(); openRubricEditor();
+}
+function deleteRubricItem(id) {
+  state.rubric = (state.rubric || []).filter(r => r.id !== id);
+  save(); openRubricEditor();
+}
+function resetRubricDefaults() {
+  if (!confirm('להחזיר את רשימת ברירת המחדל? השינויים שלך יימחקו.')) return;
+  state.rubric = defaultRubric();
+  save(); openRubricEditor();
 }
 
 // ==================== STUDENT APP (?home=1) ====================
@@ -4683,7 +4805,8 @@ function renderStudentProfile() {
       ${renderRankLadder(s)}
 
       <div class="modal-tabs" style="border:none;padding:0;margin-top:14px">
-        <button class="modal-tab active" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
+        <button class="modal-tab active" id="stTabHome" onclick="setStudentTab('home')">🏠 מהבית</button>
+        <button class="modal-tab" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
         <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
         <button class="modal-tab" id="stTabStickers" onclick="setStudentTab('stickers')">🧩 מדבקות</button>
         <button class="modal-tab" id="stTabAch" onclick="setStudentTab('ach')">🏆 הישגים</button>
@@ -4704,7 +4827,7 @@ function renderStudentProfile() {
   }
   animate();
 
-  setStudentTab('shop');
+  setStudentTab('home');
 }
 
 let studentTab = 'shop';
@@ -4714,12 +4837,37 @@ function setStudentTab(t) {
   if (!found) return;
   const { student: s } = found;
   const body = document.getElementById('studentBody');
-  ['stTabShop','stTabBox','stTabAch','stTabStickers'].forEach(id => document.getElementById(id)?.classList.remove('active'));
-  const tabId = t === 'shop' ? 'stTabShop' : t === 'box' ? 'stTabBox' : t === 'stickers' ? 'stTabStickers' : 'stTabAch';
+  ['stTabHome','stTabShop','stTabBox','stTabAch','stTabStickers'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  const tabId = t === 'home' ? 'stTabHome' : t === 'shop' ? 'stTabShop' : t === 'box' ? 'stTabBox' : t === 'stickers' ? 'stTabStickers' : 'stTabAch';
   document.getElementById(tabId)?.classList.add('active');
 
   if (t === 'stickers' && studentAnimId) { cancelAnimationFrame(studentAnimId); studentAnimId = null; }
-  if (t === 'shop') {
+  if (t === 'home') {
+    const rubric = state.rubric || [];
+    const myPending = pendingForStudent(s.id).filter(p => p.type === 'points');
+    body.innerHTML = `
+      <div style="text-align:center;padding:6px 4px 16px;color:var(--text-dim);font-size:1.05em">
+        סמן מה עשית בבית 🏡 — זה נשלח למורה, והנקודות ייכנסו <b>רק אחרי אישור</b> ✅
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+        ${rubric.map(item => {
+          const isPending = myPending.some(p => p.itemId === item.id);
+          return `
+            <div class="shop-item ${isPending ? 'owned' : ''}" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:16px 12px;gap:8px">
+              <div style="font-size:2.6em">${item.icon || '⭐'}</div>
+              <div style="font-weight:900;font-size:1.05em">${escapeHtml(item.label)}</div>
+              <div style="color:var(--neon-yellow);font-weight:900">+${item.points} נק׳</div>
+              ${isPending
+                ? '<div style="color:#ff8c00;font-weight:900;font-size:0.95em">⏳ ממתין לאישור</div>'
+                : `<button class="btn btn-primary" style="width:100%;font-size:1.05em" onclick="studentRequestPoints('${item.id}')">✓ עשיתי</button>`}
+            </div>`;
+        }).join('')}
+      </div>
+      ${myPending.length ? `<div style="margin-top:16px;padding:12px;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.4);border-radius:12px;text-align:center;font-weight:900">
+        ⏳ ${myPending.length} בקשות נקודות ממתינות לאישור המורה
+      </div>` : ''}
+    `;
+  } else if (t === 'shop') {
     const previewOw = previewOwned(s);
     const previewEq = previewEquipped(s);
     const previewPts = previewPoints(s);
@@ -4831,6 +4979,16 @@ function studentEquip(slot, itemId) {
   const found = findStudent(studentSelectedId);
   if (!found) return;
   addPending({ type: 'equip', studentId: found.student.id, classId: found.cls.id, slot, itemId, price: 0 });
+}
+function studentRequestPoints(itemId) {
+  const found = findStudent(studentSelectedId);
+  if (!found) return;
+  const item = (state.rubric || []).find(r => r.id === itemId);
+  if (!item) return;
+  // מניעת שליחה כפולה של אותה משימה לפני שהמורה הכריע
+  if (pendingForStudent(found.student.id).some(p => p.type === 'points' && p.itemId === itemId)) return;
+  addPending({ type: 'points', studentId: found.student.id, classId: found.cls.id, itemId, label: item.label, icon: item.icon || '⭐', points: Math.max(0, Math.round(item.points) || 0) });
+  setStudentTab('home'); // נשארים בטאב "מהבית" (addPending מרנדר מחדש לברירת המחדל)
 }
 function studentOpenBox() {
   const found = findStudent(studentSelectedId);
