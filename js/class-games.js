@@ -5,7 +5,15 @@
  *  תלוי ב-window.AK (המתאם) בלבד. אינו נוגע ב-THREE.js / island-engine — Canvas 2D + DOM.
  *  אפס עומס מורה: הכל אוטומטי-אלגוריתמי, שיפוט בלי הזנת תוכן, בלי תלות במבוגר.
  *  ES5-friendly, IIFE יחיד, אין import/export, אין תלות חדשה.
- *  חשיפה יחידה החוצה: window.ClassGames = {open,close,timeBank,pickPlayer,onPointsAdded}.
+ *  חשיפה יחידה החוצה: window.ClassGames = {open,close,timeBank,roundsBank,roundsLeft,
+ *  pointsToNextRound,pickPlayer,onPointsAdded}.
+ *
+ *  ---------------------------------------------------------------------------------
+ *  עדכון 2026-09-17 — בחירת משחק + קופת סבבים לפי נקודות:
+ *  1. פתיחת המשחק מציגה מסך בחירה עם כל 5 המשחקים (עם "ההמלצה של היום" מודגשת),
+ *     במקום להכתיב משחק לפי רוטציית הימים.
+ *  2. אורך סבב קבוע 30 שניות, ומספר הסבבים ביום = 1 + כל 500 נקודות שהכיתה צברה היום
+ *     (עד 8). בין סבב לסבב חוזרים למסך הבחירה ואפשר לבחור משחק אחר.
  *
  *  ---------------------------------------------------------------------------------
  *  שדרוג עיצוב "מיץ" (juice) + שפת האי — 2026-07-21:
@@ -132,6 +140,7 @@ function ensureGamesState(klass) {
   if (!g.playedSet) g.playedSet = [];
   if (typeof g.weekBonusDate !== 'string') g.weekBonusDate = '';
   if (typeof g.weekStartCoinsSnapshot !== 'number') g.weekStartCoinsSnapshot = 0;
+  if (typeof g.roundsUsed !== 'number') g.roundsUsed = 0; /* כמה סבבים מתוך קופת היום כבר שוחקו */
   rolloverDay(g);
   return g;
 }
@@ -142,6 +151,7 @@ function rolloverDay(g) {
     g.dailyPoints = 0;
     g.dailyPointsByStudent = {};
     g.dailyDone = false;
+    g.roundsUsed = 0;
   }
 }
 function ensureIslandDefaults(klass) {
@@ -163,15 +173,44 @@ function pushIslandHistory(klass, text) {
 }
 
 /* ===================================================================================
- * 3. נוסחת "זמן כמטבע" — החלטה 2-4 (RESEARCH פרק 10.4): 20 + min(40, floor(נק'/3)), תקרה 60
+ * 3. "זמן כמטבע" — גרסה 2026-09: כל סבב הוא 30 שניות קבועות, ומספר הסבבים שהכיתה
+ *    מרוויחה ליום נגזר ישירות מהנקודות שנצברו היום: סבב אחד במתנה + סבב לכל 500 נקודות.
+ *    כך "כמה פעמים משחקים" הוא הפרס — ולא סבב יחיד שנמתח ומשעמם.
  * =================================================================================== */
-function timeBank(klass) {
+var ROUND_SECONDS = 30;      /* אורך סבב יחיד — קבוע */
+var POINTS_PER_ROUND = 500;  /* כל 500 נקודות שהכיתה צוברת היום = עוד סבב */
+var MAX_ROUNDS = 8;          /* תקרה — כדי שיום חריג לא יבלע את כל הצהריים */
+
+function timeBank(klass) { return ROUND_SECONDS; } /* נשמר לתאימות ה-API הקיים */
+
+/* כמה סבבים הכיתה הרוויחה היום */
+function roundsBank(klass) {
   klass = klass || activeClass();
-  if (!klass) return 20;
+  if (!klass) return 1;
   var g = ensureGamesState(klass);
   var pts = Math.max(0, g.dailyPoints || 0);
-  var div = Math.max(1, 3 * akScale(klass)); /* כיתה עשירה לא מגיעה לתקרה בכל יום */
-  return clampInt(20 + Math.min(40, Math.floor(pts / div)), 20, 60);
+  return clampInt(1 + Math.floor(pts / POINTS_PER_ROUND), 1, MAX_ROUNDS);
+}
+/* כמה סבבים נשארו היום */
+function roundsLeft(klass) {
+  klass = klass || activeClass();
+  if (!klass) return 0;
+  var g = ensureGamesState(klass);
+  return Math.max(0, roundsBank(klass) - (g.roundsUsed || 0));
+}
+/* כמה נקודות חסרות לסבב הבא (0 = כבר בתקרה) */
+function pointsToNextRound(klass) {
+  klass = klass || activeClass();
+  if (!klass) return 0;
+  if (roundsBank(klass) >= MAX_ROUNDS) return 0;
+  var g = ensureGamesState(klass);
+  var pts = Math.max(0, g.dailyPoints || 0);
+  return POINTS_PER_ROUND - (pts % POINTS_PER_ROUND);
+}
+function fmtNum(v) {
+  var str = String(Math.round(Number(v) || 0)), out = '', c = 0, i;
+  for (i = str.length - 1; i >= 0; i--) { out = str.charAt(i) + out; if (++c % 3 === 0 && i > 0) out = ',' + out; }
+  return out;
 }
 
 /* ===================================================================================
@@ -291,6 +330,22 @@ function injectStyle() {
      * מונה בתוך פס צר, מקלדת שמופעלת מקרוב ע"י תורן/ית אחד/ת) ולא המסר המרכזי שהקהל מהשורה האחורית
      * חייב לקרוא — עדיין הרבה מעל רף ה-22px המוחלט (SPEC 5.2). */
     '.ak-cg-role{font-size:3.4vh;font-weight:800;color:#1c2340;background:rgba(139,92,246,0.14);border:2px solid #8b5cf6;padding:0.8vh 2vw;border-radius:14px;max-width:88vw;}' +
+    /* --- מסך בחירת המשחק (2026-09): אריחים גדולים, קריאים מהשורה האחורית --- */
+    '.ak-cg-bank{font-size:3.2vh;font-weight:900;color:#1c2340;background:rgba(52,199,89,0.16);' +
+      'border:3px solid #34c759;padding:0.9vh 2.4vw;border-radius:16px;max-width:94vw;}' +
+    '.ak-cg-pickgrid{display:flex;flex-wrap:wrap;gap:1.8vh;justify-content:center;width:min(96vw,1150px);}' +
+    '.ak-cg-pick{flex:0 1 30%;min-width:min(42vw,300px);background:#fffaee;border:4px solid #a9713f;border-radius:26px;' +
+      'padding:1.8vh 1.4vw;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:0.5vh;' +
+      'font-family:Heebo,Arial,sans-serif;color:#1c2340;text-align:center;' +
+      'box-shadow:0 8px 0 rgba(20,30,60,.20),0 14px 26px rgba(20,30,60,.20);transition:transform .1s,filter .15s;}' +
+    '.ak-cg-pick:hover{filter:brightness(1.04);transform:translateY(-2px);}' +
+    '.ak-cg-pick:active{transform:scale(.95);}' +
+    '.ak-cg-pick.rec{border-color:#ffb800;box-shadow:0 0 0 5px rgba(255,184,0,.38),0 8px 0 rgba(20,30,60,.20);}' +
+    '.ak-cg-pick-ico{font-size:7vh;line-height:1.05;}' +
+    '.ak-cg-pick-name{font-size:3.6vh;font-weight:900;}' +
+    '.ak-cg-pick-cap{font-size:2.2vh;font-weight:700;color:#5b6688;line-height:1.25;}' +
+    '.ak-cg-pick-rec{font-size:2vh;font-weight:900;color:#b06a00;}' +
+    '.ak-cg-hint{font-size:2.6vh;font-weight:800;color:#5b6688;max-width:92vw;}' +
     '.ak-cg-quadgrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:1.6vh;width:100%;height:100%;padding:2vh;}' +
     '.ak-cg-quad{position:relative;border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:6vh;font-weight:900;color:#fff;' +
       'border:4px solid rgba(255,255,255,.5);cursor:pointer;transition:transform .1s,filter .15s;user-select:none;' +
@@ -473,44 +528,110 @@ function pickGameForToday(d) {
 }
 
 /* ---------- כניסה ראשית ---------- */
+/* מאז 2026-09: הפתיחה מובילה למסך בחירה — הכיתה בוחרת מה משחקים, ולא הרוטציה היומית.
+   הרוטציה נשארת בתור "ההמלצה של היום" (אריח מודגש) כדי שתמיד תהיה ברירת מחדל מהירה. */
 function open(opts) {
   if (SESSION.running) return; /* כבר רץ סשן — לא פותחים כפול */
   var klass = activeClass();
   if (!klass || !klass.students || !klass.students.length) { akToast('אין תלמידים בכיתה הפעילה'); return; }
   injectStyle();
+  getRoot();
+  if (opts && opts.replay) { startGame((opts && opts.game) || pickGameForToday(), true); return; }
+  if (opts && opts.game) { startGame(opts.game, false); return; }
+  renderPicker();
+}
+var REPLAY_SECONDS = 20; /* סבב בונוס אחרי שהקופה נגמרה — קצר בכוונה, ולא נספר בקופה */
+
+/* מסך בחירת המשחק */
+function renderPicker() {
+  var klass = activeClass();
+  if (!klass || !klass.students || !klass.students.length) { akToast('אין תלמידים בכיתה הפעילה'); return; }
+  injectStyle(); getRoot();
   var g = ensureGamesState(klass);
-  var gameId = (opts && opts.game) || pickGameForToday();
-  var replay = !!(opts && opts.replay);
-  if (g.dailyDone && !replay) { renderAlreadyPlayed(klass, g); return; }
-  /* סבב נוסף באותו יום — זמן מקוצר קבוע, כדי שהקופה היומית תישאר משמעותית */
-  var duration = replay ? REPLAY_SECONDS : timeBank(klass);
+  var left = roundsLeft(klass), bank = roundsBank(klass);
+  if (left <= 0) { renderAlreadyPlayed(klass, g); return; }
+  var rec = pickGameForToday();
+  var ids = GAME_IDS.concat(['confetti']);
+  var tiles = '', i, m;
+  for (i = 0; i < ids.length; i++) {
+    m = GAME_META[ids[i]];
+    tiles += '<button type="button" class="ak-cg-pick' + (ids[i] === rec ? ' rec' : '') + '" data-game="' + ids[i] + '">' +
+      '<div class="ak-cg-pick-ico">' + m.icon + '</div>' +
+      '<div class="ak-cg-pick-name">' + akEsc(m.name) + '</div>' +
+      '<div class="ak-cg-pick-cap">' + akEsc(m.caption) + '</div>' +
+      (ids[i] === rec ? '<div class="ak-cg-pick-rec">⭐ ההמלצה של היום</div>' : '') +
+    '</button>';
+  }
+  var toNext = pointsToNextRound(klass);
+  var hint = toNext > 0
+    ? ('כל ' + POINTS_PER_ROUND + ' נקודות שהכיתה צוברת = עוד סבב של ' + ROUND_SECONDS + ' שניות · עוד ' + fmtNum(toNext) + ' נקודות לסבב הבא ⏱️')
+    : ('הגעתם לקופה המלאה — ' + MAX_ROUNDS + ' סבבים היום! 🏆');
+  setScreen(
+    '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
+    '<div class="ak-cg-wrap" style="justify-content:center;padding:3vh 3vw;gap:2vh;overflow:auto;">' +
+      '<div class="ak-cg-h1">🎮 מה משחקים?</div>' +
+      '<div class="ak-cg-bank">צברנו היום ' + fmtNum(g.dailyPoints || 0) + ' נקודות · נשארו ' + left + ' מתוך ' + bank + ' סבבים</div>' +
+      '<div class="ak-cg-pickgrid">' + tiles + '</div>' +
+      '<div class="ak-cg-hint">' + hint + '</div>' +
+    '</div>');
+  SESSION.running = false;
+  var btns = document.querySelectorAll('#' + ROOT_ID + ' .ak-cg-pick');
+  for (i = 0; i < btns.length; i++) {
+    (function (el) {
+      el.onclick = function () { akSound('coin'); startGame(el.getAttribute('data-game'), false); };
+    })(btns[i]);
+  }
+}
+
+/* הפעלת סבב בפועל */
+function startGame(gameId, replay) {
+  var klass = activeClass();
+  if (!klass || !klass.students || !klass.students.length) return;
+  if (!GAME_META[gameId]) gameId = pickGameForToday();
+  var g = ensureGamesState(klass);
+  injectStyle(); getRoot();
   SESSION.running = true;
   SESSION.klass = klass;
   SESSION.game = gameId;
-  SESSION.duration = duration;
+  SESSION.replay = !!replay;
+  SESSION.duration = replay ? REPLAY_SECONDS : ROUND_SECONDS;
   SESSION.student = (gameId === 'confetti') ? null : pickPlayer(klass);
   SESSION.gState = g;
-  getRoot();
   if (gameId === 'confetti') renderConfettiAnnounce();
   else renderAnnounce();
 }
-var REPLAY_SECONDS = 20; /* סבב רשות נוסף — קצר בכוונה */
 
-/* כבר שיחקנו היום: מציג מה הרווחנו, ומאפשר סבב נוסף קצר בלי לחלק זמן מחדש */
+/* חזרה למסך הבחירה בין סבב לסבב — בלי לסגור את המסך */
+function nextRound() {
+  clearSession();
+  SESSION.running = false;
+  SESSION.student = null; SESSION.game = null; SESSION.duration = 0; SESSION.replay = false;
+  renderPicker();
+}
+
+/* נגמרה קופת הסבבים של היום */
 function renderAlreadyPlayed(klass, g) {
-  var last = (g.plays && g.plays.length) ? g.plays[g.plays.length - 1] : null;
-  var earned = last ? last.score : 0;
+  var used = Math.max(0, g.roundsUsed || 0);
+  var earnedToday = 0, i;
+  var dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  for (i = 0; i < (g.plays || []).length; i++) {
+    if ((g.plays[i].t || 0) >= dayStart.getTime()) earnedToday += (g.plays[i].score || 0);
+  }
+  var toNext = pointsToNextRound(klass);
+  var line = toNext > 0
+    ? ('עוד <b>' + fmtNum(toNext) + '</b> נקודות לכיתה — ונפתח עוד סבב היום! ⏱️')
+    : ('סיימתם את כל ' + MAX_ROUNDS + ' הסבבים של היום — הקופה מתמלאת מחר 🌅');
   setScreen(
     '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
     '<div class="ak-cg-wrap">' +
-      '<div class="ak-cg-h1">🎉 כבר שיחקנו היום!</div>' +
-      '<div class="ak-cg-h2">הרווחנו ' + earned + ' נקודות לאי</div>' +
-      '<div class="ak-cg-body">הקופה מתמלאת שוב מחר — כל נקודה היום נחסכת למשחק של מחר! ⏳</div>' +
-      '<button class="ak-cg-btn" id="ak-cg-replay">▶️ עוד סבב קצר (' + REPLAY_SECONDS + ' שניות)</button>' +
+      '<div class="ak-cg-h1">🎉 שיחקנו ' + used + ' סבבים היום!</div>' +
+      '<div class="ak-cg-h2">הרווחנו ' + fmtNum(earnedToday) + ' נקודות לאי</div>' +
+      '<div class="ak-cg-body">' + line + '</div>' +
+      '<button class="ak-cg-btn" id="ak-cg-replay">▶️ סבב בונוס קצר (' + REPLAY_SECONDS + ' שניות)</button>' +
     '</div>');
   SESSION.running = false;
   var btn = document.getElementById('ak-cg-replay');
-  if (btn) btn.onclick = function () { close(); open({ replay: true }); };
+  if (btn) btn.onclick = function () { startGame(pickGameForToday(), true); };
 }
 function close() {
   clearSession();
@@ -531,10 +652,11 @@ function renderAnnounce() {
   setScreen(
     '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
     '<div class="ak-cg-wrap">' +
-      '<div class="ak-cg-h2">' + meta.icon + ' היום משחק/ת:</div>' +
+      '<div class="ak-cg-h2">' + meta.icon + ' ' + akEsc(meta.name) + ' · משחק/ת:</div>' +
       '<div class="ak-cg-badge" id="ak-cg-namebadge">' + name + '</div>' +
-      '<div class="ak-cg-body">הרווחנו <span id="ak-cg-secnum">0</span> שניות משחק! 🎮</div>' +
+      '<div class="ak-cg-body"><span id="ak-cg-secnum">0</span> שניות משחק! 🎮</div>' +
       '<div class="ak-cg-fillbar"><div class="ak-cg-fillinner" id="ak-cg-fill"></div></div>' +
+      '<div class="ak-cg-role">' + roundLabel() + '</div>' +
       (torenLine ? '<div class="ak-cg-role">' + torenLine + '</div>' : '') +
       '<div id="ak-cg-cd" style="min-height:22vh"></div>' +
     '</div>');
@@ -548,10 +670,20 @@ function renderAnnounce() {
   }
   trackTimer(setTimeout(function () { runCountdown(function () { renderPlay(); }); }, 2600));
 }
+/* "סבב 2 מתוך 4" — או "סבב בונוס" כשזה סבב רשות מעבר לקופה */
+function roundLabel() {
+  var klass = SESSION.klass;
+  if (SESSION.replay) return '🎁 סבב בונוס — מעבר לקופה של היום';
+  if (!klass) return '';
+  var g = ensureGamesState(klass);
+  var bank = roundsBank(klass);
+  var num = Math.min(bank, (g.roundsUsed || 0) + 1);
+  return '⏱️ סבב ' + num + ' מתוך ' + bank + ' שהכיתה הרוויחה היום';
+}
 function requestAnimTick(fillEl, numEl) {
   var target = SESSION.duration;
   trackTimer(setTimeout(function () {
-    if (fillEl) fillEl.style.width = Math.round((target / 60) * 100) + '%';
+    if (fillEl) fillEl.style.width = Math.round(clamp(target / ROUND_SECONDS, 0, 1) * 100) + '%';
   }, 30));
   var start = Date.now(), dur = 1400;
   function step() {
@@ -656,7 +788,8 @@ function renderCelebrate(perf) {
   g.plays.push({ gameId: SESSION.game, studentId: SESSION.student ? SESSION.student.id : null, score: coins, t: Date.now() });
   if (g.plays.length > 100) g.plays = g.plays.slice(-100);
   g.lastPlayed = Date.now();
-  g.dailyDone = true;
+  if (!SESSION.replay) g.roundsUsed = (g.roundsUsed || 0) + 1; /* סבב בונוס לא אוכל מהקופה */
+  g.dailyDone = roundsLeft(klass) <= 0;
   markPlayed(klass, g, SESSION.student ? SESSION.student.id : null);
   akSave();
   var roles = weeklyRoles(klass);
@@ -664,6 +797,8 @@ function renderCelebrate(perf) {
   var extra = (SESSION.game === 'treasure' && RUNNERS.treasure.lastResult)
     ? ('<div class="ak-cg-body">הסוד היה ' + RUNNERS.treasure.lastResult.secret + ', ניחשתם ' + RUNNERS.treasure.lastResult.guess + '!</div>') : '';
   var multChip = tier.mult > 1 ? ('<div class="ak-cg-role">בונוס ' + tier.stars + ' × ' + tier.mult + '!</div>') : '';
+  var left = roundsLeft(klass);
+  var nextBtn = left > 0 ? ('<button class="ak-cg-btn" id="ak-cg-next">🎮 עוד סבב — נשארו ' + left + '</button>') : '';
   setScreen(
     '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
     '<div class="ak-cg-wrap">' +
@@ -673,12 +808,15 @@ function renderCelebrate(perf) {
       multChip +
       '<div class="ak-cg-body">הכיתה בנתה עוד קצת ⭐</div>' +
       (cashierLine ? '<div class="ak-cg-role">' + cashierLine + '</div>' : '') +
+      nextBtn +
     '</div>');
   akSound('rankup');
   countUpNumber(document.getElementById('ak-cg-coinsnum'), coins, 700);
   fireConfettiBursts(6);
   fireworks(3);
-  trackTimer(setTimeout(close, 16000));
+  var nb = document.getElementById('ak-cg-next');
+  if (nb) nb.onclick = nextRound;
+  else trackTimer(setTimeout(close, 16000));
 }
 /* מספר שקופץ ועולה מ-0 עד היעד — "מיץ" משותף לכל מסכי הסיכום */
 function countUpNumber(el, target, ms) {
@@ -780,19 +918,25 @@ function renderConfettiCelebrate() {
   g.plays.push({ gameId: 'confetti', studentId: null, score: bonus, t: Date.now() });
   if (g.plays.length > 100) g.plays = g.plays.slice(-100);
   g.lastPlayed = Date.now();
-  g.dailyDone = true;
+  if (!SESSION.replay) g.roundsUsed = (g.roundsUsed || 0) + 1;
+  g.dailyDone = roundsLeft(klass) <= 0;
   akSave();
+  var cLeft = roundsLeft(klass);
+  var cNextBtn = cLeft > 0 ? ('<button class="ak-cg-btn" id="ak-cg-next2">🎮 עוד סבב — נשארו ' + cLeft + '</button>') : '';
   setScreen(
     '<div class="ak-cg-bg"></div>' + closeButtonHtml() +
     '<div class="ak-cg-wrap">' +
       '<div class="ak-cg-h1">🎊 איזה שבוע מדהים! 🎊</div>' +
       '<div class="ak-cg-h2">+' + bonus + ' נקודות לאי מתנה!</div>' +
       '<div class="ak-cg-body">כל הכבוד לכל הכיתה! 👏</div>' +
+      cNextBtn +
     '</div>');
   akSound('rankup');
   fireConfettiBursts(10);
   fireworks(5);
-  trackTimer(setTimeout(close, 14000));
+  var nb2 = document.getElementById('ak-cg-next2');
+  if (nb2) nb2.onclick = nextRound;
+  else trackTimer(setTimeout(close, 14000));
 }
 
 /* ===================================================================================
@@ -1680,6 +1824,7 @@ function checkAutoDrive() {
   try {
     if (!isProjectorMode()) return;
     if (SESSION.running) return;
+    if (document.getElementById(ROOT_ID)) return; /* מסך הבחירה כבר פתוח — לא לפתוח שוב */
     var klass = activeClass();
     if (!klass) return;
     var g = ensureGamesState(klass);
@@ -1700,9 +1845,12 @@ window.ClassGames = {
   open: open,
   close: close,
   timeBank: timeBank,
+  roundsBank: roundsBank,
+  roundsLeft: roundsLeft,
+  pointsToNextRound: pointsToNextRound,
   pickPlayer: pickPlayer,
   onPointsAdded: onPointsAdded,
-  config: { autoTime: AUTO_TIME_DEFAULT }
+  config: { autoTime: AUTO_TIME_DEFAULT, roundSeconds: ROUND_SECONDS, pointsPerRound: POINTS_PER_ROUND, maxRounds: MAX_ROUNDS }
 };
 
 })();
