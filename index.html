@@ -1444,6 +1444,7 @@ const URL_PARAMS = new URLSearchParams(window.location.search);
 // All other URLs (including the bare URL students already have) become student mode.
 const TEACHER_KEY = 'shay2026nikud';
 const APP_MODE = URL_PARAMS.get('t') === TEACHER_KEY ? 'teacher' : 'student';
+const STUDENT_CLASS_ID = URL_PARAMS.get('c') || ''; // קישור ייעודי לכיתה: ?c=<id> → רק אותה כיתה
 if (URL_PARAMS.get('reset') === '1') {
   localStorage.removeItem('cps_state_v2');
   const keep = APP_MODE === 'teacher' ? '?t=' + TEACHER_KEY : '';
@@ -1510,6 +1511,7 @@ function startCloudPoll() {
     if (hash === lastCloudHash) return;
     if (hash === JSON.stringify(state)) { lastCloudHash = hash; return; }
     state = remote;
+    ensureRubric();
     lastCloudHash = hash;
     clearAvatarCache();
     localStorage.setItem('cps_state_v2', hash);
@@ -1533,7 +1535,7 @@ if (!state.activeClassId || !state.classes.find(c => c.id === state.activeClassI
   state.activeClassId = state.classes[0].id;
 }
 if (!state.pending) state.pending = [];
-if (!Array.isArray(state.rubric) || !state.rubric.length) state.rubric = defaultRubric();
+ensureRubric();
 // migrate old states
 state.classes.forEach(c => {
   if (!c.students) c.students = [];
@@ -1596,6 +1598,11 @@ function defaultRubric() {
     { id: 'rub_tidy',     icon: '🧹', label: 'עזרתי בניקיון הבית', points: 10 },
   ];
 }
+// דואג שתמיד תהיה רובריקה — גם אחרי שסנכרון הענן דורס את state בנתונים ישנים בלי rubric.
+function ensureRubric() {
+  if (typeof state === 'undefined' || !state) return;
+  if (!Array.isArray(state.rubric) || !state.rubric.length) state.rubric = defaultRubric();
+}
 
 // ---- השהיית שמירה זמנית: פעולות מרובות (ניקוד לטור/לכיתה) שומרות פעם אחת בסוף ----
 let _saveSuspended = 0, _savePending = false;
@@ -1639,7 +1646,15 @@ function listLocalBackups() {
   out.sort((a, b) => b.ts - a.ts);
   return out;
 }
-function getActiveClass() { return state.classes.find(c => c.id === state.activeClassId); }
+function getActiveClass() {
+  // מצב בית: הכיתה ה"פעילה" היא הכיתה של התלמיד שנכנס — כך האי, המשחק והחלקה
+  // מציגים תמיד את הכיתה שלו, בלי לשנות את הכיתה הפעילה של המורה (לא נשמר לענן).
+  if (APP_MODE === 'student' && studentSelectedId) {
+    const f = findStudent(studentSelectedId);
+    if (f) return f.cls;
+  }
+  return state.classes.find(c => c.id === state.activeClassId);
+}
 function getRank(p) {
   let r = RANKS[0], next = RANKS[1];
   for (let i = 0; i < RANKS.length; i++) {
@@ -4688,10 +4703,22 @@ function renderStudentApp() {
 
 function renderStudentPicker() {
   const el = document.getElementById('classroom');
-  const allStudents = state.classes.flatMap(c => c.students.map(s => ({...s, _classId: c.id, _className: c.name})));
   el.style.display = 'block';
+  // קישור ייעודי לכיתה: מציגים אך ורק את הכיתה שבפרמטר ?c=
+  let classes = state.classes;
+  if (STUDENT_CLASS_ID) {
+    const only = state.classes.find(c => c.id === STUDENT_CLASS_ID);
+    if (!only) {
+      el.innerHTML = `<div style="text-align:center;padding:60px 20px;font-size:1.3em;font-weight:900">🔒 הקישור לא תקין או שהכיתה לא נמצאה.<br><span style="color:var(--text-dim);font-size:0.85em">בקשו מהמורה קישור מעודכן.</span></div>`;
+      return;
+    }
+    classes = [only];
+  }
+  const allStudents = classes.flatMap(c => c.students.map(s => ({...s, _classId: c.id, _className: c.name})));
+  const classTitle = STUDENT_CLASS_ID ? `<div style="text-align:center;font-size:1em;color:var(--neon-cyan);font-weight:900;margin-bottom:2px">${escapeHtml(classes[0].name)}</div>` : '';
   el.innerHTML = `
-    <div style="text-align:center;padding:20px;font-size:1.4em;font-weight:900;background:linear-gradient(90deg,#00f5ff,#ff2e93);-webkit-background-clip:text;background-clip:text;color:transparent">
+    ${classTitle}
+    <div style="text-align:center;padding:${STUDENT_CLASS_ID ? '4px' : '20px'} 20px 8px;font-size:1.4em;font-weight:900;background:linear-gradient(90deg,#00f5ff,#ff2e93);-webkit-background-clip:text;background-clip:text;color:transparent">
       👋 שלום! מי אתה?
     </div>
     <div style="text-align:center;color:var(--text-dim);margin-bottom:20px">לחץ על השם שלך</div>
@@ -5355,6 +5382,7 @@ async function init() {
       cloudReady = true;
       state = cloud.data;
       if (!state.pending) state.pending = [];
+      ensureRubric();
       state.classes.forEach(c => c.students.forEach(s => {
         if (!s.equipped.aura) s.equipped.aura = 'aura-none';
         if (!s.owned.includes('aura-none')) s.owned.push('aura-none');
