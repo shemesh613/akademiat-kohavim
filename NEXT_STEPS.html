@@ -17,6 +17,13 @@ code { background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; color
 b { color: #ffe600; }
 ul { padding-right: 24px; } li { margin: 8px 0; }
 </style>
+<style id="a11y-base-v1">
+:focus-visible{outline:3px solid #ffb300!important;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+.a11y-stmt{display:block;width:max-content;margin:18px auto 12px;position:relative;z-index:1;font:600 12px/1.2 Arial,sans-serif;color:#fff;background:rgba(0,0,0,.55);padding:5px 10px;border-radius:14px;text-decoration:none;opacity:.8}
+.a11y-stmt:hover,.a11y-stmt:focus{opacity:1}
+@media print{.a11y-stmt{display:none!important}}
+</style>
 </head>
 <body>
 
@@ -75,5 +82,30 @@ const firebaseConfig = {<br>
 💡 <b>אם אתה תקוע:</b> צלם מסך של איפה שאתה ושלח לי, אני אדריך מהמיקום המדויק.
 </div>
 
+<a class="a11y-stmt" href="accessibility.html">♿ הצהרת נגישות</a>
+<script id="a11y-base-v1-js">
+/* accessibility layer: keyboard + screen-reader names for clickable non-button elements */
+(function(){
+  function fix(el){
+    if(el.dataset.a11y||/^(BUTTON|A|INPUT|SELECT|TEXTAREA|LABEL|BODY|HTML)$/.test(el.tagName))return;
+    el.dataset.a11y='1';
+    if(!el.getAttribute('role'))el.setAttribute('role','button');
+    if(!el.hasAttribute('tabindex'))el.tabIndex=0;
+    if(!(el.textContent||'').trim()&&!el.getAttribute('aria-label'))el.setAttribute('aria-label',el.getAttribute('title')||'כפתור');
+    el.addEventListener('keydown',function(e){if(e.target===el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();el.click()}});
+  }
+  function scan(){
+    try{
+      document.querySelectorAll('[onclick]').forEach(fix);
+      document.querySelectorAll('input[placeholder]:not([aria-label]),textarea[placeholder]:not([aria-label])').forEach(function(i){i.setAttribute('aria-label',i.placeholder)});
+      document.querySelectorAll('img:not([alt])').forEach(function(i){i.setAttribute('alt','')});
+      document.querySelectorAll('button:not([aria-label])').forEach(function(b){if(!(b.textContent||'').trim())b.setAttribute('aria-label',b.getAttribute('title')||'כפתור')});
+    }catch(e){}
+  }
+  var t=0;function later(){if(t)return;t=setTimeout(function(){t=0;scan()},400)}
+  function start(){scan();try{new MutationObserver(later).observe(document.body,{childList:true,subtree:true})}catch(e){}}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
 </body>
 </html>
