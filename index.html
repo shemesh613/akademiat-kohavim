@@ -1143,7 +1143,6 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
   <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassIsland()">🏝️ האי של הכיתה</button>
   <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassGame()">🎮 משחק הצהריים</button>
   <button class="btn btn-warning" onclick="openLeaderboard()">🏆 לוח שיא</button>
-  <button class="btn" onclick="openRubricEditor()">📋 רובריקת בית</button>
   <button class="btn" onclick="resetWeek()">🔄 איפוס שבועי</button>
   <button class="btn btn-danger" onclick="exportData()">💾 גיבוי לקובץ</button>
   <button class="btn" onclick="importData()">📂 שחזור מקובץ</button>
@@ -4839,7 +4838,6 @@ function renderStudentProfile() {
       ${renderRankLadder(s)}
 
       <div class="modal-tabs" style="border:none;padding:0;margin-top:14px">
-        <button class="modal-tab active" id="stTabHome" onclick="setStudentTab('home')">🏠 מהבית</button>
         <button class="modal-tab" id="stTabShop" onclick="setStudentTab('shop')">🛍️ חנות</button>
         <button class="modal-tab" id="stTabBox" onclick="setStudentTab('box')">🎁 הפתעה</button>
         <button class="modal-tab" id="stTabStickers" onclick="setStudentTab('stickers')">🧩 מדבקות</button>
@@ -4861,11 +4859,12 @@ function renderStudentProfile() {
   }
   animate();
 
-  setStudentTab('home');
+  setStudentTab('shop');
 }
 
 let studentTab = 'shop';
 function setStudentTab(t) {
+  if (t === 'home') t = 'shop'; /* משימות מהבית בוטלו */
   studentTab = t;
   const found = findStudent(studentSelectedId);
   if (!found) return;
@@ -5015,6 +5014,7 @@ function studentEquip(slot, itemId) {
   addPending({ type: 'equip', studentId: found.student.id, classId: found.cls.id, slot, itemId, price: 0 });
 }
 function studentRequestPoints(itemId) {
+  return; /* משימות מהבית בוטלו לבקשת המורה */
   const found = findStudent(studentSelectedId);
   if (!found) return;
   const item = (state.rubric || []).find(r => r.id === itemId);
