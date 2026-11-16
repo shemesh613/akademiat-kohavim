@@ -276,6 +276,8 @@
    * ========================================================================= */
   function canBuild(regionKey, studentId) {
     if (isTeacher()) return true;
+    /* בקשת המורה: בכניסת תלמידים אין בנייה ואין קנייה באי בכלל — גם לא בחלקה האישית. */
+    return false;
     if (!regionKey) return false;
     if (String(regionKey).indexOf('plot_') === 0) {
       var owner = String(regionKey).slice(5);
@@ -637,6 +639,7 @@
   }
 
   function syncPanel(container) {
+    if (!isTeacher()) { if (panelEl) panelEl.className = 'ak-own-panel'; return; } /* בכניסת תלמידים — אין פאנל קנייה/בנייה */
     if (!panelEl || panelEl.parentNode !== container) {
       if (panelEl && panelEl.parentNode) panelEl.parentNode.removeChild(panelEl);
       panelEl = document.createElement('div');

@@ -73,6 +73,9 @@ var FALLBACK_ITEMS = [
 var _warned = {};
 function warnOnce(key, msg) { if (_warned[key]) return; _warned[key] = true; console.warn('[Island] ' + msg); }
 function AKref() { return window.AK || null; }
+/* מצב תלמיד (כניסה מהבית): האי לצפייה בלבד — אין בנייה, אין קנייה, אין הסרה.
+   כל שינוי באי נעשה רק מהמסך של המורה. אכיפה בליבת המנוע ולא רק ב-CSS. */
+function islStudentView() { var ak = AKref(); return !(ak && ak.isTeacher === true); }
 function akSave() { var ak = AKref(); if (ak && typeof ak.save === 'function') { try { ak.save(); } catch (e) {} } }
 function akToast(msg) { var ak = AKref(); if (ak && typeof ak.toast === 'function') { try { ak.toast(msg); } catch (e) {} } }
 function akSound(t) { var ak = AKref(); if (ak && typeof ak.playSound === 'function') { try { ak.playSound(t); } catch (e) {} } }
@@ -1335,6 +1338,7 @@ function tileOccupied(isl, regionKey, x, z) {
   return isl.items.some(function (it) { return it.r === regionKey && it.x === x && it.z === z; });
 }
 function placeAt(regionKey, itemId, x, z, studentId) {
+  if (islStudentView()) { akToast('🔒 בנייה באי — רק המורה'); return false; }
   var klass = activeClass();
   if (!klass) { warnOnce('noclass', 'אין כיתה פעילה (AK.getActiveClass) — לא ניתן לבנות.'); return false; }
   var isl = ensureIslandState(klass);
@@ -1359,6 +1363,7 @@ function placeAt(regionKey, itemId, x, z, studentId) {
   return true;
 }
 function removeAt(regionKey, x, z) {
+  if (islStudentView()) return false;
   var klass = activeClass();
   if (!klass) return false;
   var isl = ensureIslandState(klass);
@@ -1675,6 +1680,7 @@ function renderShopPalette() {
   var targetRegion = ISL.plotTarget ? ('plot_' + ISL.plotTarget) : ISL.activeId;
   var el = ISL.hud.shop;
   el.innerHTML = '';
+  if (islStudentView()) { ISL.buildSel = null; ISL.delMode = false; el.style.display = 'none'; return; }
   /* מסתכלים על אי שעוד נעול — פלטת הבנייה לא רלוונטית, רק "עוד כמה" */
   if (!ISL.plotTarget && isl.regions && isl.regions.indexOf(ISL.activeId) < 0) {
     var defL = regionDef(ISL.activeId);
