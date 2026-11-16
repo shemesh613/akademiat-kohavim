@@ -1144,7 +1144,6 @@ input[type=text]:focus { border-color: var(--neon-cyan); }
   <button class="btn btn-primary" style="font-size:1.15em" onclick="openClassGame()">🎮 משחק הצהריים</button>
   <button class="btn btn-warning" onclick="openLeaderboard()">🏆 לוח שיא</button>
   <button class="btn" onclick="openRubricEditor()">📋 רובריקת בית</button>
-  <button class="btn" onclick="openStudentCodes()">🔑 קודים לתלמידים</button>
   <button class="btn" onclick="resetWeek()">🔄 איפוס שבועי</button>
   <button class="btn btn-danger" onclick="exportData()">💾 גיבוי לקובץ</button>
   <button class="btn" onclick="importData()">📂 שחזור מקובץ</button>
@@ -4747,76 +4746,7 @@ function renderStudentPicker() {
   });
 }
 
-/* ---- קוד אישי לכל תלמיד ----
- * בלי קוד, כל ילד יכול ללחוץ על שם של חבר ולבקש בשמו נקודות / לקנות בנקודות שלו.
- * הקוד (4 ספרות) נגזר מהמזהה של התלמיד — קבוע, לא דורש שמירה, והמורה רואה
- * את כל הקודים בכפתור "🔑 קודים לתלמידים". המכשיר זוכר קוד שהוקלד נכון. */
-function studentPin(s) {
-  if (!s) return '';
-  if (s.pin && /^\d{4}$/.test(String(s.pin))) return String(s.pin);
-  let h = 5381;
-  const str = String(s.id) + '|akpin';
-  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
-  return String(1000 + (h % 9000));
-}
-function pinRemembered(s) {
-  try { return localStorage.getItem('ak_pin_' + s.id) === studentPin(s); } catch (e) { return false; }
-}
-function rememberPin(s) {
-  try { localStorage.setItem('ak_pin_' + s.id, studentPin(s)); } catch (e) {}
-}
 function enterStudentMode(sid) {
-  const f = findStudent(sid);
-  if (!f) return;
-  if (APP_MODE === 'student' && !pinRemembered(f.student)) {
-    akPrompt('🔑 ' + f.student.name + ' — מה הקוד האישי שלך?', '', (v) => {
-      if (String(v).replace(/\D/g, '') !== studentPin(f.student)) {
-        playSound('minus');
-        try { if (window.AK && AK.toast) AK.toast('❌ הקוד לא נכון. את הקוד מקבלים מהמורה.'); else alert('הקוד לא נכון'); } catch (e) {}
-        return;
-      }
-      rememberPin(f.student);
-      openStudentProfile(sid);
-    }, 'קוד של 4 ספרות שקיבלת מהמורה. נכנסים רק לשם שלך.');
-    return;
-  }
-  openStudentProfile(sid);
-}
-
-/* מורה: רשימת הקודים האישיים + קישור הכניסה מהבית של הכיתה */
-function openStudentCodes() {
-  if (APP_MODE === 'student') return;
-  const cls = getActiveClass();
-  if (!cls) return;
-  const link = location.origin + location.pathname + '?c=' + encodeURIComponent(cls.id);
-  const m = document.getElementById('modalContent');
-  m.innerHTML = `
-    <div class="modal-hero" style="padding-bottom:10px">
-      <div style="font-size:60px">🔑</div>
-      <div style="flex:1">
-        <div class="modal-title">קודים אישיים — ${escapeHtml(cls.name)}</div>
-        <div class="modal-sub">כל תלמיד נכנס מהבית רק לשם שלו, עם הקוד שלו</div>
-      </div>
-      <button class="btn" onclick="closeModal()">✕</button>
-    </div>
-    <div style="padding:10px;background:var(--card);border-radius:12px;margin-bottom:12px;direction:ltr;text-align:left;word-break:break-all">
-      <div style="direction:rtl;text-align:right;font-weight:900;margin-bottom:4px">🏠 קישור הכניסה מהבית לכיתה:</div>
-      <span id="akHomeLink">${escapeHtml(link)}</span>
-      <button class="btn" style="margin-inline-start:8px" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('akHomeLink').textContent).then(()=>{try{AK.toast('הקישור הועתק ✓')}catch(e){}})">📋 העתק</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">
-      ${cls.students.map(s => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--card);border-radius:10px">
-          <span style="font-weight:900">${escapeHtml(s.name)}</span>
-          <span style="font-family:monospace;font-size:1.3em;color:var(--neon-yellow);letter-spacing:2px">${studentPin(s)}</span>
-        </div>`).join('')}
-    </div>
-    <div style="text-align:center;margin-top:14px"><button class="btn btn-primary" onclick="window.print()">🖨️ הדפסה</button></div>
-  `;
-  document.getElementById('studentModal').classList.add('show');
-}
-
-function openStudentProfile(sid) {
   studentSelectedId = sid;
   currentShopStudentSid = sid;
   claimDailyBonus(sid);
